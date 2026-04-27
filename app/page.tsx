@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import RevealOnScroll from "./components/RevealOnScroll";
+import Footer from "./components/Footer";
 
 export const metadata: Metadata = {
   title: "AIcuenta | Claridad fiscal desde tus XML",
@@ -462,6 +463,7 @@ export default function Home() {
         </section>
         </RevealOnScroll>
       </main>
+      <Footer />
     </div>
   );
 }

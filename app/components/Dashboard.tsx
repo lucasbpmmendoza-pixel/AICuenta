@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import DropZone from './DropZone'
-import { uploadFiles } from '../actions/upload'
+import { uploadFiles } from '../api/actions/upload'
 
 export default function Dashboard() {
   const [rfc, setRfc] = useState('')
