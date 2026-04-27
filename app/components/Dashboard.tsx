@@ -85,9 +85,9 @@ export default function Dashboard() {
 
             {/* Structure preview */}
             <div className="rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-4 py-3 mt-auto">
-              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">Estructura generada</p>
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">Estructura en Vercel Blob</p>
               <pre className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-mono whitespace-pre">
-{`uploads/
+{`blob/
   ${rfc || '<RFC>'}/
     |- archivo.CER
     |- archivo.KEY

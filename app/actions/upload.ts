@@ -1,10 +1,8 @@
 'use server'
 
-import fs from 'fs'
+import { put } from '@vercel/blob'
 import path from 'path'
 
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads')
-const ALLOWED_EXTENSIONS = ['.cer', '.key']
 const RFC_SAFE = /^[A-Za-z0-9_\-]{1,50}$/
 
 export async function uploadFiles(formData: FormData): Promise<{ success: boolean; message: string }> {
@@ -40,24 +38,13 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
     return { success: false, message: 'El archivo KEY debe tener extension .key' }
   }
 
-  // Construct target path and verify it stays within UPLOADS_DIR (anti path traversal)
-  const rfcDir = path.resolve(UPLOADS_DIR, rfc)
-  if (!rfcDir.startsWith(path.resolve(UPLOADS_DIR) + path.sep)) {
-    return { success: false, message: 'RFC no valido.' }
-  }
+  // Sanitize filenames (keep only safe characters)
+  const safeCerName = cerFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
+  const safeKeyName = keyFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
 
-  fs.mkdirSync(rfcDir, { recursive: true })
+  await put(`${rfc}/${safeCerName}`, cerFile, { access: 'public' })
+  await put(`${rfc}/${safeKeyName}`, keyFile, { access: 'public' })
+  await put(`${rfc}/efiel.txt`, efiel, { access: 'public', contentType: 'text/plain' })
 
-  const cerBuffer = Buffer.from(await cerFile.arrayBuffer())
-  const keyBuffer = Buffer.from(await keyFile.arrayBuffer())
-
-  // Sanitize original filenames (keep only safe characters)
-  const safeCerName = path.basename(cerFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_'))
-  const safeKeyName = path.basename(keyFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_'))
-
-  fs.writeFileSync(path.join(rfcDir, safeCerName), cerBuffer)
-  fs.writeFileSync(path.join(rfcDir, safeKeyName), keyBuffer)
-  fs.writeFileSync(path.join(rfcDir, 'efiel.txt'), efiel, 'utf8')
-
-  return { success: true, message: `Archivos guardados en uploads/${rfc}/` }
+  return { success: true, message: `Archivos guardados en Blob bajo ${rfc}/` }
 }
