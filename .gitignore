@@ -38,4 +38,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# uploads (datos de clientes, no subir al repo)
+/uploads
 next-env.d.ts
