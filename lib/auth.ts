@@ -34,6 +34,54 @@ export async function verifyToken(token: string): Promise<JWTPayload> {
   return payload as unknown as JWTPayload;
 }
 
+// ── Tokens de verificación de correo (24h, purpose distinto) ──────────────
+
+interface VerificationPayload {
+  sub: string;   // user id
+  email: string;
+  purpose: "email_verification";
+}
+
+export async function signVerificationToken(userId: string, email: string): Promise<string> {
+  return new SignJWT({ sub: userId, email, purpose: "email_verification" })
+    .setProtectedHeader({ alg: ALGORITHM })
+    .setIssuedAt()
+    .setExpirationTime("24h")
+    .sign(getSecret());
+}
+
+export async function verifyVerificationToken(token: string): Promise<VerificationPayload> {
+  const { payload } = await jwtVerify(token, getSecret(), { algorithms: [ALGORITHM] });
+  if (payload["purpose"] !== "email_verification") {
+    throw new Error("Invalid token purpose");
+  }
+  return payload as unknown as VerificationPayload;
+}
+
+// ── Tokens de restablecimiento de contraseña (1h) ────────────────────────
+
+interface ResetPayload {
+  sub: string;   // user id
+  email: string;
+  purpose: "password_reset";
+}
+
+export async function signResetToken(userId: string, email: string): Promise<string> {
+  return new SignJWT({ sub: userId, email, purpose: "password_reset" })
+    .setProtectedHeader({ alg: ALGORITHM })
+    .setIssuedAt()
+    .setExpirationTime("1h")
+    .sign(getSecret());
+}
+
+export async function verifyResetToken(token: string): Promise<ResetPayload> {
+  const { payload } = await jwtVerify(token, getSecret(), { algorithms: [ALGORITHM] });
+  if (payload["purpose"] !== "password_reset") {
+    throw new Error("Invalid token purpose");
+  }
+  return payload as unknown as ResetPayload;
+}
+
 export async function setAuthCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, token, {

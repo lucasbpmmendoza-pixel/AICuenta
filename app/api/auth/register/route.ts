@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { registerSchema } from "@/lib/validations";
 import { getDb } from "@/lib/db";
-import { signToken, setAuthCookie } from "@/lib/auth";
+import { signVerificationToken } from "@/lib/auth";
+import { sendVerificationEmail } from "@/lib/email";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -91,12 +92,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 7. Firmar JWT y setear cookie HTTP-only ────────────
-  const token = await signToken({ sub: userId, email, name });
-  await setAuthCookie(token);
+  // ── 7. Generar token de verificación y enviar correo ──────
+  const verificationToken = await signVerificationToken(userId, email);
+  sendVerificationEmail(email, name, verificationToken).catch((err) =>
+    console.error("[register] Verification email error:", (err as Error).message),
+  );
 
   return NextResponse.json(
-    { ok: true, redirectTo: "/dashboard" },
+    { ok: true, message: "check_email" },
     { status: 201 },
   );
 }

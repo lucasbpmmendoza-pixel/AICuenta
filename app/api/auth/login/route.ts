@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { signToken, setAuthCookie } from "@/lib/auth";
+import { getPostLoginRedirect } from "@/lib/redirect";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Correo invalido"),
@@ -39,13 +40,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let user: { id: string; name: string; email: string; password_hash: string; is_active: boolean } | undefined;
+  let user: { id: string; name: string; email: string; password_hash: string; is_active: boolean; email_verified: boolean } | undefined;
   try {
     const result = await db
       .request()
       .input("email", email)
-      .query<{ id: string; name: string; email: string; password_hash: string; is_active: boolean }>(
-        `SELECT id, name, email, password_hash, is_active
+      .query<{ id: string; name: string; email: string; password_hash: string; is_active: boolean; email_verified: boolean }>(
+        `SELECT id, name, email, password_hash, is_active, email_verified
          FROM users
          WHERE email = @email`,
       );
@@ -78,9 +79,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 5. Firmar JWT y setear cookie ──────────────────────
+  // ── 5. Verificar que el correo esté confirmado ─────────
+  if (!user.email_verified) {
+    return NextResponse.json(
+      { error: "Debes verificar tu correo antes de iniciar sesion.", code: "email_not_verified" },
+      { status: 403 },
+    );
+  }
+
+  // ── 6. Firmar JWT y setear cookie ──────────────────────
   const token = await signToken({ sub: user.id, email: user.email, name: user.name });
   await setAuthCookie(token);
 
-  return NextResponse.json({ ok: true, redirectTo: "/dashboard" });
+  const redirectTo = await getPostLoginRedirect(user.id);
+  return NextResponse.json({ ok: true, redirectTo });
 }
