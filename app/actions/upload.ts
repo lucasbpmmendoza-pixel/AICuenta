@@ -42,9 +42,9 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
   const safeCerName = cerFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
   const safeKeyName = keyFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
 
-  await put(`${rfc}/${safeCerName}`, cerFile, { access: 'public' })
-  await put(`${rfc}/${safeKeyName}`, keyFile, { access: 'public' })
-  await put(`${rfc}/efiel.txt`, efiel, { access: 'public', contentType: 'text/plain' })
+  await put(`${rfc}/${safeCerName}`, cerFile, { access: 'private' })
+  await put(`${rfc}/${safeKeyName}`, keyFile, { access: 'private' })
+  await put(`${rfc}/efiel.txt`, efiel, { access: 'private', contentType: 'text/plain' })
 
   return { success: true, message: `Archivos guardados en Blob bajo ${rfc}/` }
 }
