@@ -2,8 +2,10 @@
 
 import Image from "next/image";
 import { useState } from "react";
+import { useRecaptcha } from "@/app/hooks/useRecaptcha";
 
 export default function RegisterView() {
+  const { getToken } = useRecaptcha();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -20,10 +22,11 @@ export default function RegisterView() {
     setLoading(true);
 
     try {
+      const recaptchaToken = await getToken("register");
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, recaptchaToken }),
       });
 
       const data = await res.json();

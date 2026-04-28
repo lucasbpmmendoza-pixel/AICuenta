@@ -4,6 +4,7 @@ import { registerSchema } from "@/lib/validations";
 import { getDb } from "@/lib/db";
 import { signVerificationToken } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
+import { verifyRecaptcha } from "@/lib/recaptcha";
 
 const BCRYPT_ROUNDS = 12;
 
@@ -19,7 +20,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // ── 2. Validar con Zod ─────────────────────────────────
+  // ── 2. Verificar reCAPTCHA ────────────────────────
+  const recaptchaToken = (body as Record<string, unknown>)?.recaptchaToken;
+  if (typeof recaptchaToken !== "string" || !recaptchaToken) {
+    return NextResponse.json({ error: "Verificacion de seguridad requerida." }, { status: 400 });
+  }
+  try {
+    await verifyRecaptcha(recaptchaToken, "register");
+  } catch (err) {
+    console.error("[register] reCAPTCHA error:", (err as Error).message);
+    return NextResponse.json({ error: "Verificacion de seguridad fallida. Intenta de nuevo." }, { status: 400 });
+  }
+
+  // ── 3. Validar con Zod ─────────────────────────────
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {
     const firstError = parsed.error.issues[0];
@@ -31,7 +44,7 @@ export async function POST(req: NextRequest) {
 
   const { name, email, password } = parsed.data;
 
-  // ── 3. Conectar a Azure SQL ────────────────────────────
+  // ── 4. Conectar a Azure SQL ────────────────────────
   let db;
   try {
     db = await getDb();

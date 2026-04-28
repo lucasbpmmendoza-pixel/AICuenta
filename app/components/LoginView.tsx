@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { useRecaptcha } from "@/app/hooks/useRecaptcha";
 
 const GOOGLE_ERRORS: Record<string, string> = {
   google_cancelled: "Inicio de sesion con Google cancelado.",
@@ -17,6 +18,7 @@ export default function LoginView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlError = searchParams.get("error");
+  const { getToken } = useRecaptcha();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,10 +32,11 @@ export default function LoginView() {
     setLoading(true);
 
     try {
+      const recaptchaToken = await getToken("login");
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, recaptchaToken }),
       });
 
       const data = await res.json();

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/db";
 import { signToken, setAuthCookie } from "@/lib/auth";
 import { getPostLoginRedirect } from "@/lib/redirect";
+import { verifyRecaptcha } from "@/lib/recaptcha";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Correo invalido"),
@@ -18,7 +19,17 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
   }
-
+  // ── 2. Verificar reCAPTCHA ────────────────────────
+  const recaptchaToken = (body as Record<string, unknown>)?.recaptchaToken;
+  if (typeof recaptchaToken !== "string" || !recaptchaToken) {
+    return NextResponse.json({ error: "Verificacion de seguridad requerida." }, { status: 400 });
+  }
+  try {
+    await verifyRecaptcha(recaptchaToken, "login");
+  } catch (err) {
+    console.error("[login] reCAPTCHA error:", (err as Error).message);
+    return NextResponse.json({ error: "Verificacion de seguridad fallida. Intenta de nuevo." }, { status: 400 });
+  }
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
