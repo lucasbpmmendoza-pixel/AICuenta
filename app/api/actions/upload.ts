@@ -2,10 +2,17 @@
 
 import { put } from '@vercel/blob'
 import path from 'path'
+import { getSession } from '@/lib/session'
+import { getDb } from '@/lib/db'
 
 const RFC_SAFE = /^[A-Za-z0-9_\-]{1,50}$/
 
 export async function uploadFiles(formData: FormData): Promise<{ success: boolean; message: string }> {
+  const session = await getSession()
+  if (!session) {
+    return { success: false, message: 'Sesion expirada. Vuelve a iniciar sesion.' }
+  }
+
   const rfc = (formData.get('rfc') as string | null)?.trim() ?? ''
   const efiel = (formData.get('efiel') as string | null)?.trim() ?? ''
   const cerFile = formData.get('cer') as File | null
@@ -42,9 +49,32 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
   const safeCerName = cerFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
   const safeKeyName = keyFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
 
-  await put(`${rfc}/${safeCerName}`, cerFile, { access: 'private' })
-  await put(`${rfc}/${safeKeyName}`, keyFile, { access: 'private' })
-  await put(`${rfc}/efiel.txt`, efiel, { access: 'private', contentType: 'text/plain' })
+  await put(`${rfc}/${safeCerName}`, cerFile, { access: 'private', allowOverwrite: true })
+  await put(`${rfc}/${safeKeyName}`, keyFile, { access: 'private', allowOverwrite: true })
+  await put(`${rfc}/efiel.txt`, efiel, { access: 'private', contentType: 'text/plain', allowOverwrite: true })
+
+  // Registrar / actualizar en tabla EFIELES (UPSERT por user_id + rfc)
+  try {
+    const db = await getDb()
+    await db
+      .request()
+      .input('user_id', session.sub)
+      .input('rfc', rfc)
+      .input('fiel', efiel)
+      .query(`
+        MERGE EFIELES AS target
+        USING (SELECT @user_id AS user_id, @rfc AS rfc) AS source
+          ON target.user_id = source.user_id AND target.rfc = source.rfc
+        WHEN MATCHED THEN
+          UPDATE SET fiel = @fiel, last_update = SYSUTCDATETIME()
+        WHEN NOT MATCHED THEN
+          INSERT (user_id, rfc, fiel)
+          VALUES (@user_id, @rfc, @fiel);
+      `)
+  } catch (err) {
+    console.error('[uploadFiles] Error al guardar en EFIELES:', (err as Error).message)
+    // Los archivos ya se subieron a Blob; no bloqueamos al usuario por error de BD
+  }
 
   return { success: true, message: `Archivos guardados en Blob bajo ${rfc}/` }
 }

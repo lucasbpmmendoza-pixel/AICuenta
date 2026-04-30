@@ -14,9 +14,11 @@ function getSecret(): Uint8Array {
 }
 
 export interface JWTPayload {
-  sub: string;   // user id
+  sub: string;       // user id (propio)
   email: string;
   name: string;
+  role: 'owner' | 'member';
+  ownerId?: string;  // solo para members: ID del dueño de la cuenta
 }
 
 export async function signToken(payload: JWTPayload): Promise<string> {

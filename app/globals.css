@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
 
 :root {
   --background: #ffffff;
@@ -55,6 +56,11 @@
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+}
+
+/* Ocultar badge de reCAPTCHA — uso permitido con aviso de texto en el formulario */
+.grecaptcha-badge {
+  visibility: hidden !important;
 }
 
 body {

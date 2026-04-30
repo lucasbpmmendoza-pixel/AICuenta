@@ -69,3 +69,39 @@ export async function sendVerificationEmail(to: string, name: string, token: str
     `,
   });
 }
+
+export async function sendSupportEmail(opts: {
+  fromName: string;
+  fromEmail: string;
+  subject: string;
+  message: string;
+}) {
+  return resend.emails.send({
+    from: FROM,
+    to: process.env.SUPPORT_EMAIL ?? "soporte@aicuenta.mx",
+    replyTo: opts.fromEmail,
+    subject: `[Soporte] ${opts.subject}`,
+    html: `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
+        <h2 style="font-size:20px;font-weight:900;color:#0f172a;margin-bottom:4px">
+          Nuevo ticket de soporte
+        </h2>
+        <p style="font-size:13px;color:#64748b;margin-bottom:24px">AIcuenta · Soporte interno</p>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:20px">
+          <tr>
+            <td style="padding:8px 0;color:#64748b;width:90px;vertical-align:top">De</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600">${opts.fromName} &lt;${opts.fromEmail}&gt;</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;vertical-align:top">Asunto</td>
+            <td style="padding:8px 0;color:#0f172a;font-weight:600">${opts.subject}</td>
+          </tr>
+        </table>
+        <div style="background:#f8fafc;border-radius:12px;padding:20px;line-height:1.7;color:#334155;font-size:14px;white-space:pre-wrap">${opts.message}</div>
+        <p style="margin-top:20px;font-size:12px;color:#94a3b8">
+          Puedes responder directamente a este correo para contactar al usuario.
+        </p>
+      </div>
+    `,
+  });
+}

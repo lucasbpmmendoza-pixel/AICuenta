@@ -9,12 +9,14 @@ const config: sql.config = {
   options: {
     encrypt: true,             // requerido por Azure SQL
     trustServerCertificate: false,
+    enableArithAbort: true,    // mejora planes de ejecución en SQL Server
   },
   pool: {
     max: 10,
     min: 0,
     idleTimeoutMillis: 30_000,
   },
+  requestTimeout: 60_000,
 };
 
 // Pool singleton — se reutiliza entre requests en el mismo proceso

@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 5. Crear o recuperar usuario en BD ─────────────────
-  let user: { id: string; name: string; email: string };
+  let user: { id: string; name: string; email: string; role: string; owner_id: string | null };
   try {
     const db = await getDb();
 
@@ -103,8 +103,8 @@ export async function GET(req: NextRequest) {
       .request()
       .input("googleId", sql.NVarChar(255), googleUser.id)
       .input("email", sql.NVarChar(254), googleUser.email)
-      .query<{ id: string; name: string; email: string }>(
-        `SELECT id, name, email FROM users
+      .query<{ id: string; name: string; email: string; role: string; owner_id: string | null }>(
+        `SELECT id, name, email, role, owner_id FROM users
          WHERE google_id = @googleId OR email = @email`,
       );
 
@@ -141,8 +141,8 @@ export async function GET(req: NextRequest) {
       const created = await db
         .request()
         .input("email", sql.NVarChar(254), googleUser.email)
-        .query<{ id: string; name: string; email: string }>(
-          `SELECT id, name, email FROM users WHERE email = @email`,
+        .query<{ id: string; name: string; email: string; role: string; owner_id: string | null }>(
+          `SELECT id, name, email, role, owner_id FROM users WHERE email = @email`,
         );
       user = created.recordset[0];
       console.log("[google/callback] new user created, id:", user.id);
@@ -154,9 +154,16 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 6. Firmar JWT y setear cookie ──────────────────────
-  const token = await signToken({ sub: user.id, email: user.email, name: user.name });
+  const role = (user.role ?? 'owner') as 'owner' | 'member';
+  const token = await signToken({
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role,
+    ...(user.owner_id ? { ownerId: user.owner_id } : {}),
+  });
   await setAuthCookie(token);
 
-  const redirectTo = await getPostLoginRedirect(user.id);
+  const redirectTo = role === 'member' ? '/dashboard' : await getPostLoginRedirect(user.id);
   return NextResponse.redirect(new URL(redirectTo, req.url));
 }

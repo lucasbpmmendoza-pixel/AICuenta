@@ -1,13 +1,14 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
-import DashboardView from "../components/DashboardView";
+import Sidebar from "@/app/components/Sidebar";
+import SoporteView from "@/app/components/SoporteView";
+import DashboardFooter from "@/app/components/DashboardFooter";
 
-export default async function DashboardPage() {
+export default async function SoportePage() {
   const session = await getSession();
   if (!session) redirect("/login");
 
-  // Para miembros, usar el ID del dueño para obtener account_type
   const effectiveId = session.ownerId ?? session.sub;
 
   let accountType: string | null = null;
@@ -19,10 +20,17 @@ export default async function DashboardPage() {
       .query<{ account_type: string | null }>("SELECT account_type FROM users WHERE id = @id");
     accountType = result.recordset[0]?.account_type ?? null;
   } catch (err) {
-    console.error("[dashboard] Error al leer account_type:", (err as Error).message);
+    console.error("[soporte] Error al leer account_type:", (err as Error).message);
   }
   if (!accountType) redirect("/upload-fiel");
 
-  return <DashboardView session={session} accountType={accountType as "single" | "multi"} />;
+  return (
+    <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
+      <Sidebar userName={session.name} accountType={accountType as "single" | "multi"} />
+      <div className="flex-1 flex flex-col">
+        <SoporteView />
+        <DashboardFooter />
+      </div>
+    </div>
+  );
 }
-

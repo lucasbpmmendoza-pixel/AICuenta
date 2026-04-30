@@ -51,13 +51,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let user: { id: string; name: string; email: string; password_hash: string; is_active: boolean; email_verified: boolean } | undefined;
+  let user: { id: string; name: string; email: string; password_hash: string; is_active: boolean; email_verified: boolean; role: string; owner_id: string | null } | undefined;
   try {
     const result = await db
       .request()
       .input("email", email)
-      .query<{ id: string; name: string; email: string; password_hash: string; is_active: boolean; email_verified: boolean }>(
-        `SELECT id, name, email, password_hash, is_active, email_verified
+      .query<{ id: string; name: string; email: string; password_hash: string; is_active: boolean; email_verified: boolean; role: string; owner_id: string | null }>(
+        `SELECT id, name, email, password_hash, is_active, email_verified, role, owner_id
          FROM users
          WHERE email = @email`,
       );
@@ -99,9 +99,19 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 6. Firmar JWT y setear cookie ──────────────────────
-  const token = await signToken({ sub: user.id, email: user.email, name: user.name });
+  const role = (user.role ?? 'owner') as 'owner' | 'member';
+  const token = await signToken({
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role,
+    ...(user.owner_id ? { ownerId: user.owner_id } : {}),
+  });
   await setAuthCookie(token);
 
-  const redirectTo = await getPostLoginRedirect(user.id);
+  // Members siempre van al dashboard (no necesitan configurar EFIEL)
+  const redirectTo = role === 'member'
+    ? '/dashboard'
+    : await getPostLoginRedirect(user.id);
   return NextResponse.json({ ok: true, redirectTo });
 }
