@@ -83,7 +83,7 @@ export async function PATCH(req: NextRequest) {
   );
 
   // Re-emitir cookie con datos actualizados
-  const newToken = await signToken({ sub: session.sub, email, name });
+  const newToken = await signToken({ sub: session.sub, email, name, role: session.role, ownerId: session.ownerId });
   await setAuthCookie(newToken);
 
   return NextResponse.json({ ok: true });

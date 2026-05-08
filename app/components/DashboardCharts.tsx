@@ -11,7 +11,10 @@ export interface DashboardData {
   ingresos: {
     total: number; count: number;
     vigentes: number; cancelados: number;
-    ivaTotal: number; isrRetenido: number; ivaRetenido: number;
+    ivaTotal: number; ivaRetenido: number;
+    isrEstimado: number;
+    regimenFiscal: string;
+    regimenLabel: string;
   }
   egresos: { total: number; count: number }
   topClientes:          Array<{ nombre: string; monto: number }>
@@ -160,7 +163,7 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
 
   const periodo = `${mes} ${anio}`
 
-  const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, isrRetenido: 0, ivaRetenido: 0 }
+  const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
   const egresos   = data?.egresos   ?? { total: 0, count: 0 }
   const utilidad  = ingresos.total - egresos.total
   const cfdiData  = [
@@ -180,9 +183,9 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
       </div>
 
       {/* ── Fila 2: KPIs fiscales + estado CFDIs ─────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <KpiCard label="ISR retenido"      skeleton={loading} value={MXN(ingresos.isrRetenido)} sub="Retenido por clientes"  color="amber"  icon={<IconISR />} />
-        <KpiCard label="IVA trasladado"    skeleton={loading} value={MXN(ingresos.ivaTotal)}    sub="En facturas emitidas"  color="violet" icon={<IconIVA />} />
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <KpiCard label="ISR estimado"   skeleton={loading} value={MXN(ingresos.isrEstimado ?? 0)} sub={ingresos.regimenLabel || 'Provisional mensual'} color="amber"  icon={<IconISR />} />
+        <KpiCard label="IVA trasladado" skeleton={loading} value={MXN(ingresos.ivaTotal)}          sub="IVA cargado a tus clientes"                     color="violet" icon={<IconIVA />} />
 
         {/* Mini donut CFDIs */}
         <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm px-5 py-4 flex items-center gap-4">

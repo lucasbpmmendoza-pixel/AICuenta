@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 3. Login automático: firmar JWT y setear cookie ────
-  const authToken = await signToken({ sub: user.id, email: user.email, name: user.name });
+  const authToken = await signToken({ sub: user.id, email: user.email, name: user.name, role: 'owner' });
   await setAuthCookie(authToken);
 
   const redirectTo = await getPostLoginRedirect(user.id);

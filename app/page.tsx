@@ -102,7 +102,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#fcfdfc] font-sans text-slate-900">
       <main className="mx-auto w-full max-w-[1560px] px-5 pb-20 pt-6 sm:px-8 lg:px-12 2xl:px-16">
-        <section className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(135deg,#ffffff_0%,#fbfcff_58%,#f7fafc_100%)] shadow-[0_30px_90px_rgba(148,163,184,0.16)]">
+        <section className="relative overflow-hidden bg-[linear-gradient(135deg,#ffffff_0%,#fbfcff_58%,#f7fafc_100%)]">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-52 bg-[radial-gradient(circle_at_top_left,_rgba(191,219,254,0.26),_transparent_52%)]" />
           <div className="pointer-events-none absolute right-0 top-12 h-80 w-80 rounded-full bg-[#dbeafe]/40 blur-3xl" />
           <div className="pointer-events-none absolute bottom-0 left-20 h-56 w-56 rounded-full bg-[#e2e8f0]/40 blur-3xl" />
@@ -112,9 +112,6 @@ export default function Home() {
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.34em] text-slate-500">
                   AIcuenta
-                </p>
-                <p className="mt-1 hidden text-sm text-slate-600 sm:block">
-                  Inteligencia fiscal util para direccion, finanzas y despachos.
                 </p>
               </div>
               <div className="hidden flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 sm:flex">
@@ -146,14 +143,11 @@ export default function Home() {
 
             <div className="grid gap-6 py-7 lg:grid-cols-12 lg:gap-8 lg:py-7 xl:gap-10 xl:py-8">
               <div className="lg:col-span-7 2xl:col-span-8">
-                <p className="animate-fade-up inline-flex rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-4 py-1.5 text-sm font-bold text-[#1e3a8a]" style={{ animationDelay: "60ms" }}>
-                  Menos persecucion de XML. Mas lectura de negocio y control fiscal.
-                </p>
-                <h1 className="animate-fade-up mt-4 max-w-[900px] text-4xl font-black leading-[1.02] tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl xl:text-[3.8rem] 2xl:text-[4.4rem]" style={{ animationDelay: "160ms" }}>
+                <h1 className="animate-fade-up mt-2 max-w-[900px] text-4xl font-black leading-[1.02] tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl xl:text-[3.8rem] 2xl:text-[4.4rem]" style={{ animationDelay: "80ms" }}>
                   Deja de administrar archivos. Empieza a leer el negocio que ya tienes.
                 </h1>
-                <p className="animate-fade-up mt-4 max-w-3xl text-base leading-7 text-slate-700 sm:text-base sm:leading-7 lg:text-[1.05rem] lg:leading-7 xl:text-[1.12rem] xl:leading-8" style={{ animationDelay: "280ms" }}>
-                  Tu informacion fiscal ya esta en el SAT. AIcuenta la trae, la ordena y te la pone en pantalla: quien te compra, quien te cobra, cuanto ISR e IVA se acumula y donde esta el riesgo — antes de que el contador te llame.
+                <p className="animate-fade-up mt-4 max-w-2xl text-base leading-7 text-slate-600" style={{ animationDelay: "200ms" }}>
+                  Tu informacion fiscal ya esta en el SAT. AIcuenta la trae, la ordena y te la pone en pantalla antes de que el contador te llame.
                 </p>
 
                 <div className="animate-fade-up mt-6 flex flex-col gap-3 sm:flex-row lg:mt-6" style={{ animationDelay: "380ms" }}>
@@ -175,7 +169,7 @@ export default function Home() {
                   {trustSignals.map((signal) => (
                     <div
                       key={signal.label}
-                      className="rounded-[1.6rem] border border-slate-900/10 bg-white/88 px-5 py-5 shadow-[0_18px_45px_rgba(148,163,184,0.12)]"
+                      className="px-5 py-5"
                     >
                       <p className="text-3xl font-black text-slate-950">{signal.value}</p>
                       <p className="mt-2 text-sm leading-6 text-slate-600">{signal.label}</p>
@@ -185,7 +179,7 @@ export default function Home() {
               </div>
 
               <div className="animate-fade-in relative hidden lg:col-span-5 lg:block 2xl:col-span-4" style={{ animationDelay: "300ms" }}>
-                <div className="rounded-[2rem] border border-[#d8e6df] bg-white/88 p-6 shadow-[0_28px_80px_rgba(148,163,184,0.22)] backdrop-blur sm:p-7">
+                  <div className="rounded-[2rem] bg-white/88 p-6 shadow-[0_28px_80px_rgba(148,163,184,0.22)] backdrop-blur sm:p-7">
                   <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">
                     <span>Vista ejecutiva</span>
                     <span>Actualizado hoy</span>
@@ -209,7 +203,7 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-[1.6rem] border border-slate-900/8 bg-[#fdfcf9] p-5">
+                  <div className="mt-5 rounded-[1.6rem] bg-[#fdfcf9] p-5">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-bold text-slate-900">Ingresos por cliente</p>
                       <p className="text-xs text-slate-500">Ultimo corte</p>
@@ -233,7 +227,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="mt-4 rounded-[1.7rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(148,163,184,0.12)]">
+                <div className="mt-4 rounded-[1.7rem] bg-white p-5">
                   <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">
                     Lo que se ordena automatico
                   </p>
@@ -251,60 +245,39 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="grid gap-4 border-t border-slate-900/10 pt-6 lg:grid-cols-3">
-              <div className="rounded-[1.6rem] border border-[#dbeafe] bg-[#f0f9ff] px-5 py-5">
-                <p className="text-sm font-bold text-slate-950">Sin instalacion. Sin configuracion. Listo en menos de 24 horas.</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Subes tus certificados, nosotros hacemos el resto. Tu primer tablero accionable aparece el mismo dia.
-                </p>
-              </div>
-              <div className="rounded-[1.6rem] border border-slate-900/10 bg-white/88 px-5 py-5">
-                <p className="text-sm font-bold text-slate-950">Listo para Excel, analisis y seguimiento.</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  La data no se queda en lo visual; aterriza en formatos que tu equipo puede operar de inmediato.
-                </p>
-              </div>
-              <div className="rounded-[1.6rem] border border-[#e2e8f0] bg-[#f8fafc] px-5 py-5">
-                <p className="text-sm font-bold text-slate-950">Pensado para quien responde por el numero final.</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Direccion, finanzas, administracion y despacho comparten la misma lectura del cierre.
-                </p>
-              </div>
+            <div className="flex flex-wrap gap-6 border-t border-slate-900/10 pt-6 text-sm font-semibold text-slate-500">
+              <span>Sin instalacion</span>
+              <span>Listo en menos de 24 h</span>
+              <span>Excel + dashboards incluidos</span>
+              <span>Datos directos del SAT</span>
             </div>
           </div>
         </section>
 
         <RevealOnScroll>
         <section className="mt-14 grid gap-6 lg:grid-cols-12">
-          <article className="rounded-[2rem] border border-[#dbeafe] bg-[#f0f9ff] p-7 shadow-[0_18px_50px_rgba(148,163,184,0.10)] lg:col-span-4 lg:p-8">
+          <article className="p-7 lg:col-span-4 lg:p-8">
             <p className="text-xs font-black uppercase tracking-[0.3em] text-[#1e3a8a]">
               El problema real
             </p>
             <h2 className="mt-4 max-w-md text-3xl font-black leading-tight text-slate-950 sm:text-4xl lg:text-[2.5rem] xl:text-[2.7rem]">
-              Tus datos fiscales existen, pero hoy no se leen como negocio.
+              Tus datos fiscales existen, pero no se leen como negocio.
             </h2>
-            <p className="mt-4 max-w-md text-base leading-7 text-slate-700">
-              La mayor perdida no es bajar XML. La mayor perdida es llegar al escritorio de direccion sin contexto claro para decidir rapido.
-            </p>
           </article>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 lg:col-span-8">
             {painPoints.map((point, index) => (
               <article
                 key={point.title}
-                className={`rounded-[2rem] border p-6 shadow-[0_18px_50px_rgba(148,163,184,0.10)] ${
+                className={`p-6 ${
                   index === 1
-                    ? "border-[#dbeafe] bg-[#f0f9ff]"
-                    : "border-[#d9d1c3] bg-white/92"
+                    ? "bg-[#f0f9ff]"
+                    : ""
                 }`}
               >
-                <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">
-                  Punto {index + 1}
-                </p>
-                <p className="mt-4 text-xl font-black leading-snug text-slate-950">
+                <p className="text-xl font-black leading-snug text-slate-950">
                   {point.title}
                 </p>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{point.copy}</p>
               </article>
             ))}
           </div>
@@ -313,22 +286,17 @@ export default function Home() {
 
         <RevealOnScroll>
         <section id="entregables" className="mt-14 grid gap-6 lg:grid-cols-12">
-          <article className="rounded-[2rem] border border-slate-900/10 bg-white p-7 shadow-[0_20px_55px_rgba(148,163,184,0.12)] lg:col-span-7 lg:p-8">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
-                  Que recibes
-                </p>
-                <h2 className="mt-3 max-w-2xl text-2xl font-black leading-tight text-slate-950 sm:text-3xl lg:text-4xl">
-                  Una capa de claridad fiscal lista para operar desde PC desde el dia uno.
-                </h2>
-              </div>
-              <p className="max-w-md text-sm leading-6 text-slate-600">
-                Sin archivos dispersos ni reportes improvisados. Lo que se descarga se acomoda para analisis comercial, operativo y fiscal.
+          <article className="p-7 lg:col-span-7 lg:p-8">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
+                Que recibes
               </p>
+              <h2 className="mt-3 max-w-2xl text-2xl font-black leading-tight text-slate-950 sm:text-3xl lg:text-4xl">
+                Claridad fiscal lista para operar desde el dia uno.
+              </h2>
             </div>
 
-            <div className="mt-8 rounded-[1.8rem] border border-[#e2e8f0] bg-[#f8fafc] p-5 lg:p-6">
+            <div className="mt-8 rounded-[1.8rem] bg-[#f8fafc] p-5 lg:p-6">
               <div className="flex items-center justify-between border-b border-slate-900/8 pb-3 text-xs uppercase tracking-[0.24em] text-slate-500">
                 <span>Excel operativo</span>
                 <span>Corte fiscal</span>
@@ -337,7 +305,7 @@ export default function Home() {
                 {excelRows.map((row) => (
                   <div
                     key={row.concept}
-                    className="flex flex-col gap-1 rounded-[1.2rem] border border-slate-900/8 bg-white px-4 py-4 text-sm md:grid md:grid-cols-[1.55fr_0.75fr_0.85fr_0.7fr] md:items-center md:gap-3"
+                    className="flex flex-col gap-1 rounded-[1.2rem] bg-white px-4 py-4 text-sm md:grid md:grid-cols-[1.55fr_0.75fr_0.85fr_0.7fr] md:items-center md:gap-3"
                   >
                     <span className="font-semibold text-slate-950">{row.concept}</span>
                     <span className="text-slate-500 md:text-slate-600">{row.type}</span>
@@ -350,7 +318,7 @@ export default function Home() {
           </article>
 
           <div className="grid gap-6 lg:col-span-5">
-            <article className="rounded-[2rem] border border-[#dbeafe] bg-[#f0f9ff] p-7 shadow-[0_18px_50px_rgba(148,163,184,0.10)] lg:p-8">
+            <article className="rounded-[2rem] bg-[#f0f9ff] p-7 lg:p-8">
               <p className="text-xs font-black uppercase tracking-[0.3em] text-[#1e3a8a]">
                 Dashboards amplios
               </p>
@@ -361,7 +329,7 @@ export default function Home() {
                 {dashboardItems.map((item) => (
                   <div
                     key={item}
-                    className="rounded-[1.4rem] border border-slate-900/8 bg-white/90 px-4 py-4 text-sm font-bold text-slate-900"
+                    className="rounded-[1.4rem] bg-white/90 px-4 py-4 text-sm font-bold text-slate-900"
                   >
                     {item}
                   </div>
@@ -369,7 +337,7 @@ export default function Home() {
               </div>
             </article>
 
-            <article className="rounded-[2rem] border border-slate-200 bg-[#ffffff] p-7 shadow-[0_18px_50px_rgba(148,163,184,0.10)] lg:p-8">
+            <article className="p-7 lg:p-8">
               <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
                 Clasificacion inmediata
               </p>
@@ -389,32 +357,26 @@ export default function Home() {
         </RevealOnScroll>
 
         <RevealOnScroll>
-        <section id="proceso" className="mt-14 rounded-[2.2rem] border border-slate-900/10 bg-white p-7 shadow-[0_20px_60px_rgba(148,163,184,0.12)] sm:p-8 lg:p-10">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
-                Como funciona
-              </p>
-              <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight text-slate-950 sm:text-4xl lg:text-[2.7rem]">
-                De la FIEL a una vista ejecutiva util en tres pasos claros.
-              </h2>
-            </div>
-            <p className="max-w-md text-sm leading-6 text-slate-600">
-              La operacion baja XML; AIcuenta los convierte en lectura para administracion, finanzas y direccion.
+        <section id="proceso" className="mt-14 p-7 sm:p-8 lg:p-10">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
+              Como funciona
             </p>
+            <h2 className="mt-3 max-w-3xl text-3xl font-black leading-tight text-slate-950 sm:text-4xl lg:text-[2.7rem]">
+              De la FIEL a una vista ejecutiva en tres pasos.
+            </h2>
           </div>
 
           <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {workflow.map((item) => (
               <article
                 key={item.step}
-                className="rounded-[1.8rem] border border-slate-900/10 bg-[#f8fafc] p-6"
+                className="rounded-[1.8rem] bg-[#f8fafc] p-6"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-[1.1rem] bg-slate-900 text-lg font-black text-white">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-sm font-black text-white">
                   {item.step}
                 </div>
-                <p className="mt-5 text-xl font-black leading-snug text-slate-950">{item.title}</p>
-                <p className="mt-3 text-sm leading-6 text-slate-600">{item.copy}</p>
+                <p className="mt-5 text-lg font-black leading-snug text-slate-950">{item.title}</p>
               </article>
             ))}
           </div>
@@ -422,22 +384,16 @@ export default function Home() {
         </RevealOnScroll>
 
         <RevealOnScroll delay={100}>
-        <section id="cta" className="mt-14 overflow-hidden rounded-[2.25rem] border border-[#e2e8f0] bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_55%,#eff6ff_100%)] shadow-[0_24px_70px_rgba(148,163,184,0.14)]">
+        <section id="cta" className="mt-14 bg-[linear-gradient(135deg,#ffffff_0%,#f8fafc_55%,#eff6ff_100%)]">
           <div className="grid gap-8 px-6 py-8 sm:px-10 sm:py-10 lg:grid-cols-12 lg:items-end lg:px-12 lg:py-12">
             <div className="lg:col-span-7">
               <h2 className="mt-4 max-w-3xl text-3xl font-black leading-tight text-slate-950 sm:text-5xl lg:text-[3.4rem]">
-                Si tus XML ya existen, tu claridad fiscal deberia verse igual de clara en pantalla grande.
+                De certificados sueltos a un tablero ejecutivo listo para decidir.
               </h2>
-              <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-700">
-                Agenda una demo y te mostramos como pasar de certificados y archivos sueltos a un tablero amplio, entendible y listo para tomar decisiones con contexto fiscal real.
-              </p>
             </div>
 
-            <div className="rounded-[1.9rem] border border-slate-900/10 bg-white p-6 shadow-[0_18px_45px_rgba(148,163,184,0.12)] lg:col-span-5 lg:p-7">
-              <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">
-                Lo que veras en la llamada
-              </p>
-              <div className="mt-5 space-y-3 text-sm leading-6 text-slate-700">
+            <div className="p-6 lg:col-span-5 lg:p-7">
+              <div className="space-y-3 text-sm leading-6 text-slate-700">
                 {executiveSignals.map((item) => (
                   <p key={item} className="rounded-[1.2rem] bg-[#f4f7fb] px-4 py-3">
                     {item}

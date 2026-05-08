@@ -57,7 +57,12 @@ export async function GET(req: NextRequest) {
             SUM(CASE WHEN Status!='Vigente' THEN 1 ELSE 0 END)                                                            AS cancelados,
             ISNULL(SUM(CASE WHEN Status='Vigente' THEN TotalTrasladadoIVA * ISNULL(NULLIF(tipoCambio,0),1) ELSE 0 END),0) AS ivaTotal,
             ISNULL(SUM(CASE WHEN Status='Vigente' THEN TotalRetenidoISR   * ISNULL(NULLIF(tipoCambio,0),1) ELSE 0 END),0) AS isrRetenido,
-            ISNULL(SUM(CASE WHEN Status='Vigente' THEN TotalRetenidoIVA   * ISNULL(NULLIF(tipoCambio,0),1) ELSE 0 END),0) AS ivaRetenido
+            ISNULL(SUM(CASE WHEN Status='Vigente' THEN TotalRetenidoIVA   * ISNULL(NULLIF(tipoCambio,0),1) ELSE 0 END),0) AS ivaRetenido,
+            -- Régimen fiscal del emisor (tomado del CFDI más reciente emitido)
+            (SELECT TOP 1 RegimenFiscal
+             FROM facturalo_cfdis WITH (NOLOCK)
+             WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
+             ORDER BY Fecha DESC) AS regimenFiscal
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
             AND Fecha>=@dateFrom AND Fecha<@dateTo;
@@ -122,27 +127,83 @@ export async function GET(req: NextRequest) {
     const cfdi = cfdiBatch.recordsets as unknown as unknown[][];
     const conc = concBatch.recordsets  as unknown as unknown[][];
 
-    type IngRow  = { total:number; count:number; vigentes:number; cancelados:number; ivaTotal:number; isrRetenido:number; ivaRetenido:number };
+    type IngRow  = { total:number; count:number; vigentes:number; cancelados:number; ivaTotal:number; isrRetenido:number; ivaRetenido:number; regimenFiscal:string|null };
     type EgrRow  = { total:number; count:number };
     type NomRow  = { nombre:string; monto:number };
     type ConcRow = { concepto:string; monto:number };
 
-    const ingRow   = ((cfdi[0] as IngRow[])[0])  ?? { total:0, count:0, vigentes:0, cancelados:0, ivaTotal:0, isrRetenido:0, ivaRetenido:0 };
+    const ingRow   = ((cfdi[0] as IngRow[])[0])  ?? { total:0, count:0, vigentes:0, cancelados:0, ivaTotal:0, isrRetenido:0, ivaRetenido:0, regimenFiscal:null };
     const egrRow   = ((cfdi[1] as EgrRow[])[0])  ?? { total:0, count:0 };
     const clientes = cfdi[2] as NomRow[];
     const provs    = cfdi[3] as NomRow[];
     const concIng  = conc[0] as ConcRow[];
     const concEgr  = conc[1] as ConcRow[];
 
+    const ingresosMXN = Number(ingRow.total)   || 0;
+    const egresosMXN  = Number(egrRow.total)   || 0;
+    const utilidad    = Math.max(ingresosMXN - egresosMXN, 0);
+    const isrRetenido = Number(ingRow.isrRetenido) || 0;
+    // regimenFiscal puede venir como '601', '612', etc. Algunos XML traen '601 ' con espacio
+    const regimen     = String(ingRow.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
+
+    // Estima ISR provisional mensual según régimen fiscal
+    function estimarISR(reg: string, ing: number, util: number, retenido: number): number {
+      switch (reg) {
+        // RESICO Personas Físicas — tasa progresiva sobre ingresos
+        case '625':
+          if (ing <= 25_000)  return ing * 0.0100;
+          if (ing <= 50_000)  return ing * 0.0110;
+          if (ing <= 83_333)  return ing * 0.0150;
+          if (ing <= 208_333) return ing * 0.0200;
+          return ing * 0.0250;
+        // RESICO Personas Morales — 1 % sobre ingresos
+        case '626':
+          return ing * 0.01;
+        // General Personas Morales — 30 % sobre utilidad
+        case '601':
+          return util * 0.30;
+        // PF Actividades Empresariales y Profesionales (incluye honorarios)
+        // Retención en la fuente = 10 %; pago provisional propio = 30 % de utilidad
+        case '612':
+          return Math.max(util * 0.30, retenido) || 0;
+        // Arrendamiento — 20 % sobre ingresos (sin deducción)
+        case '606':
+          return ing * 0.20;
+        // Incorporación Fiscal
+        case '621':
+          return ing * 0.10;
+        default:
+          // Sin régimen identificado: si hubo retenciones (honorarios, servicios)
+          // se asume 10 %; de lo contrario 30 % de utilidad como respaldo conservador
+          return (retenido > 0 ? Math.max(ing * 0.10, retenido) : util * 0.30) || 0;
+      }
+    }
+
+    function labelRegimen(reg: string): string {
+      const MAP: Record<string, string> = {
+        '601': 'General PM · 30% utilidad',
+        '606': 'Arrendamiento · 20% ingresos',
+        '608': 'Demás ingresos',
+        '610': 'Resid. extranjero',
+        '612': 'PF Empresarial/Honorarios · 30% util.',
+        '621': 'RIF · 10% ingresos',
+        '625': 'RESICO PF · 1–2.5% ingresos',
+        '626': 'RESICO PM · 1% ingresos',
+      };
+      return MAP[reg] ?? (reg ? `Régimen ${reg}` : 'Régimen no identificado');
+    }
+
     return NextResponse.json({
       ingresos: {
-        total:       Number(ingRow.total),
-        count:       Number(ingRow.count),
-        vigentes:    Number(ingRow.vigentes),
-        cancelados:  Number(ingRow.cancelados),
-        ivaTotal:    Number(ingRow.ivaTotal),
-        isrRetenido: Number(ingRow.isrRetenido),
-        ivaRetenido: Number(ingRow.ivaRetenido),
+        total:        ingresosMXN,
+        count:        Number(ingRow.count)     || 0,
+        vigentes:     Number(ingRow.vigentes)  || 0,
+        cancelados:   Number(ingRow.cancelados) || 0,
+        ivaTotal:     Number(ingRow.ivaTotal)  || 0,
+        ivaRetenido:  Number(ingRow.ivaRetenido) || 0,
+        isrEstimado:  estimarISR(regimen, ingresosMXN, utilidad, isrRetenido),
+        regimenFiscal: regimen,
+        regimenLabel:  labelRegimen(regimen),
       },
       egresos: {
         total: Number(egrRow.total),

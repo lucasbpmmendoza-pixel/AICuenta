@@ -1,0 +1,154 @@
+import { NextRequest } from "next/server";
+import ExcelJS from "exceljs";
+import { getSession } from "@/lib/session";
+import { getDb } from "@/lib/db";
+import { fetchPagosData, fetchNombreEmpresa } from "@/lib/facturas-query";
+
+// ─── Style helpers (match variablesEstaticas.js / variablesEspecificas.js) ────
+
+function setFill(cell: ExcelJS.Cell, hex: string) {
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${hex}` } };
+}
+function addBorder(cell: ExcelJS.Cell) {
+  const b = { style: "thin" as const };
+  cell.border = { top: b, left: b, bottom: b, right: b };
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const HEADER_BG = "595959"; // GRIS — matches escribirEncabezadoRfc
+const DATE_FMT  = "dd/mm/yyyy";
+const MXN       = '"$"#,##0.00';
+
+// Headers match writeTableHeadersPagos() in variablesEspecificas.js
+const PAGOS_HEADERS = [
+  "Fecha Emision", "Fecha Pago", "UUID Pago", "RFC Emisor", "RFC Receptor",
+  "Forma Pago", "Moneda Pago", "Tipo Cambio", "Total Pago",
+  "UUID Documento", "Moneda Documento", "Num Parcialidad",
+  "Saldo Anterior", "Importe Pagado", "Saldo Insoluto",
+  "Base", "Impuesto", "Tipo Factor", "Tasa o Cuota", "Importe Impuesto", "Objeto Impuesto",
+];
+
+// Column widths match ajustarAnchoColumnas() in variablesEspecificas.js
+const COL_WIDTHS = [13, 13, 18, 17, 16, 13, 13, 13, 13, 18, 13, 13, 13, 13, 13, 10, 13, 13, 15, 13, 13];
+const COL_COUNT  = PAGOS_HEADERS.length;
+
+// ─── Auth helper ───────────────────────────────────────────────────────────────
+
+async function validateRfc(userId: string, rfc: string): Promise<boolean> {
+  const db = await getDb();
+  const r = await db.request().input("uid", userId).input("rfc", rfc)
+    .query<{ cnt: number }>("SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id=@uid AND rfc=@rfc");
+  return (r.recordset[0]?.cnt ?? 0) > 0;
+}
+
+// ─── GET ───────────────────────────────────────────────────────────────────────
+
+export async function GET(req: NextRequest) {
+  const session = await getSession();
+  if (!session) return new Response("No autorizado", { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const rfc   = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
+  const year  = parseInt(searchParams.get("year")  ?? String(new Date().getFullYear()), 10);
+  const month = parseInt(searchParams.get("month") ?? String(new Date().getMonth() + 1), 10);
+
+  if (!rfc || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
+    return new Response("Parámetros inválidos", { status: 400 });
+  }
+
+  const effectiveUserId = session.ownerId ?? session.sub;
+  if (!(await validateRfc(effectiveUserId, rfc))) {
+    return new Response("RFC no encontrado", { status: 403 });
+  }
+
+  try {
+    const [rows, nombreEmpresa] = await Promise.all([
+      fetchPagosData(rfc, year, month),
+      fetchNombreEmpresa(rfc),
+    ]);
+
+    // ─── Build workbook ────────────────────────────────────────────────────────
+
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("PAGOS");
+
+    // Column widths (ajustarAnchoColumnas)
+    COL_WIDTHS.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+    // Company header (escribirEncabezadoRfc — GRIS bg, height 20, white bold, centered, bordered)
+    const hRow = ws.addRow([nombreEmpresa]);
+    hRow.height = 20;
+    const hCell = hRow.getCell(1);
+    hCell.font = { bold: true, size: 14, color: { argb: "FFFFFFFF" } };
+    setFill(hCell, HEADER_BG);
+    hCell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    addBorder(hCell);
+    ws.mergeCells(hRow.number, 1, hRow.number, COL_COUNT);
+
+    // Blank row
+    ws.addRow([]);
+
+    // Table headers (writeTableHeadersPagos — bold, centered, bordered, no fill)
+    const thRow = ws.addRow(PAGOS_HEADERS);
+    thRow.font = { bold: true };
+    thRow.eachCell({ includeEmpty: true }, (cell) => {
+      addBorder(cell);
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    });
+
+    // Data rows
+    for (const row of rows) {
+      const tc = Number(row.tipoCambio) || 1;
+      const dr = ws.addRow([
+        row.fechaEmision,                  // 1  Fecha Emision
+        row.fechaPago,                     // 2  Fecha Pago
+        row.uuid_pago,                     // 3  UUID Pago
+        row.RFC_emisor,                    // 4  RFC Emisor
+        row.RFC_receptor,                  // 5  RFC Receptor
+        row.forma_pago,                    // 6  Forma Pago
+        row.moneda_pago,                   // 7  Moneda Pago
+        tc,                                // 8  Tipo Cambio
+        Number(row.total_pago)   * tc,     // 9  Total Pago
+        row.uuid_relacionado,              // 10 UUID Documento
+        row.moneda_docto,                  // 11 Moneda Documento
+        row.numParcialidad,                // 12 Num Parcialidad
+        Number(row.saldo_anterior) * tc,   // 13 Saldo Anterior
+        Number(row.saldo_pagado)   * tc,   // 14 Importe Pagado
+        Number(row.saldo_insoluto) * tc,   // 15 Saldo Insoluto
+        Number(row.base)           * tc,   // 16 Base
+        Number(row.impuesto)       * tc,   // 17 Impuesto
+        row.tipo_factor,                   // 18 Tipo Factor
+        row.tasa_o_cuota,                  // 19 Tasa o Cuota
+        Number(row.importe)        * tc,   // 20 Importe Impuesto
+        row.objetoImpuesto,                // 21 Objeto Impuesto
+      ]);
+
+      // Date format for cols 1 & 2
+      dr.getCell(1).numFmt = DATE_FMT;
+      dr.getCell(2).numFmt = DATE_FMT;
+
+      // Money format and borders (cols 8-18 match original pagos.js: colIndex >= 8 && colIndex <= 18)
+      dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+        addBorder(cell);
+        if (ci >= 8 && ci <= 18) cell.numFmt = MXN;
+      });
+    }
+
+    // Stream response
+    const buf = await wb.xlsx.writeBuffer();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const fileName = `pagos_${rfc}_${pad(month)}-${year}.xlsx`;
+
+    return new Response(buf as ArrayBuffer, {
+      headers: {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${fileName}"`,
+      },
+    });
+  } catch (err) {
+    console.error("[export/pagos]", (err as Error).message);
+    return new Response("Error al generar el reporte", { status: 503 });
+  }
+}
