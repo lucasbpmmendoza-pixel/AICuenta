@@ -16,6 +16,12 @@ export default function Dashboard() {
   const [keyFile, setKeyFile] = useState<File | null>(null)
   const [status, setStatus] = useState<{ success: boolean; message: string } | null>(null)
   const [loading, setLoading] = useState(false)
+  const [nombre, setNombre] = useState('')
+
+  function handleUnete() {
+    const mensaje = encodeURIComponent(`Hola soy ${nombre.trim()} ${rfc.trim()}`)
+    window.open(`https://wa.me/526563138465?text=${mensaje}`, '_blank')
+  }
 
   useEffect(() => {
     fetch('/api/auth/account-type')
@@ -138,14 +144,53 @@ export default function Dashboard() {
     </form>
   )
 
+  const unetePanel = (
+    <div className="w-[300px] shrink-0 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+      <div className="bg-green-600 px-6 py-5">
+        <h2 className="text-lg font-bold text-white tracking-tight">Unete a nuestro equipo</h2>
+        <p className="text-sm text-green-100 mt-0.5">Un paso mas para empezar.</p>
+      </div>
+      <div className="flex flex-col gap-5 px-6 py-6 flex-1">
+        <p className="text-zinc-600 dark:text-zinc-300 text-sm leading-relaxed">
+          Para ser una empresa de vanguardia usamos IA. Si quieres unirte a nuestro equipo, escribenos por WhatsApp.
+        </p>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+            Nombre completo
+          </label>
+          <input
+            type="text"
+            value={nombre}
+            onChange={(e) => setNombre(e.target.value)}
+            placeholder="Ingresa tu nombre completo"
+            className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-sm"
+          />
+        </div>
+        {rfc && (
+          <p className="text-xs text-zinc-400 dark:text-zinc-500">
+            RFC: <span className="font-mono font-semibold text-zinc-600 dark:text-zinc-300">{rfc}</span>
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={handleUnete}
+          disabled={nombre.trim() === '' || rfc.trim() === ''}
+          className="mt-auto rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm"
+        >
+          Aceptar - Ir a WhatsApp
+        </button>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 flex items-center justify-center py-10">
+    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 flex items-start justify-center gap-6 py-10 px-4">
       <AccountTypeModal
         show={accountTypeReady && accountType === null}
         onComplete={(type) => setAccountType(type)}
       />
 
-      {/* Fixed-width desktop card */}
+      {/* Main upload card */}
       <div className="w-[900px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col">
 
         {accountType === 'multi' ? (
@@ -195,6 +240,9 @@ export default function Dashboard() {
           </>
         )}
       </div>
+
+      {/* Unete panel */}
+      {unetePanel}
     </div>
   )
 }

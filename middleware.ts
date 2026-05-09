@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
 const COOKIE_NAME = "auth_token";
-const PROTECTED = ["/dashboard", "/upload-fiel"];
+const PROTECTED = ["/dashboard", "/upload-fiel", "/unete"];
 
 function getSecret(): Uint8Array {
   const secret = process.env.JWT_SECRET ?? "";
@@ -35,5 +35,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/upload-fiel/:path*"],
+  matcher: ["/dashboard/:path*", "/upload-fiel/:path*", "/unete/:path*", "/unete"],
 };
