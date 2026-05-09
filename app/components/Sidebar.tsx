@@ -90,7 +90,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   {
     label: 'IA Contable',
-    href: '/unete',
+    href: '/dashboard/unete',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="8" r="4" />
