@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const pagos = await fetchPagosData(rfc, year, month);
+    const pagos = await fetchPagosData(rfc, year, month, 10);
     return NextResponse.json({ pagos });
   } catch (err) {
     console.error("[pagos/data]", (err as Error).message);

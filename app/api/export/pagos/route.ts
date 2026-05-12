@@ -135,6 +135,40 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Totals row — sum monetary columns
+    const sum = (fn: (r: typeof rows[0]) => number) =>
+      rows.reduce((s, r) => s + fn(r), 0);
+    const tc1 = 1; // totals already in MXN (each row multiplied by its own tc)
+    const totRow = ws.addRow([
+      "TOTALES",      // 1
+      null,           // 2  Fecha Pago
+      null,           // 3  UUID Pago
+      null,           // 4  RFC Emisor
+      null,           // 5  RFC Receptor
+      null,           // 6  Forma Pago
+      null,           // 7  Moneda Pago
+      null,           // 8  Tipo Cambio
+      sum(r => Number(r.total_pago)     * (Number(r.tipoCambio) || 1)),   //  9 Total Pago
+      null,           // 10 UUID Documento
+      null,           // 11 Moneda Documento
+      null,           // 12 Num Parcialidad
+      sum(r => Number(r.saldo_anterior) * (Number(r.tipoCambio) || 1)),   // 13 Saldo Anterior
+      sum(r => Number(r.saldo_pagado)   * (Number(r.tipoCambio) || 1)),   // 14 Importe Pagado
+      sum(r => Number(r.saldo_insoluto) * (Number(r.tipoCambio) || 1)),   // 15 Saldo Insoluto
+      sum(r => Number(r.base)           * (Number(r.tipoCambio) || 1)),   // 16 Base
+      sum(r => Number(r.impuesto)       * (Number(r.tipoCambio) || 1)),   // 17 Impuesto
+      null,           // 18 Tipo Factor
+      null,           // 19 Tasa o Cuota
+      sum(r => Number(r.importe)        * (Number(r.tipoCambio) || 1)),   // 20 Importe Impuesto
+      null,           // 21 Objeto Impuesto
+    ]);
+    totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+      addBorder(cell);
+      setFill(cell, HEADER_BG);
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      if ([9, 13, 14, 15, 16, 17, 20].includes(ci)) cell.numFmt = MXN;
+    });
+
     // Stream response
     const buf = await wb.xlsx.writeBuffer();
     const pad = (n: number) => String(n).padStart(2, "0");

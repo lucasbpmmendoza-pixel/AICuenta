@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
-import { fetchNotasCreditoData } from "@/lib/facturas-query";
+import { fetchEfectivamentePagado } from "@/lib/facturas-query";
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -34,11 +34,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
   }
 
+  const dateFrom = new Date(year, month - 1, 1);
+  const dateTo   = new Date(year, month, 1);
+
   try {
-    const notas = await fetchNotasCreditoData(rfc, year, month, 10);
-    return NextResponse.json({ notas });
+    const rows = await fetchEfectivamentePagado(rfc, dateFrom, dateTo, 10);
+    return NextResponse.json({ rows });
   } catch (err) {
-    console.error("[notas-credito/data]", (err as Error).message);
-    return NextResponse.json({ error: "Error al obtener notas de crédito" }, { status: 503 });
+    console.error("[efectivamente-pagado/data]", (err as Error).message);
+    return NextResponse.json({ error: "Error al obtener datos" }, { status: 503 });
   }
 }

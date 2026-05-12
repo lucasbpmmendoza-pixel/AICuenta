@@ -392,13 +392,15 @@ export interface NotaCreditoRow {
 export async function fetchNotasCreditoData(
   rfc: string,
   year: number,
-  month: number
+  month: number,
+  limit?: number
 ): Promise<NotaCreditoRow[]> {
   const db = await getDb();
   const pad2 = (n: number) => String(n).padStart(2, "0");
   const dateFrom = `${year}-${pad2(month)}-01`;
   const lastDay  = new Date(year, month, 0).getDate();
   const dateTo   = `${year}-${pad2(month)}-${pad2(lastDay)}`;
+  const top = limit !== undefined ? `TOP ${limit}` : '';
 
   const result = await db
     .request()
@@ -406,7 +408,7 @@ export async function fetchNotasCreditoData(
     .input("dateFrom", sql.VarChar,  dateFrom)
     .input("dateTo",   sql.VarChar,  dateTo)
     .query<NotaCreditoRow>(`
-      SELECT TOP 10
+      SELECT ${top}
         fact.UUID                                                           AS uuid,
         fact.Fecha                                                          AS fecha,
         ISNULL(fact.RFC_Emisor,'')                                          AS RFC_emisor,
@@ -434,6 +436,99 @@ export async function fetchNotasCreditoData(
         AND CAST(fact.Fecha AS date) >= CAST(@dateFrom AS date)
         AND CAST(fact.Fecha AS date) <= CAST(@dateTo   AS date)
       ORDER BY fact.Fecha
+    `);
+  return result.recordset;
+}
+
+// ─── Efectivamente Pagado ─────────────────────────────────────────────────────
+
+export interface EfectivamentePagadoRow {
+  uuid:                string;
+  fuente:              string;   // 'Complemento P' | 'Factura PUE'
+  fechaEmision:        Date;
+  fechaPago:           Date | null;
+  RFC_emisor:          string;
+  RazonSocialEmisor:   string;
+  RFC_receptor:        string;
+  RazonSocialReceptor: string;
+  formaPago:           string;
+  moneda:              string;
+  tipoCambio:          number;
+  subtotal:            number;
+  iva:                 number;
+  retISR:              number;
+  retIVA:              number;
+  total:               number;
+}
+
+export async function fetchEfectivamentePagado(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  limit?: number
+): Promise<EfectivamentePagadoRow[]> {
+  const db = await getDb();
+  const top = limit !== undefined ? `TOP ${limit}` : '';
+  const result = await db
+    .request()
+    .input("rfc",      sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime,  dateFrom)
+    .input("dateTo",   sql.DateTime,  dateTo)
+    .query<EfectivamentePagadoRow>(`
+      SELECT ${top} * FROM (
+        -- Complementos de pago (tipo P) — monto tomado de facturalo_pagos
+        SELECT
+          fc.UUID                                                           AS uuid,
+          'Complemento P'                                                   AS fuente,
+          fc.Fecha                                                          AS fechaEmision,
+          p.fecha_pago                                                      AS fechaPago,
+          ISNULL(fc.RFC_Emisor,'')                                          AS RFC_emisor,
+          ISNULL(fc.RazonSocialEmisor,'')                                   AS RazonSocialEmisor,
+          ISNULL(fc.RFC_Receptor,'')                                        AS RFC_receptor,
+          ISNULL(fc.RazonSocialReceptor,'')                                 AS RazonSocialReceptor,
+          ISNULL(p.forma_pago,'')                                           AS formaPago,
+          ISNULL(p.moneda,'MXN')                                            AS moneda,
+          ISNULL(p.tipoCambio, 1)                                           AS tipoCambio,
+          0                                                                 AS subtotal,
+          0                                                                 AS iva,
+          0                                                                 AS retISR,
+          0                                                                 AS retIVA,
+          ISNULL(TRY_CONVERT(decimal(18,2), p.monto_total_pagos), 0)       AS total
+        FROM dbo.facturalo_cfdis fc WITH (NOLOCK)
+        INNER JOIN dbo.facturalo_pagos p WITH (NOLOCK) ON p.UUID = fc.UUID
+        WHERE fc.RFC_Emisor = @rfc
+          AND fc.TipoComprobante = 'P'
+          AND fc.Status = 'Vigente'
+          AND fc.Fecha >= @dateFrom AND fc.Fecha < @dateTo
+
+        UNION ALL
+
+        -- Facturas PUE (tipo I, MetodoPago = 'PUE') — pago en una sola exhibición
+        SELECT
+          UUID                                                              AS uuid,
+          'Factura PUE'                                                     AS fuente,
+          Fecha                                                             AS fechaEmision,
+          NULL                                                              AS fechaPago,
+          ISNULL(RFC_Emisor,'')                                             AS RFC_emisor,
+          ISNULL(RazonSocialEmisor,'')                                      AS RazonSocialEmisor,
+          ISNULL(RFC_Receptor,'')                                           AS RFC_receptor,
+          ISNULL(RazonSocialReceptor,'')                                    AS RazonSocialReceptor,
+          ISNULL(TipoPago,'')                                               AS formaPago,
+          ISNULL(Moneda,'MXN')                                              AS moneda,
+          ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), tipoCambio),0), 1)      AS tipoCambio,
+          TRY_CONVERT(decimal(18,2), ISNULL(Subtotal,0))                   AS subtotal,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalTrasladado,0))            AS iva,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoISR,0))           AS retISR,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoIVA,0))           AS retIVA,
+          TRY_CONVERT(decimal(18,2), ISNULL(Total,0))                      AS total
+        FROM dbo.facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Emisor = @rfc
+          AND TipoComprobante = 'I'
+          AND MetodoPago = 'PUE'
+          AND Status = 'Vigente'
+          AND Fecha >= @dateFrom AND Fecha < @dateTo
+      ) ep
+      ORDER BY fechaEmision DESC
     `);
   return result.recordset;
 }
@@ -483,12 +578,14 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 export async function fetchPagosData(
   rfc: string,
   year: number,
-  month: number
+  month: number,
+  limit?: number
 ): Promise<PagoRow[]> {
   const db = await getDb();
   const dateFrom = `${year}-${pad2(month)}-01`;
   const lastDay  = new Date(year, month, 0).getDate();
   const dateTo   = `${year}-${pad2(month)}-${pad2(lastDay)}`;
+  const top = limit !== undefined ? `TOP ${limit}` : '';
 
   const result = await db
     .request()
@@ -496,7 +593,7 @@ export async function fetchPagosData(
     .input("dateFrom", sql.VarChar,  dateFrom)
     .input("dateTo",   sql.VarChar,  dateTo)
     .query<PagoRow>(`
-      SELECT TOP 10
+      SELECT ${top}
         p.UUID                                           AS uuid_pago,
         fc.Fecha                                         AS fechaEmision,
         p.fecha_pago                                     AS fechaPago,
