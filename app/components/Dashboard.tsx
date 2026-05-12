@@ -61,7 +61,7 @@ export default function Dashboard() {
       {/* Left column */}
       <div className="flex flex-col gap-5 px-8 py-7 w-[340px] border-r border-zinc-200 dark:border-zinc-700 shrink-0">
         <div className="flex flex-col gap-1">
-          <label htmlFor="rfc" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+          <label htmlFor="rfc" className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#450c7d' }}>
             RFC
           </label>
           <input
@@ -77,7 +77,7 @@ export default function Dashboard() {
         </div>
 
         <div className="flex flex-col gap-1">
-          <label htmlFor="efiel" className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
+          <label htmlFor="efiel" className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#450c7d' }}>
             EFIEL
           </label>
           <input
@@ -108,14 +108,17 @@ export default function Dashboard() {
         <button
           type="submit"
           disabled={loading}
-          className={`rounded-xl bg-brand-deep hover:bg-brand-purple disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm${!status ? ' mt-auto' : ''}`}
+          className={`rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm${!status ? ' mt-auto' : ''}`}
+          style={{ backgroundColor: '#450c7d' }}
+          onMouseEnter={e => { if (!loading) (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#7B6FE8' }}
+          onMouseLeave={e => (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#450c7d'}
         >
           {loading ? 'Guardando...' : 'Guardar archivos'}
         </button>
       </div>
 
       {/* Right column */}
-      <div className="flex flex-col gap-6 px-8 py-7 flex-1">
+      <div className="flex flex-col gap-6 px-8 py-7 flex-1" >
         <DropZone
           label="Certificado (.CER)"
           accept=".cer"
@@ -145,8 +148,7 @@ export default function Dashboard() {
           Para ser una empresa de vanguardia usamos IA. Si quieres unirte a nuestro equipo, escribenos por WhatsApp.
         </p>
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-            Nombre completo
+          <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#450c7d' }}>
           </label>
           <input
             type="text"
@@ -199,7 +201,10 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => router.push('/dashboard')}
-                className="mt-1 inline-flex items-center gap-2 rounded-xl bg-brand-deep hover:bg-brand-purple text-white font-semibold px-8 py-3 transition-colors text-sm"
+                className="mt-1 inline-flex items-center gap-2 rounded-xl text-white font-semibold px-8 py-3 transition-colors text-sm"
+                style={{ backgroundColor: '#450c7d' }}
+                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#7B6FE8')}
+                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#450c7d')}
               >
                 Ir al Dashboard
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
@@ -222,8 +227,8 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Header */}
-            <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5">
-              <h1 className="text-xl font-bold text-white tracking-tight">Dashboard de Certificados</h1>
+            <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5" >
+              <h1 className="text-xl font-bold text-white tracking-tight" >Dashboard de Certificados</h1>
               <p className="text-sm text-white/70 mt-0.5">Ingresa los datos y sube los archivos de firma electronica.</p>
             </div>
             {uploadForm}

@@ -80,18 +80,28 @@ export default function RegisterView() {
     <div className="flex min-h-screen">
       {/* ── Left panel ── */}
       <div className="relative hidden w-[46%] flex-col items-center justify-center overflow-hidden bg-slate-950 px-12 py-12 lg:flex xl:w-[42%]">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-20"
+          src="/Video.mp4"
+          onLoadedData={e => { (e.target as HTMLVideoElement).playbackRate = 2 }}
+        />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(99,102,241,0.15),transparent_55%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_75%_75%,rgba(20,86,73,0.18),transparent_55%)]" />
         <div className="relative flex flex-col items-center text-center">
           <Image
-            src="/logo.webp"
+            src="/logo3.webp"
             alt="AIcuenta"
             width={360}
             height={360}
-            className="mb-2 rounded-3xl"
+            className="mb-2"
+            style={{ width: 360, height: 'auto' }}
             priority
           />
-          <p className="mt-2 max-w-[220px] text-sm leading-6 text-white/45">
+          <p className="mt-2 max-w-[220px] text-sm leading-6 text-[#7B6FE8]">
             Claridad fiscal desde tus datos, sin captura manual.
           </p>
         </div>
@@ -104,10 +114,10 @@ export default function RegisterView() {
         </p>
 
         <div className="w-full max-w-[400px]">
-          <h1 className="text-3xl font-black tracking-tight text-slate-950">
+          <h1 className="text-3xl font-black tracking-tight" style={{ color: '#450c7d' }}>
             Crea tu cuenta
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm" style={{ color: '#7B6FE8' }}>
             Empieza gratis, sin tarjeta de credito.
           </p>
 
@@ -127,7 +137,7 @@ export default function RegisterView() {
 
           <div className="my-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-slate-200" />
-            <span className="text-xs font-semibold text-slate-400">O registrate con tu correo</span>
+            <span className="text-xs font-semibold text-slate-400" style={{ color: "#7B6FE8" }}>O registrate con tu correo</span>
             <div className="h-px flex-1 bg-slate-200" />
           </div>
 
@@ -136,6 +146,7 @@ export default function RegisterView() {
               <label
                 htmlFor="name"
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
+              style={{ color: '#450c7d' }}
               >
                 Nombre completo
               </label>
@@ -155,6 +166,7 @@ export default function RegisterView() {
               <label
                 htmlFor="email"
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
+              style={{ color: '#450c7d' }}
               >
                 Correo electronico
               </label>
@@ -174,6 +186,7 @@ export default function RegisterView() {
               <label
                 htmlFor="password"
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
+              style={{ color: '#450c7d' }}
               >
                 Contrasena
               </label>
@@ -201,7 +214,7 @@ export default function RegisterView() {
                   )}
                 </button>
               </div>
-              <p className="mt-1.5 text-xs text-slate-400">
+              <p className="mt-1.5 text-xs text-slate-400" style={{ color: "#7B6FE8" }}>
                 Min. 8 caracteres, una mayuscula y un numero
               </p>
             </div>
@@ -215,7 +228,10 @@ export default function RegisterView() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 flex h-12 w-full items-center justify-center rounded-2xl bg-slate-950 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
+              className="mt-2 flex h-12 w-full items-center justify-center rounded-2xl text-sm font-extrabold text-white transition disabled:opacity-60"
+              style={{ backgroundColor: '#450c7d' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#7B6FE8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#450c7d')}
             >
               {loading ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -229,7 +245,10 @@ export default function RegisterView() {
             ¿Ya tienes cuenta?{" "}
             <a
               href="/login"
-              className="font-bold text-slate-700 underline-offset-2 transition hover:text-slate-950 hover:underline"
+              className="font-bold text-slate-700  transition hover:text-slate-950 hover:underline"
+              style={{ color: '#450c7d' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#7B6FE8')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#450c7d')}
             >
               Iniciar sesion
             </a>

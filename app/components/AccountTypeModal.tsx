@@ -9,12 +9,12 @@ const OPTIONS: { value: AccountType; title: string; description: string; icon: s
     value: 'multi',
     title: 'Contador independiente o despacho',
     description: 'Manejo varios RFCs de distintos clientes',
-    icon: '🏢',
+    icon: '👥',
   },
   {
     value: 'single',
     title: 'Negocio propio',
-    description: 'Facturo de forma independiente, manejo solo mi RFC',
+    description: 'Facturo de forma independiente',
     icon: '👤',
   },
 ]
@@ -75,17 +75,17 @@ export default function AccountTypeModal({ show, onComplete }: Props) {
         ].join(' ')}
       >
         {/* Top accent */}
-        <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />
+        <div className="h-1.5 w-full bg-gradient-to-r from-[#450c7d] to-[#450c7d]" />
 
         <div className="px-7 py-7">
           {/* Header */}
-          <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400 dark:text-zinc-500">
+          <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400 dark:text-zinc-500" style={{ color: "#7B6FE8" }}>
             Configuracion inicial
           </p>
-          <h2 className="mt-2 text-xl font-black text-zinc-900 dark:text-zinc-50 leading-snug">
+          <h2 className="mt-2 text-xl font-black text-zinc-900 dark:text-zinc-50 leading-snug" style={{ color: "#450c7d" }}>
             Usaras esta herramienta como…
           </h2>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400" style={{ color: "#7B6FE8" }}>
             Elige el perfil que mejor describe tu uso. Podras cambiarlo despues desde tu cuenta.
           </p>
 
@@ -101,15 +101,15 @@ export default function AccountTypeModal({ show, onComplete }: Props) {
                   className={[
                     'flex items-start gap-4 rounded-xl border-2 px-4 py-4 text-left transition-all duration-150 cursor-pointer',
                     isSelected
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40'
-                      : 'border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-600 bg-white dark:bg-zinc-800',
+                      ? 'border-[#4833d6] bg-white dark:bg-[#450c7d]'
+                      : 'border-zinc-200 dark:border-zinc-700 hover:border-[#7B6FE8] dark:hover:border-[#7B6FE8] bg-white dark:bg-zinc-800',
                   ].join(' ')}
                 >
                   <span className="text-2xl leading-none mt-0.5">{opt.icon}</span>
                   <div className="flex flex-col gap-0.5">
                     <span className={[
                       'text-sm font-bold leading-tight',
-                      isSelected ? 'text-blue-700 dark:text-blue-300' : 'text-zinc-800 dark:text-zinc-100',
+                      isSelected ? 'text-[#4833d6] dark:text-[#7B6FE8]' : 'text-zinc-800 dark:text-zinc-100',
                     ].join(' ')}>
                       {opt.title}
                     </span>
@@ -121,7 +121,7 @@ export default function AccountTypeModal({ show, onComplete }: Props) {
                   <span className={[
                     'ml-auto mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-150',
                     isSelected
-                      ? 'border-blue-500 bg-blue-500'
+                      ? 'border-[#4833d6] bg-[#4833d6]'
                       : 'border-zinc-300 dark:border-zinc-600',
                   ].join(' ')}>
                     {isSelected && (
@@ -143,7 +143,7 @@ export default function AccountTypeModal({ show, onComplete }: Props) {
             className={[
               'mt-6 w-full rounded-xl py-3 text-sm font-bold transition-all duration-150',
               selected && !saving
-                ? 'bg-blue-600 hover:bg-blue-700 text-white cursor-pointer'
+                ? 'bg-[#450c7d] hover:bg-[#7B6FE8] text-white cursor-pointer'
                 : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-400 dark:text-zinc-500 cursor-not-allowed',
             ].join(' ')}
           >
