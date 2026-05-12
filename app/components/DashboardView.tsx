@@ -25,6 +25,7 @@ export default function DashboardView({ session, accountType }: Props) {
   const [month, setMonth]             = useState(now.getMonth() + 1)
   const [data,  setData]              = useState<DashboardData | null>(null)
   const [loading, setLoading]         = useState(false)
+  const [error,   setError]           = useState<string | null>(null)
 
   // Cargar lista de RFCs
   useEffect(() => {
@@ -43,12 +44,21 @@ export default function DashboardView({ session, accountType }: Props) {
     if (!rfc) return
     setLoading(true)
     setData(null)
+    setError(null)
     try {
       const res = await fetch(`/api/dashboard/data?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`)
       const d = await res.json()
-      if (res.ok) setData(d)
-    } catch {}
-    finally { setLoading(false) }
+      if (res.ok) {
+        setData(d)
+      } else {
+        setError(d?.error ?? 'Error al obtener datos del dashboard')
+      }
+    } catch (e) {
+      setError('No se pudo conectar con el servidor. Intenta de nuevo.')
+      console.error('[dashboard] fetchData error:', e)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -123,6 +133,12 @@ export default function DashboardView({ session, accountType }: Props) {
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">Sin RFCs registrados</p>
               <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Agrega un RFC en la sección RFCs para ver el dashboard.</p>
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center gap-3">
+              <svg className="h-8 w-8 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">{error}</p>
+              <button onClick={() => fetchData(selectedRfc, year, month)} className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2">Reintentar</button>
             </div>
           ) : (
             <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} />

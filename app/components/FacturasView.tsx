@@ -104,18 +104,6 @@ export default function FacturasView({ session, accountType }: Props) {
       .finally(() => setLoadingNotas(false))
   }, [selectedRfc, year, month])
 
-  // Load notas de crédito alongside facturas data
-  useEffect(() => {
-    if (!selectedRfc) return
-    setNotasData(null)
-    setLoadingNotas(true)
-    fetch(`/api/notas-credito/data?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`)
-      .then(r => r.json())
-      .then(d => { if (Array.isArray(d.notas)) setNotasData(d.notas) })
-      .catch(() => {})
-      .finally(() => setLoadingNotas(false))
-  }, [selectedRfc, year, month])
-
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
     else setMonth(m => m - 1)
@@ -271,6 +259,17 @@ export default function FacturasView({ session, accountType }: Props) {
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
+
+          {/* Leyenda informativa */}
+          {selectedRfc && (
+            <div className="mb-5 flex items-start gap-3 rounded-xl border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 px-4 py-3">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
+                <span className="font-semibold">Vista previa:</span> se muestran hasta 10 registros por tabla. La generación del Excel puede tardar algunos segundos dependiendo del volumen de datos — descárgalo para ver el reporte completo.
+              </p>
+            </div>
+          )}
+
           {!selectedRfc && !loading ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
               <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">Sin RFCs registrados</p>
@@ -411,6 +410,20 @@ function EmptyRow({ cols }: { cols: number }) {
   )
 }
 
+const PREVIEW_LIMIT = 10
+function LimitNote({ count, cols }: { count: number; cols: number }) {
+  if (count <= PREVIEW_LIMIT) return null
+  return (
+    <tfoot>
+      <tr>
+        <td colSpan={cols} className="px-5 py-3 text-center text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/10 border-t border-amber-200 dark:border-amber-900/30">
+          Vista previa limitada a {PREVIEW_LIMIT} registros — descarga el Excel para el reporte completo
+        </td>
+      </tr>
+    </tfoot>
+  )
+}
+
 function TablaIngresos({ rows }: { rows: IngresoCFDI[] }) {
   return (
     <table className="w-full min-w-[900px]">
@@ -421,8 +434,8 @@ function TablaIngresos({ rows }: { rows: IngresoCFDI[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={11} /> : rows.map(r => (
-          <tr key={r.UUID} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
+        {rows.length === 0 ? <EmptyRow cols={11} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
+          <tr key={`${r.UUID}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs text-slate-400 dark:text-zinc-500">{uuid4(r.UUID)}</span></TD>
             <TD>{fmt(r.Fecha)}</TD>
             <TD><span className="font-mono text-xs">{r.RFC_Receptor}</span></TD>
@@ -437,6 +450,7 @@ function TablaIngresos({ rows }: { rows: IngresoCFDI[] }) {
           </tr>
         ))}
       </tbody>
+      <LimitNote count={rows.length} cols={11} />
     </table>
   )
 }
@@ -451,8 +465,8 @@ function TablaEgresos({ rows }: { rows: EgresoCFDI[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={9} /> : rows.map(r => (
-          <tr key={r.RFC_Emisor} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
+        {rows.length === 0 ? <EmptyRow cols={9} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
+          <tr key={`${r.RFC_Emisor}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs">{r.RFC_Emisor}</span></TD>
             <TD><span className="max-w-[220px] truncate block">{r.RazonSocialEmisor}</span></TD>
             <TD right>{r.NumFacturas}</TD>
@@ -465,6 +479,7 @@ function TablaEgresos({ rows }: { rows: EgresoCFDI[] }) {
           </tr>
         ))}
       </tbody>
+      <LimitNote count={rows.length} cols={9} />
     </table>
   )
 }
@@ -479,8 +494,8 @@ function TablaNomina({ rows }: { rows: NominaCFDI[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={9} /> : rows.map(r => (
-          <tr key={r.UUID} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
+        {rows.length === 0 ? <EmptyRow cols={9} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
+          <tr key={`${r.UUID}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs text-slate-400 dark:text-zinc-500">{uuid4(r.UUID)}</span></TD>
             <TD>
               <span className="inline-flex items-center rounded-full bg-violet-100 dark:bg-violet-900/40 px-2 py-0.5 text-xs font-semibold text-violet-700 dark:text-violet-300">
@@ -497,6 +512,7 @@ function TablaNomina({ rows }: { rows: NominaCFDI[] }) {
           </tr>
         ))}
       </tbody>
+      <LimitNote count={rows.length} cols={9} />
     </table>
   )
 }
@@ -511,8 +527,8 @@ function TablaRetenciones({ rows }: { rows: RetencionCFDI[] }) {
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={10} /> : rows.map(r => (
-          <tr key={r.UUID} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
+        {rows.length === 0 ? <EmptyRow cols={10} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
+          <tr key={`${r.UUID}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs text-slate-400 dark:text-zinc-500">{uuid4(r.UUID)}</span></TD>
             <TD>
               <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${r.Direccion === 'Emitida' ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' : 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'}`}>
@@ -530,6 +546,7 @@ function TablaRetenciones({ rows }: { rows: RetencionCFDI[] }) {
           </tr>
         ))}
       </tbody>
+      <LimitNote count={rows.length} cols={10} />
     </table>
   )
 }
@@ -555,7 +572,7 @@ function TablaPagos({ rows, loading }: { rows: PagoRow[]; loading: boolean }) {
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={11} /> : rows.map((r, i) => {
+        {rows.length === 0 ? <EmptyRow cols={11} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => {
           const tc = Number(r.tipoCambio) || 1
           return (
             <tr key={`${r.uuid_pago}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
@@ -574,6 +591,7 @@ function TablaPagos({ rows, loading }: { rows: PagoRow[]; loading: boolean }) {
           )
         })}
       </tbody>
+      <LimitNote count={rows.length} cols={11} />
     </table>
   )
 }
@@ -599,7 +617,7 @@ function TablaNotasCredito({ rows, loading }: { rows: NotaCreditoRow[]; loading:
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={12} /> : rows.map((r, i) => {
+        {rows.length === 0 ? <EmptyRow cols={12} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => {
           const tc = Number(r.tipoCambio) || 1
           return (
             <tr key={`${r.uuid}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
@@ -619,6 +637,7 @@ function TablaNotasCredito({ rows, loading }: { rows: NotaCreditoRow[]; loading:
           )
         })}
       </tbody>
+      <LimitNote count={rows.length} cols={12} />
     </table>
   )
 }
