@@ -16,7 +16,8 @@ const config: sql.config = {
     min: 0,
     idleTimeoutMillis: 30_000,
   },
-  requestTimeout: 60_000,
+  connectionTimeout: 30_000,
+  requestTimeout: 120_000,
 };
 
 // Pool singleton — se reutiliza entre requests en el mismo proceso

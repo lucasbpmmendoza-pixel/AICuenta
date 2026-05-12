@@ -113,119 +113,184 @@ export async function fetchFacturasData(
 ): Promise<FacturasData> {
   const db = await getDb();
 
-  const result = await db
-    .request()
-    .input("rfc",      sql.NVarChar, rfc)
-    .input("dateFrom", sql.DateTime,  dateFrom)
-    .input("dateTo",   sql.DateTime,  dateTo)
-    .query(`
-      -- RS0: Ingresos (facturas emitidas, tipo I)
-      SELECT
-        UUID, ISNULL(Serie,'') AS Serie, ISNULL(Folio,'') AS Folio,
-        Fecha, ISNULL(Status,'') AS Status, ISNULL(Version,'') AS Version,
-        ISNULL(RFC_Receptor,'') AS RFC_Receptor,
-        ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
-        ISNULL(UsoCFDI,'') AS UsoCFDI,
-        ISNULL(MetodoPago,'') AS MetodoPago,
-        ISNULL(TipoPago,'') AS TipoPago,
-        ISNULL(Moneda,'MXN') AS Moneda,
-        ISNULL(tipoCambio,1) AS tipoCambio,
-        ISNULL(Subtotal,0) AS Subtotal,
-        ISNULL(Descuento,0) AS Descuento,
-        ISNULL(BaseIVA16,0) AS BaseIVA16, ISNULL(BaseIVA8,0) AS BaseIVA8,
-        ISNULL(BaseIVA0,0) AS BaseIVA0, ISNULL(BaseIVAExento,0) AS BaseIVAExento,
-        ISNULL(TotalTrasladadoIVADieciseis,0) AS TotalTrasladadoIVADieciseis,
-        ISNULL(TotalTrasladadoIVAOcho,0) AS TotalTrasladadoIVAOcho,
-        ISNULL(TotalTrasladadoIVACero,0) AS TotalTrasladadoIVACero,
-        ISNULL(TotalTrasladadoIVAExento,0) AS TotalTrasladadoIVAExento,
-        ISNULL(TotalTrasladadoIEPS,0) AS TotalTrasladadoIEPS,
-        ISNULL(TotalTrasladado,0) AS TotalTrasladado,
-        ISNULL(TotalRetenidoISR,0) AS TotalRetenidoISR,
-        ISNULL(TotalRetenidoIVA,0) AS TotalRetenidoIVA,
-        ISNULL(TotalRetenidoIEPS,0) AS TotalRetenidoIEPS,
-        ISNULL(TotalRetenidos,0) AS TotalRetenidos,
-        ISNULL(Total,0) AS Total,
-        ISNULL(Total,0) * ${TC} AS Total_MXN,
-        ISNULL(RegimenFiscal,'') AS RegimenFiscal,
-        ISNULL(LugarExpedicion,'') AS LugarExpedicion,
-        ISNULL(Movimiento,'') AS Movimiento
-      FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
-        AND Fecha>=@dateFrom AND Fecha<@dateTo
-      ORDER BY Fecha DESC;
+  const [ingresosRes, egresosRes, nominaRes, retencionesRes] = await Promise.all([
+    // Q0: Ingresos emitidos
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<IngresoCFDI>(`
+        SELECT TOP 10
+          UUID, ISNULL(Serie,'') AS Serie, ISNULL(Folio,'') AS Folio,
+          Fecha, ISNULL(Status,'') AS Status, ISNULL(Version,'') AS Version,
+          ISNULL(RFC_Receptor,'') AS RFC_Receptor,
+          ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
+          ISNULL(UsoCFDI,'') AS UsoCFDI,
+          ISNULL(MetodoPago,'') AS MetodoPago,
+          ISNULL(TipoPago,'') AS TipoPago,
+          ISNULL(Moneda,'MXN') AS Moneda,
+          ISNULL(tipoCambio,1) AS tipoCambio,
+          ISNULL(Subtotal,0) AS Subtotal,
+          ISNULL(Descuento,0) AS Descuento,
+          ISNULL(BaseIVA16,0) AS BaseIVA16, ISNULL(BaseIVA8,0) AS BaseIVA8,
+          ISNULL(BaseIVA0,0) AS BaseIVA0, ISNULL(BaseIVAExento,0) AS BaseIVAExento,
+          ISNULL(TotalTrasladadoIVADieciseis,0) AS TotalTrasladadoIVADieciseis,
+          ISNULL(TotalTrasladadoIVAOcho,0) AS TotalTrasladadoIVAOcho,
+          ISNULL(TotalTrasladadoIVACero,0) AS TotalTrasladadoIVACero,
+          ISNULL(TotalTrasladadoIVAExento,0) AS TotalTrasladadoIVAExento,
+          ISNULL(TotalTrasladadoIEPS,0) AS TotalTrasladadoIEPS,
+          ISNULL(TotalTrasladado,0) AS TotalTrasladado,
+          ISNULL(TotalRetenidoISR,0) AS TotalRetenidoISR,
+          ISNULL(TotalRetenidoIVA,0) AS TotalRetenidoIVA,
+          ISNULL(TotalRetenidoIEPS,0) AS TotalRetenidoIEPS,
+          ISNULL(TotalRetenidos,0) AS TotalRetenidos,
+          ISNULL(Total,0) AS Total,
+          ISNULL(Total,0) * ${TC} AS Total_MXN,
+          ISNULL(RegimenFiscal,'') AS RegimenFiscal,
+          ISNULL(LugarExpedicion,'') AS LugarExpedicion,
+          ISNULL(Movimiento,'') AS Movimiento
+        FROM facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
+          AND Fecha>=@dateFrom AND Fecha<@dateTo
+        ORDER BY Fecha DESC
+      `),
 
-      -- RS1: Egresos agrupados por RFC emisor
-      SELECT
-        RFC_Emisor,
-        ISNULL(NULLIF(RazonSocialEmisor,''), RFC_Emisor) AS RazonSocialEmisor,
-        COUNT(*) AS NumFacturas,
-        SUM(CASE WHEN Status='Vigente'  THEN 1 ELSE 0 END) AS Vigentes,
-        SUM(CASE WHEN Status<>'Vigente' THEN 1 ELSE 0 END) AS Canceladas,
-        ISNULL(SUM(ISNULL(Total,0)                * ${TC}),0) AS Total_MXN,
-        ISNULL(SUM(ISNULL(TotalTrasladadoIVA,0)   * ${TC}),0) AS IVA_MXN,
-        ISNULL(SUM(ISNULL(TotalRetenidoISR,0)     * ${TC}),0) AS ISR_Retenido_MXN,
-        ISNULL(SUM(ISNULL(TotalRetenidoIVA,0)     * ${TC}),0) AS IVA_Retenido_MXN,
-        ISNULL(SUM(ISNULL(TotalTrasladadoIEPS,0)  * ${TC}),0) AS IEPS_MXN
-      FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE RFC_Receptor=@rfc AND TipoComprobante='I'
-        AND Fecha>=@dateFrom AND Fecha<@dateTo
-      GROUP BY RFC_Emisor, RazonSocialEmisor
-      ORDER BY Total_MXN DESC;
+    // Q1: Egresos agrupados por RFC emisor
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<EgresoCFDI>(`
+        SELECT TOP 10
+          RFC_Emisor,
+          ISNULL(NULLIF(RazonSocialEmisor,''), RFC_Emisor) AS RazonSocialEmisor,
+          COUNT(*) AS NumFacturas,
+          SUM(CASE WHEN Status='Vigente'  THEN 1 ELSE 0 END) AS Vigentes,
+          SUM(CASE WHEN Status<>'Vigente' THEN 1 ELSE 0 END) AS Canceladas,
+          ISNULL(SUM(ISNULL(Total,0)                * ${TC}),0) AS Total_MXN,
+          ISNULL(SUM(ISNULL(TotalTrasladadoIVA,0)   * ${TC}),0) AS IVA_MXN,
+          ISNULL(SUM(ISNULL(TotalRetenidoISR,0)     * ${TC}),0) AS ISR_Retenido_MXN,
+          ISNULL(SUM(ISNULL(TotalRetenidoIVA,0)     * ${TC}),0) AS IVA_Retenido_MXN,
+          ISNULL(SUM(ISNULL(TotalTrasladadoIEPS,0)  * ${TC}),0) AS IEPS_MXN
+        FROM facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Receptor=@rfc AND TipoComprobante='I'
+          AND Fecha>=@dateFrom AND Fecha<@dateTo
+        GROUP BY RFC_Emisor, RazonSocialEmisor
+        ORDER BY Total_MXN DESC
+      `),
 
-      -- RS2: Nómina (tipo N emitida o recibida)
-      SELECT
-        UUID, Fecha, ISNULL(Status,'') AS Status,
-        ISNULL(RFC_Emisor,'') AS RFC_Emisor,
-        ISNULL(RazonSocialEmisor,'') AS RazonSocialEmisor,
-        ISNULL(RFC_Receptor,'') AS RFC_Receptor,
-        ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
-        ISNULL(Moneda,'MXN') AS Moneda,
-        ISNULL(tipoCambio,1) AS tipoCambio,
-        ISNULL(Subtotal,0) AS Subtotal,
-        ISNULL(Descuento,0) AS Descuento,
-        ISNULL(TotalRetenidoISR,0) AS TotalRetenidoISR,
-        ISNULL(TotalRetenidoIVA,0) AS TotalRetenidoIVA,
-        ISNULL(Total,0) AS Total,
-        ISNULL(Total,0) * ${TC} AS Total_MXN,
-        ISNULL(LugarExpedicion,'') AS LugarExpedicion,
-        CASE WHEN RFC_Emisor=@rfc THEN 'Nómina Egreso' ELSE 'Nómina Ingreso' END AS TipoNomina
-      FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='N'
-        AND Fecha>=@dateFrom AND Fecha<@dateTo
-      ORDER BY Fecha DESC;
+    // Q2: Nómina — UNION ALL evita OR para mejor uso de índices
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<NominaCFDI>(`
+        SELECT TOP 10 * FROM (
+          SELECT
+            UUID, Fecha, ISNULL(Status,'') AS Status,
+            ISNULL(RFC_Emisor,'') AS RFC_Emisor,
+            ISNULL(RazonSocialEmisor,'') AS RazonSocialEmisor,
+            ISNULL(RFC_Receptor,'') AS RFC_Receptor,
+            ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
+            ISNULL(Moneda,'MXN') AS Moneda,
+            ISNULL(tipoCambio,1) AS tipoCambio,
+            ISNULL(Subtotal,0) AS Subtotal,
+            ISNULL(Descuento,0) AS Descuento,
+            ISNULL(TotalRetenidoISR,0) AS TotalRetenidoISR,
+            ISNULL(TotalRetenidoIVA,0) AS TotalRetenidoIVA,
+            ISNULL(Total,0) AS Total,
+            ISNULL(Total,0) * ${TC} AS Total_MXN,
+            ISNULL(LugarExpedicion,'') AS LugarExpedicion,
+            'Nómina Egreso' AS TipoNomina
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Emisor=@rfc AND TipoComprobante='N'
+            AND Fecha>=@dateFrom AND Fecha<@dateTo
+          UNION ALL
+          SELECT
+            UUID, Fecha, ISNULL(Status,'') AS Status,
+            ISNULL(RFC_Emisor,'') AS RFC_Emisor,
+            ISNULL(RazonSocialEmisor,'') AS RazonSocialEmisor,
+            ISNULL(RFC_Receptor,'') AS RFC_Receptor,
+            ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
+            ISNULL(Moneda,'MXN') AS Moneda,
+            ISNULL(tipoCambio,1) AS tipoCambio,
+            ISNULL(Subtotal,0) AS Subtotal,
+            ISNULL(Descuento,0) AS Descuento,
+            ISNULL(TotalRetenidoISR,0) AS TotalRetenidoISR,
+            ISNULL(TotalRetenidoIVA,0) AS TotalRetenidoIVA,
+            ISNULL(Total,0) AS Total,
+            ISNULL(Total,0) * ${TC} AS Total_MXN,
+            ISNULL(LugarExpedicion,'') AS LugarExpedicion,
+            'Nómina Ingreso' AS TipoNomina
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Receptor=@rfc AND TipoComprobante='N'
+            AND Fecha>=@dateFrom AND Fecha<@dateTo
+        ) n
+        ORDER BY Fecha DESC
+      `),
 
-      -- RS3: Retenciones (facturas con cualquier retención > 0)
-      SELECT
-        UUID, Fecha, ISNULL(Status,'') AS Status,
-        ISNULL(TipoComprobante,'') AS TipoComprobante,
-        ISNULL(RFC_Emisor,'') AS RFC_Emisor,
-        ISNULL(RazonSocialEmisor,'') AS RazonSocialEmisor,
-        ISNULL(RFC_Receptor,'') AS RFC_Receptor,
-        ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
-        ISNULL(Moneda,'MXN') AS Moneda,
-        ISNULL(tipoCambio,1) AS tipoCambio,
-        ISNULL(Total,0) AS Total,
-        ISNULL(Total,0) * ${TC} AS Total_MXN,
-        ISNULL(TotalRetenidoISR,0)  AS TotalRetenidoISR,
-        ISNULL(TotalRetenidoIVA,0)  AS TotalRetenidoIVA,
-        ISNULL(TotalRetenidoIEPS,0) AS TotalRetenidoIEPS,
-        ISNULL(TotalRetenidos,0)    AS TotalRetenidos,
-        ISNULL(TotalRetenidoISR,0)  * ${TC} AS ISR_MXN,
-        ISNULL(TotalRetenidoIVA,0)  * ${TC} AS IVA_Ret_MXN,
-        CASE WHEN RFC_Emisor=@rfc THEN 'Emitida' ELSE 'Recibida' END AS Direccion
-      FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
-        AND (ISNULL(TotalRetenidoISR,0)>0 OR ISNULL(TotalRetenidoIVA,0)>0 OR ISNULL(TotalRetenidoIEPS,0)>0)
-        AND Fecha>=@dateFrom AND Fecha<@dateTo
-      ORDER BY Fecha DESC;
-    `);
+    // Q3: Retenciones — UNION ALL evita OR para mejor uso de índices
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<RetencionCFDI>(`
+        SELECT TOP 10 * FROM (
+          SELECT
+            UUID, Fecha, ISNULL(Status,'') AS Status,
+            ISNULL(TipoComprobante,'') AS TipoComprobante,
+            ISNULL(RFC_Emisor,'') AS RFC_Emisor,
+            ISNULL(RazonSocialEmisor,'') AS RazonSocialEmisor,
+            ISNULL(RFC_Receptor,'') AS RFC_Receptor,
+            ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
+            ISNULL(Moneda,'MXN') AS Moneda,
+            ISNULL(tipoCambio,1) AS tipoCambio,
+            ISNULL(Total,0) AS Total,
+            ISNULL(Total,0) * ${TC} AS Total_MXN,
+            ISNULL(TotalRetenidoISR,0)  AS TotalRetenidoISR,
+            ISNULL(TotalRetenidoIVA,0)  AS TotalRetenidoIVA,
+            ISNULL(TotalRetenidoIEPS,0) AS TotalRetenidoIEPS,
+            ISNULL(TotalRetenidos,0)    AS TotalRetenidos,
+            ISNULL(TotalRetenidoISR,0)  * ${TC} AS ISR_MXN,
+            ISNULL(TotalRetenidoIVA,0)  * ${TC} AS IVA_Ret_MXN,
+            'Emitida' AS Direccion
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Emisor=@rfc
+            AND (TotalRetenidoISR>0 OR TotalRetenidoIVA>0 OR TotalRetenidoIEPS>0)
+            AND Fecha>=@dateFrom AND Fecha<@dateTo
+          UNION ALL
+          SELECT
+            UUID, Fecha, ISNULL(Status,'') AS Status,
+            ISNULL(TipoComprobante,'') AS TipoComprobante,
+            ISNULL(RFC_Emisor,'') AS RFC_Emisor,
+            ISNULL(RazonSocialEmisor,'') AS RazonSocialEmisor,
+            ISNULL(RFC_Receptor,'') AS RFC_Receptor,
+            ISNULL(RazonSocialReceptor,'') AS RazonSocialReceptor,
+            ISNULL(Moneda,'MXN') AS Moneda,
+            ISNULL(tipoCambio,1) AS tipoCambio,
+            ISNULL(Total,0) AS Total,
+            ISNULL(Total,0) * ${TC} AS Total_MXN,
+            ISNULL(TotalRetenidoISR,0)  AS TotalRetenidoISR,
+            ISNULL(TotalRetenidoIVA,0)  AS TotalRetenidoIVA,
+            ISNULL(TotalRetenidoIEPS,0) AS TotalRetenidoIEPS,
+            ISNULL(TotalRetenidos,0)    AS TotalRetenidos,
+            ISNULL(TotalRetenidoISR,0)  * ${TC} AS ISR_MXN,
+            ISNULL(TotalRetenidoIVA,0)  * ${TC} AS IVA_Ret_MXN,
+            'Recibida' AS Direccion
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Receptor=@rfc
+            AND (TotalRetenidoISR>0 OR TotalRetenidoIVA>0 OR TotalRetenidoIEPS>0)
+            AND Fecha>=@dateFrom AND Fecha<@dateTo
+        ) r
+        ORDER BY Fecha DESC
+      `),
+  ]);
 
-  const rs = result.recordsets as unknown as Record<string, unknown>[][];
   return {
-    ingresos:    (rs[0] ?? []) as unknown as IngresoCFDI[],
-    egresos:     (rs[1] ?? []) as unknown as EgresoCFDI[],
-    nomina:      (rs[2] ?? []) as unknown as NominaCFDI[],
-    retenciones: (rs[3] ?? []) as unknown as RetencionCFDI[],
+    ingresos:    ingresosRes.recordset,
+    egresos:     egresosRes.recordset,
+    nomina:      nominaRes.recordset,
+    retenciones: retencionesRes.recordset,
   };
 }
 
@@ -341,7 +406,7 @@ export async function fetchNotasCreditoData(
     .input("dateFrom", sql.VarChar,  dateFrom)
     .input("dateTo",   sql.VarChar,  dateTo)
     .query<NotaCreditoRow>(`
-      SELECT
+      SELECT TOP 10
         fact.UUID                                                           AS uuid,
         fact.Fecha                                                          AS fecha,
         ISNULL(fact.RFC_Emisor,'')                                          AS RFC_emisor,
@@ -431,7 +496,7 @@ export async function fetchPagosData(
     .input("dateFrom", sql.VarChar,  dateFrom)
     .input("dateTo",   sql.VarChar,  dateTo)
     .query<PagoRow>(`
-      SELECT
+      SELECT TOP 10
         p.UUID                                           AS uuid_pago,
         fc.Fecha                                         AS fechaEmision,
         p.fecha_pago                                     AS fechaPago,
