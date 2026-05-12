@@ -134,6 +134,38 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Totals row — cols 7–15 (all already in MXN: each row × its own tc)
+    const sum = (fn: (r: typeof rows[0]) => number) =>
+      rows.reduce((s, r) => s + fn(r), 0);
+    const totRow = ws.addRow([
+      "TOTALES",  // 1
+      null,        // 2  Folio
+      null,        // 3  Emisor
+      null,        // 4  Régimen Emisor
+      null,        // 5  Receptor
+      null,        // 6  Régimen Receptor
+      sum(r => Number(r.subtotal)         * (Number(r.tipoCambio) || 1)), //  7 Subtotal
+      sum(r => Number(r.iva8)             * (Number(r.tipoCambio) || 1)), //  8 IVA 8%
+      sum(r => Number(r.iva16)            * (Number(r.tipoCambio) || 1)), //  9 IVA 16%
+      sum(r => Number(r.totaltrasladados) * (Number(r.tipoCambio) || 1)), // 10 Total Trasl.
+      sum(r => Number(r.retISR)           * (Number(r.tipoCambio) || 1)), // 11 Ret. ISR
+      sum(r => Number(r.retIVA)           * (Number(r.tipoCambio) || 1)), // 12 Ret. IVA
+      sum(r => Number(r.totalretenidos)   * (Number(r.tipoCambio) || 1)), // 13 Total Ret.
+      sum(r => Number(r.descuento)        * (Number(r.tipoCambio) || 1)), // 14 Descuento
+      sum(r => Number(r.total)            * (Number(r.tipoCambio) || 1)), // 15 Total
+      null,        // 16 Forma Pago
+      null,        // 17 Moneda
+      null,        // 18 Tipo Cambio
+      null,        // 19 Tipo Comprobante
+      null,        // 20 Método Pago
+    ]);
+    totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+      addBorder(cell);
+      setFill(cell, HEADER_BG);
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      if (ci >= 7 && ci <= 15) cell.numFmt = MXN_FMT;
+    });
+
     const buf = await wb.xlsx.writeBuffer();
     const pad = (n: number) => String(n).padStart(2, "0");
     const fileName = `notas-credito_${rfc}_${pad(month)}-${year}.xlsx`;

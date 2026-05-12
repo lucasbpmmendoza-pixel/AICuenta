@@ -174,13 +174,15 @@ export async function GET(req: NextRequest) {
         // RESICO Personas Morales — 1 % sobre ingresos
         case '626':
           return ing * 0.01;
-        // General Personas Morales — 30 % sobre utilidad
+        // General Personas Morales — pago provisional ~30 % sobre ingresos
+        // (Art. 14 LISR: ingresos acumulados × coeficiente utilidad × 30%;
+        //  se usa 30% directo sobre ingresos como estimado conservador)
         case '601':
-          return util * 0.30;
+          return ing * 0.30;
         // PF Actividades Empresariales y Profesionales (incluye honorarios)
-        // Retención en la fuente = 10 %; pago provisional propio = 30 % de utilidad
+        // Retención en la fuente = 10 %; pago provisional propio = 30 % de ingresos
         case '612':
-          return Math.max(util * 0.30, retenido) || 0;
+          return Math.max(ing * 0.30, retenido) || 0;
         // Arrendamiento — 20 % sobre ingresos (sin deducción)
         case '606':
           return ing * 0.20;
@@ -190,17 +192,17 @@ export async function GET(req: NextRequest) {
         default:
           // Sin régimen identificado: si hubo retenciones (honorarios, servicios)
           // se asume 10 %; de lo contrario 30 % de utilidad como respaldo conservador
-          return (retenido > 0 ? Math.max(ing * 0.10, retenido) : util * 0.30) || 0;
+          return (retenido > 0 ? Math.max(ing * 0.10, retenido) : ing * 0.30) || 0;
       }
     }
 
     function labelRegimen(reg: string): string {
       const MAP: Record<string, string> = {
-        '601': 'General PM · 30% utilidad',
+        '601': 'General PM · 30% ingresos (estimado)',
         '606': 'Arrendamiento · 20% ingresos',
         '608': 'Demás ingresos',
         '610': 'Resid. extranjero',
-        '612': 'PF Empresarial/Honorarios · 30% util.',
+        '612': 'PF Empresarial/Honorarios · 30% ingresos',
         '621': 'RIF · 10% ingresos',
         '625': 'RESICO PF · 1–2.5% ingresos',
         '626': 'RESICO PM · 1% ingresos',

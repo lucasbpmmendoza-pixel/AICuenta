@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
-import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow } from '@/lib/facturas-query'
+import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, EfectivamentePagadoRow } from '@/lib/facturas-query'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -55,6 +55,9 @@ export default function FacturasView({ session, accountType }: Props) {
   const [notasData, setNotasData]             = useState<NotaCreditoRow[] | null>(null)
   const [loadingNotas, setLoadingNotas]       = useState(false)
   const [exportingNotas, setExportingNotas]   = useState(false)
+  const [efectivamentePagadoData, setEfectivamentePagadoData]   = useState<EfectivamentePagadoRow[] | null>(null)
+  const [loadingEfectivamente, setLoadingEfectivamente]         = useState(false)
+  const [exportingEfectivamente, setExportingEfectivamente]     = useState(false)
 
   useEffect(() => {
     fetch('/api/rfcs').then(r => r.json()).then(d => {
@@ -104,6 +107,18 @@ export default function FacturasView({ session, accountType }: Props) {
       .finally(() => setLoadingNotas(false))
   }, [selectedRfc, year, month])
 
+  // Load efectivamente pagado (tipo P + PUE)
+  useEffect(() => {
+    if (!selectedRfc) return
+    setEfectivamentePagadoData(null)
+    setLoadingEfectivamente(true)
+    fetch(`/api/efectivamente-pagado/data?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`)
+      .then(r => r.json())
+      .then(d => { if (Array.isArray(d.rows)) setEfectivamentePagadoData(d.rows) })
+      .catch(() => {})
+      .finally(() => setLoadingEfectivamente(false))
+  }, [selectedRfc, year, month])
+
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
     else setMonth(m => m - 1)
@@ -132,6 +147,23 @@ export default function FacturasView({ session, accountType }: Props) {
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
     finally { setExportingNotas(false) }
+  }
+
+  async function handleExportEfectivamente() {
+    if (!selectedRfc || exportingEfectivamente) return
+    setExportingEfectivamente(true)
+    try {
+      const url = `/api/export/efectivamente-pagado?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`
+      const res = await fetch(url)
+      if (!res.ok) { alert('Error al generar el reporte'); return }
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `efectivamente-pagado_${selectedRfc}_${String(month).padStart(2,'0')}-${year}.xlsx`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch { alert('Error al descargar') }
+    finally { setExportingEfectivamente(false) }
   }
 
   async function handleExportPagos() {
@@ -199,7 +231,7 @@ export default function FacturasView({ session, accountType }: Props) {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType} />
-      <main className="flex-1 flex flex-col lg:ml-0">
+      <main className="flex-1 min-w-0 flex flex-col lg:ml-0">
         <div className="lg:hidden h-14" />
 
         {/* Header */}
@@ -258,7 +290,7 @@ export default function FacturasView({ session, accountType }: Props) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6">
 
           {/* Leyenda informativa */}
           {selectedRfc && (
@@ -343,6 +375,40 @@ export default function FacturasView({ session, accountType }: Props) {
               {/* Pagos table */}
               <div className="overflow-x-auto w-full">
                 <TablaPagos rows={pagosData ?? []} loading={loadingPagos} />
+              </div>
+            </div>
+          )}
+
+          {/* ─── Efectivamente Pagado (tipo P + PUE) ────────────────────────── */}
+          {selectedRfc && (
+            <div className="mt-6 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Efectivamente pagado</h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Complementos de pago (P) + Facturas PUE del período</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {!loadingEfectivamente && efectivamentePagadoData && (
+                    <span className="rounded-full bg-sky-50 dark:bg-sky-900/30 px-2.5 py-0.5 text-xs font-bold text-sky-700 dark:text-sky-300">
+                      {efectivamentePagadoData.length} registros
+                    </span>
+                  )}
+                  <button
+                    onClick={handleExportEfectivamente}
+                    disabled={exportingEfectivamente || loadingEfectivamente}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                  >
+                    {exportingEfectivamente ? (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                    ) : (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>
+                    )}
+                    {exportingEfectivamente ? 'Generando…' : 'Descargar Excel'}
+                  </button>
+                </div>
+              </div>
+              <div className="w-full">
+                <TablaEfectivamentePagado rows={efectivamentePagadoData ?? []} loading={loadingEfectivamente} />
               </div>
             </div>
           )}
@@ -592,6 +658,51 @@ function TablaPagos({ rows, loading }: { rows: PagoRow[]; loading: boolean }) {
         })}
       </tbody>
       <LimitNote count={rows.length} cols={11} />
+    </table>
+  )
+}
+
+function TablaEfectivamentePagado({ rows, loading }: { rows: EfectivamentePagadoRow[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20 text-sm text-slate-400 dark:text-zinc-500 gap-2">
+        <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+        Cargando…
+      </div>
+    )
+  }
+  return (
+    <table className="w-full table-fixed">
+      <colgroup><col className="w-36" /><col className="w-28" /><col className="w-28" /><col className="w-36" /><col /><col className="w-28" /><col className="w-32" /></colgroup>
+      <thead>
+        <tr>
+          <TH>Fuente</TH><TH>F. Emisión</TH><TH>F. Pago</TH>
+          <TH>RFC Receptor</TH><TH>Razón Social</TH>
+          <TH>Forma Pago</TH><TH>Total</TH>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length === 0 ? <EmptyRow cols={7} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => {
+          const tc = Number(r.tipoCambio) || 1
+          const isPago = r.fuente === 'Complemento P'
+          return (
+            <tr key={`${r.uuid}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
+              <TD>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${isPago ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'}`}>
+                  {r.fuente}
+                </span>
+              </TD>
+              <TD>{fmt(r.fechaEmision)}</TD>
+              <TD>{r.fechaPago ? fmt(r.fechaPago) : '—'}</TD>
+              <TD><span className="font-mono text-xs">{r.RFC_receptor}</span></TD>
+              <TD><span className="truncate block">{r.RazonSocialReceptor || r.RFC_receptor}</span></TD>
+              <TD>{r.formaPago || '—'}</TD>
+              <TD right><span className="font-semibold">{MXN(Number(r.total) * tc)}</span></TD>
+            </tr>
+          )
+        })}
+      </tbody>
+      <LimitNote count={rows.length} cols={7} />
     </table>
   )
 }
