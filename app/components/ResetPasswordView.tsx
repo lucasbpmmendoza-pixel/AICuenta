@@ -98,7 +98,7 @@ export default function ResetPasswordView() {
             className="mb-2 rounded-3xl"
             priority
           />
-          <p className="mt-2 max-w-[220px] text-sm leading-6 text-white/45">
+          <p className="mt-2 max-w-[220px] text-sm leading-6 text-white/45 text-color-brand-deep-light-300"> 
             Claridad fiscal desde tus datos, sin captura manual.
           </p>
         </div>

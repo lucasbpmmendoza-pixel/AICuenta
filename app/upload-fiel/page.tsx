@@ -5,7 +5,7 @@ import Dashboard from "../components/Dashboard";
 
 export default async function UploadFielPage() {
   const session = await getSession();
-  if (!session) redirect("/upload-f");
+  if (!session) redirect("/login");
 
   // Los miembros no configuran EFIEL, van directo al dashboard
   if (session.role === 'member') redirect("/dashboard");

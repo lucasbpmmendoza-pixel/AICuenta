@@ -19,7 +19,7 @@ export default function Dashboard() {
   const [nombre, setNombre] = useState('')
 
   function handleUnete() {
-    const mensaje = encodeURIComponent(`Hola soy ${nombre.trim()} ${rfc.trim()}`)
+    const mensaje = encodeURIComponent(`${nombre.trim()} ${rfc.trim()}`)
     window.open(`https://wa.me/526563138465?text=${mensaje}`, '_blank')
   }
 
@@ -72,7 +72,7 @@ export default function Dashboard() {
             placeholder="Ej. XAXX010101000"
             maxLength={50}
             required
-            className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
+            className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-deep transition text-sm"
           />
         </div>
 
@@ -87,25 +87,15 @@ export default function Dashboard() {
             onChange={(e) => setEfiel(e.target.value)}
             placeholder="Contrasena de la e.firma"
             required
-            className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition text-sm"
+            className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-deep transition text-sm"
           />
         </div>
 
-        <div className="rounded-xl bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 px-4 py-3 mt-auto">
-          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">Estructura en Vercel Blob</p>
-          <pre className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed font-mono whitespace-pre">
-{`blob/
-  ${rfc || '<RFC>'}/
-    |- archivo.CER
-    |- archivo.KEY
-    |- efiel.txt`}
-          </pre>
-        </div>
 
         {status && (
           <div
             className={[
-              'rounded-lg px-4 py-3 text-sm font-medium',
+              'rounded-lg px-4 py-3 text-sm font-medium mt-auto',
               status.success
                 ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
                 : 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300',
@@ -118,7 +108,7 @@ export default function Dashboard() {
         <button
           type="submit"
           disabled={loading}
-          className="rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm"
+          className={`rounded-xl bg-brand-deep hover:bg-brand-purple disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm${!status ? ' mt-auto' : ''}`}
         >
           {loading ? 'Guardando...' : 'Guardar archivos'}
         </button>
@@ -146,9 +136,9 @@ export default function Dashboard() {
 
   const unetePanel = (
     <div className="w-[300px] shrink-0 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col">
-      <div className="bg-green-600 px-6 py-5">
+      <div className="bg-gradient-to-b from-brand-green to-brand-lime px-6 py-5">
         <h2 className="text-lg font-bold text-white tracking-tight">Unete a nuestro equipo</h2>
-        <p className="text-sm text-green-100 mt-0.5">Un paso mas para empezar.</p>
+        <p className="text-sm text-white/70 mt-0.5">Un paso mas para empezar.</p>
       </div>
       <div className="flex flex-col gap-5 px-6 py-6 flex-1">
         <p className="text-zinc-600 dark:text-zinc-300 text-sm leading-relaxed">
@@ -175,7 +165,7 @@ export default function Dashboard() {
           type="button"
           onClick={handleUnete}
           disabled={nombre.trim() === '' || rfc.trim() === ''}
-          className="mt-auto rounded-xl bg-green-600 hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm"
+          className="mt-auto rounded-xl bg-brand-green hover:bg-[#25D366] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm"
         >
           Aceptar - Ir a WhatsApp
         </button>
@@ -196,9 +186,9 @@ export default function Dashboard() {
         {accountType === 'multi' ? (
           <>
             {/* Header */}
-            <div className="bg-indigo-600 px-8 py-5">
+            <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5">
               <h1 className="text-xl font-bold text-white tracking-tight">Bienvenido, Contador</h1>
-              <p className="text-sm text-indigo-200 mt-0.5">Gestionas multiples RFCs. Accede al dashboard o registra tu propia FIEL.</p>
+              <p className="text-sm text-white/70 mt-0.5">Gestionas multiples RFCs. Accede al dashboard o registra tu propia FIEL.</p>
             </div>
 
             {/* Dashboard CTA */}
@@ -209,7 +199,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => router.push('/dashboard')}
-                className="mt-1 inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-3 transition-colors text-sm"
+                className="mt-1 inline-flex items-center gap-2 rounded-xl bg-brand-deep hover:bg-brand-purple text-white font-semibold px-8 py-3 transition-colors text-sm"
               >
                 Ir al Dashboard
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
@@ -232,9 +222,9 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Header */}
-            <div className="bg-blue-600 px-8 py-5">
+            <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5">
               <h1 className="text-xl font-bold text-white tracking-tight">Dashboard de Certificados</h1>
-              <p className="text-sm text-blue-100 mt-0.5">Ingresa los datos y sube los archivos de firma electronica.</p>
+              <p className="text-sm text-white/70 mt-0.5">Ingresa los datos y sube los archivos de firma electronica.</p>
             </div>
             {uploadForm}
           </>

@@ -249,7 +249,7 @@ export default function RFCsView({ readOnly = false }: Props) {
           {editingRfc && !readOnly && (
             <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-blue-200 dark:border-blue-800 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-blue-100 dark:border-blue-900/40">
-                <h2 className="text-sm font-bold text-blue-700 dark:text-blue-300">Actualizar RFC: {editingRfc.rfc}</h2>
+                <h2 className="text-sm font-bold text-blue-700 dark:text-blue-light-300">Actualizar RFC: {editingRfc.rfc}</h2>
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                   Sube los nuevos archivos .CER y .KEY para renovar la e.firma.
                 </p>
@@ -279,7 +279,7 @@ export default function RFCsView({ readOnly = false }: Props) {
                   <input
                     type="text" value={search} onChange={(e) => setSearch(e.target.value)}
                     placeholder="Buscar RFC..."
-                    className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 pl-8 pr-4 py-1.5 text-sm text-slate-800 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                    className="w-full rounded-lg border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 pl-8 pr-4 py-1.5 text-sm text-slate-800 dark:text-zinc-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-light-light-500 transition"
                   />
                   {search && (
                     <button type="button" onClick={() => setSearch('')}
@@ -349,7 +349,7 @@ export default function RFCsView({ readOnly = false }: Props) {
                             className={[
                               'rounded-lg px-3 py-1.5 text-xs font-semibold border transition-colors',
                               editingRfc?.id === r.id
-                                ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
+                                ? 'border-blue-light-ldeep-lblue-ldeep-ldeep-ldeep-ldeep-ldeep-ldeep-ldeep-ldeep-lblue-ldeep-ldeep-ldeep-lblue-ldeep-ldeep-lblue-light-light-light-light-light-lblue-ldeep-ldeep-ldeep-ldeep-ldeep-ldeep-ldeep-lblue-ldeep-ldeep-ldeep-lblue-light-light-light-light-light-light-light-light-light-light-light-light-light-light-400 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300'
                                 : 'border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:border-blue-300 hover:text-blue-600',
                             ].join(' ')}
                           >

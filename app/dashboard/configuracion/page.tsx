@@ -12,15 +12,30 @@ export default async function ConfiguracionPage() {
   const effectiveId = session.ownerId ?? session.sub;
 
   let accountType: string | null = null;
+  let rfcFromDb: string | null = null;
+  let efieles: string[] = [];
   try {
     const db = await getDb();
-    const result = await db
+    const userResult = await db
       .request()
       .input("id", effectiveId)
-      .query<{ account_type: string | null }>("SELECT account_type FROM users WHERE id = @id");
-    accountType = result.recordset[0]?.account_type ?? null;
+      .query<{ account_type: string | null; rfc: string | null }>(
+        "SELECT account_type, rfc FROM users WHERE id = @id"
+      );
+    accountType = userResult.recordset[0]?.account_type ?? null;
+    rfcFromDb = userResult.recordset[0]?.rfc ?? null;
+
+    if (accountType === "multi") {
+      const efielesResult = await db
+        .request()
+        .input("user_id", effectiveId)
+        .query<{ rfc: string }>(
+          "SELECT rfc FROM EFIELES WHERE user_id = @user_id ORDER BY created_at DESC"
+        );
+      efieles = efielesResult.recordset.map((r) => r.rfc);
+    }
   } catch (err) {
-    console.error("[configuracion] Error al leer account_type:", (err as Error).message);
+    console.error("[configuracion] Error al leer datos:", (err as Error).message);
   }
   if (!accountType) redirect("/upload-fiel");
 
@@ -28,7 +43,12 @@ export default async function ConfiguracionPage() {
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType as "single" | "multi"} />
       <div className="flex-1 flex flex-col">
-        <ConfiguracionView session={session} />
+        <ConfiguracionView
+          session={session}
+          accountType={accountType as "single" | "multi"}
+          rfcFromDb={rfcFromDb}
+          efieles={efieles}
+        />
         <DashboardFooter />
       </div>
     </div>
