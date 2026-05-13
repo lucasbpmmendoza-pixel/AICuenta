@@ -46,7 +46,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
 
         {/* Header */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
-          <h1 className="text-lg font-bold text-slate-900 dark:text-white">AIChikenelo</h1>
+          <h1 className="text-lg font-bold text-[#7B6FE8] dark:text-[#91eb78]">AIChikenelo</h1>
           <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Unete a nuestro equipo</p>
         </div>
 
@@ -55,8 +55,8 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
           <div className="w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col">
 
             <div className="bg-gradient-to-b from-brand-green to-brand-lime px-8 py-5">
-              <h2 className="text-xl font-bold text-white tracking-tight">Unete a nuestro equipo</h2>
-              <p className="text-sm text-white/70 mt-0.5">Un paso mas para empezar.</p>
+              <h2 className="text-xl font-bold text-zinc-700 dark:text-white tracking-tight">Unete a nuestro equipo</h2>
+              <p className="text-sm text-zinc-700 dark:text-white mt-0.5">Un paso mas para empezar.</p>
             </div>
 
             <div className="flex flex-col gap-6 px-8 py-8">

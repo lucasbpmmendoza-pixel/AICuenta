@@ -140,7 +140,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
 
       {/* Page header */}
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
-        <h1 className="text-lg font-bold text-slate-900 dark:text-white">Configuracion</h1>
+        <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Configuracion</h1>
         <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Administra tu cuenta y datos personales.</p>
       </div>
 
@@ -150,7 +150,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
           {/* ── Edit profile card ── */}
           <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
-              <h2 className="text-sm font-bold text-slate-800 dark:text-zinc-100">Datos personales</h2>
+              <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Datos personales</h2>
               <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                 Ingresa tu contrasena actual para guardar cambios.
               </p>

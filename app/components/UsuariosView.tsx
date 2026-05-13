@@ -102,7 +102,7 @@ export default function UsuariosView() {
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">Usuarios</h1>
+            <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Usuarios</h1>
             <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
               Gestiona los miembros de tu cuenta. Maximo 10 usuarios.
             </p>
@@ -138,7 +138,7 @@ export default function UsuariosView() {
           {showForm && (
             <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
-                <h2 className="text-sm font-bold text-slate-800 dark:text-zinc-100">Nuevo usuario</h2>
+                <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Nuevo usuario</h2>
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                   El usuario podra iniciar sesion con estas credenciales y tendra acceso de solo lectura a tu cuenta.
                 </p>
@@ -200,7 +200,7 @@ export default function UsuariosView() {
           {/* Members list */}
           <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
-              <h2 className="text-sm font-bold text-slate-800 dark:text-zinc-100">
+              <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">
                 Miembros del equipo
                 <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 text-xs font-bold text-slate-500 dark:text-zinc-400">
                   {members.length}

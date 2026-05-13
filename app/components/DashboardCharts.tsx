@@ -92,7 +92,7 @@ function ChartCard({ title, subtitle, children, className = '' }: {
   return (
     <div className={`rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden ${className}`}>
       <div className="px-5 py-4 border-b border-slate-100 dark:border-zinc-800">
-        <h3 className="text-sm font-bold text-slate-800 dark:text-zinc-100">{title}</h3>
+        <h3 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">{title}</h3>
         {subtitle && <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">{subtitle}</p>}
       </div>
       <div className="p-5">{children}</div>
@@ -103,7 +103,7 @@ function ChartCard({ title, subtitle, children, className = '' }: {
 function EmptyChart({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center h-[190px] gap-2 text-center">
-      <svg className="h-8 w-8 text-slate-200 dark:text-zinc-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <svg className="h-8 w-8  text-[#7B6FE8] dark:text-[#91eb78]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
         <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
       </svg>
       <p className="text-xs text-slate-400 dark:text-zinc-500">{label}</p>

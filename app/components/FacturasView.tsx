@@ -215,17 +215,23 @@ export default function FacturasView({ session, accountType }: Props) {
   ]
 
   const tabActive  = 'border-b-2 font-semibold text-sm px-4 py-2.5 transition'
-  const tabNormal  = 'border-b-2 border-transparent font-semibold text-sm px-4 py-2.5 transition text-slate-500 dark:text-zinc-400 hover:text-slate-700 dark:hover:text-zinc-200'
+  const tabBase    = 'border-b-2 border-transparent font-semibold text-sm px-4 py-2.5 transition text-slate-500 dark:text-zinc-400'
 
   function tabClass(t: Tab) {
-    if (t !== tab) return tabNormal
-    const colors: Record<Tab, string> = {
+    const activeColors: Record<Tab, string> = {
       ingresos:    'border-emerald-500 text-emerald-700 dark:text-emerald-300',
       egresos:     'border-amber-500 text-amber-700 dark:text-amber-300',
       nomina:      'border-violet-500 text-violet-700 dark:text-violet-300',
       retenciones: 'border-red-500 text-red-700 dark:text-red-300',
     }
-    return `${tabActive} ${colors[t]}`
+    if (t === tab) return `${tabActive} ${activeColors[t]}`
+    const hoverColors: Record<Tab, string> = {
+      ingresos:    'hover:text-emerald-700 dark:hover:text-emerald-300',
+      egresos:     'hover:text-amber-700 dark:hover:text-amber-300',
+      nomina:      'hover:text-violet-700 dark:hover:text-violet-300',
+      retenciones: 'hover:text-red-700 dark:hover:text-red-300',
+    }
+    return `${tabBase} ${hoverColors[t]}`
   }
 
   return (
@@ -238,7 +244,7 @@ export default function FacturasView({ session, accountType }: Props) {
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">Facturas</h1>
+              <h1 className="text-lg font-bold text-[#7B6FE8] dark:text-[#91eb78]">Facturas</h1>
               <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Listado y exportación de CFDIs</p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -349,7 +355,7 @@ export default function FacturasView({ session, accountType }: Props) {
               {/* Pagos header */}
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Pagos</h2>
+                  <h2 className="text-sm font-bold text-teal-700 dark:text-teal-300">Pagos</h2>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Complementos de pago (TipoComprobante P)</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -384,7 +390,7 @@ export default function FacturasView({ session, accountType }: Props) {
             <div className="mt-6 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Efectivamente pagado</h2>
+                  <h2 className="text-sm font-bold text-sky-700 dark:text-sky-300">Efectivamente pagado</h2>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Complementos de pago (P) + Facturas PUE del período</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -418,7 +424,7 @@ export default function FacturasView({ session, accountType }: Props) {
             <div className="mt-6 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
                 <div>
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">Notas de Crédito</h2>
+                  <h2 className="text-sm font-bold text-orange-700 dark:text-orange-300">Notas de Crédito</h2>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">CFDIs de tipo Egreso (E) vigentes</p>
                 </div>
                 <div className="flex items-center gap-2">

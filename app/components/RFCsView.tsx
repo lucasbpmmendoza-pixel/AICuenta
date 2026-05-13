@@ -195,7 +195,7 @@ export default function RFCsView({ readOnly = false }: Props) {
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-bold text-slate-900 dark:text-white">RFCs</h1>
+            <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">RFCs</h1>
             <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
               {readOnly ? 'Visualiza los RFCs registrados en esta cuenta.' : 'Gestiona los RFCs y sus e.firmas.'}
             </p>
@@ -233,7 +233,7 @@ export default function RFCsView({ readOnly = false }: Props) {
           {showAdd && !readOnly && (
             <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
-                <h2 className="text-sm font-bold text-slate-800 dark:text-zinc-100">Nuevo RFC</h2>
+                <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Nuevo RFC</h2>
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                   Sube los archivos .CER y .KEY de la e.firma para este RFC.
                 </p>
@@ -265,7 +265,7 @@ export default function RFCsView({ readOnly = false }: Props) {
           {/* RFC list */}
           <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800 flex flex-col sm:flex-row sm:items-center gap-3">
-              <h2 className="text-sm font-bold text-slate-800 dark:text-zinc-100 shrink-0">
+              <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78] shrink-0">
                 RFCs registrados
                 <span className="ml-2 inline-flex items-center rounded-full bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 text-xs font-bold text-slate-500 dark:text-zinc-400">
                   {rfcs.length}
