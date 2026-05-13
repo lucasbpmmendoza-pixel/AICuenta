@@ -208,7 +208,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">Estados Financieros</h1>
+              <h1 className="text-lg font-bold text-[#7B6FE8] dark:text-[#91eb78]">Estados Financieros</h1>
               <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Principales ingresos y egresos por producto o servicio</p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -296,7 +296,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                       </svg>
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold text-slate-900 dark:text-white">Principales Ingresos</h2>
+                      <h2 className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Principales Ingresos</h2>
                       <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Por producto o servicio — facturas emitidas</p>
                     </div>
                   </div>
@@ -320,7 +320,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                       </svg>
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold text-slate-900 dark:text-white">Principales Egresos</h2>
+                      <h2 className="text-sm font-bold text-rose-700 dark:text-rose-300">Principales Egresos</h2>
                       <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Por producto o servicio — facturas recibidas</p>
                     </div>
                   </div>
