@@ -83,7 +83,7 @@ export default function LoginView() {
             style={{ width: 360, height: 'auto' }}
             priority
           />
-          <p className="mt-2 max-w-[220px] text-sm leading-6 text-[#7B6FE8]">
+          <p className="mt-2 max-w-[220px] text-sm leading-6 text-[#4932d7]">
             Claridad fiscal desde tus datos, sin captura manual.
           </p>
         </div>
