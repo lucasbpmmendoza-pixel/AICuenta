@@ -141,7 +141,7 @@ export default function Sidebar({ userName, accountType }: Props) {
         </div>
         <span className="  text-sm font-black tracking-tight text-[#7b6fe8] dark:text-[#91EB78]">AIcuenta</span>
         {accountType === 'multi' && (
-          <span className="ml-auto rounded-full bg-indigo-100 dark:bg-indigo-500/20 px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#6bda4d] font-bold">
+          <span className="ml-auto rounded-full bg-[#ebe9fb] dark:bg-[#5E6957] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#7b6fe8] dark:text-[#6BDA4D] font-bold">
             Multi
           </span>
         )}
