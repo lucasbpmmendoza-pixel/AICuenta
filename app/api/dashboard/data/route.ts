@@ -40,9 +40,8 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
 
-    // 6 queries completamente en paralelo — cada una usa su propia conexión del pool
-    // OPTION (RECOMPILE) evita reutilizar planes de ejecución malos por parameter sniffing
-    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes] = await Promise.all([
+    // Promise.allSettled — si una query es lenta/falla, las demás igual retornan
+    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes] = await Promise.allSettled([
 
       // Q1: Resumen ingresos emitidos
       db.request()
@@ -61,7 +60,7 @@ export async function GET(req: NextRequest) {
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
             AND Fecha>=@dateFrom AND Fecha<@dateTo
-          OPTION (RECOMPILE)
+          OPTION (RECOMPILE, MAXDOP 1)
         `),
 
       // Q2: Resumen egresos recibidos
@@ -76,7 +75,7 @@ export async function GET(req: NextRequest) {
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE RFC_Receptor=@rfc AND TipoComprobante='I'
             AND Fecha>=@dateFrom AND Fecha<@dateTo
-          OPTION (RECOMPILE)
+          OPTION (RECOMPILE, MAXDOP 1)
         `),
 
       // Q3: Top 5 clientes (receptores de ingresos emitidos)
@@ -93,7 +92,7 @@ export async function GET(req: NextRequest) {
             AND Fecha>=@dateFrom AND Fecha<@dateTo
           GROUP BY RazonSocialReceptor, RFC_Receptor
           ORDER BY SUM(Total * ISNULL(NULLIF(tipoCambio,0),1)) DESC
-          OPTION (RECOMPILE)
+          OPTION (RECOMPILE, MAXDOP 1)
         `),
 
       // Q4: Top 5 proveedores (emisores de egresos recibidos)
@@ -110,10 +109,10 @@ export async function GET(req: NextRequest) {
             AND Fecha>=@dateFrom AND Fecha<@dateTo
           GROUP BY RazonSocialEmisor, RFC_Emisor
           ORDER BY SUM(Total * ISNULL(NULLIF(tipoCambio,0),1)) DESC
-          OPTION (RECOMPILE)
+          OPTION (RECOMPILE, MAXDOP 1)
         `),
 
-      // Q5: Top 5 conceptos de ingresos — sin JOIN, usa importe directo de conceptos
+      // Q5: Top 5 conceptos de ingresos
       db.request()
         .input("rfc",      sql.NVarChar, rfc)
         .input("dateFrom", sql.DateTime,  dateFrom)
@@ -127,10 +126,10 @@ export async function GET(req: NextRequest) {
             AND c.fecha>=@dateFrom AND c.fecha<@dateTo
           GROUP BY c.Descripcion
           ORDER BY SUM(ISNULL(c.Importe,0)) DESC
-          OPTION (RECOMPILE)
+          OPTION (RECOMPILE, MAXDOP 1)
         `),
 
-      // Q6: Régimen fiscal (query mínima, índice por RFC_Emisor + Fecha)
+      // Q6: Régimen fiscal
       db.request()
         .input("rfc", sql.NVarChar, rfc)
         .query(`
@@ -139,6 +138,7 @@ export async function GET(req: NextRequest) {
           WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
             AND RegimenFiscal IS NOT NULL AND RegimenFiscal<>''
           ORDER BY Fecha DESC
+          OPTION (RECOMPILE, MAXDOP 1)
         `),
     ]);
 
@@ -147,19 +147,34 @@ export async function GET(req: NextRequest) {
     type NomRow  = { nombre:string; monto:number };
     type ConcRow = { concepto:string; monto:number };
 
-    const ingRow   = (ingRes.recordset[0]  as IngRow)  ?? { total:0, count:0, vigentes:0, cancelados:0, ivaTotal:0, isrRetenido:0, ivaRetenido:0 };
-    const egrRow   = (egrRes.recordset[0]  as EgrRow)  ?? { total:0, count:0 };
-    const clientes = clientesRes.recordset as NomRow[];
-    const provs    = provsRes.recordset    as NomRow[];
-    const concIng  = concIngRes.recordset  as ConcRow[];
-    const concEgr  = provs.map(p => ({ concepto: p.nombre, monto: p.monto })); // egresos = mismos proveedores
+    // Helper: extrae recordset de un PromiseSettledResult, o retorna default
+    function settled<T>(res: PromiseSettledResult<sql.IResult<T>>, def: T[]): T[] {
+      if (res.status === 'fulfilled') return res.value.recordset as T[];
+      console.error('[dashboard/data] query failed:', (res.reason as Error)?.message);
+      return def;
+    }
+    function settledOne<T>(res: PromiseSettledResult<sql.IResult<T>>, def: T): T {
+      if (res.status === 'fulfilled') return (res.value.recordset[0] as T) ?? def;
+      console.error('[dashboard/data] query failed:', (res.reason as Error)?.message);
+      return def;
+    }
+
+    const defIng: IngRow = { total:0, count:0, vigentes:0, cancelados:0, ivaTotal:0, isrRetenido:0, ivaRetenido:0 };
+    const defEgr: EgrRow = { total:0, count:0 };
+
+    const ingRow   = settledOne<IngRow>(ingRes,  defIng);
+    const egrRow   = settledOne<EgrRow>(egrRes,  defEgr);
+    const clientes = settled<NomRow>(clientesRes, []);
+    const provs    = settled<NomRow>(provsRes,    []);
+    const concIng  = settled<ConcRow>(concIngRes, []);
+    const concEgr  = provs.map(p => ({ concepto: p.nombre, monto: p.monto }));
+    const regRes   = regimenRes.status === 'fulfilled' ? regimenRes.value.recordset[0] : undefined;
+    const regimen  = String((regRes as { regimenFiscal: string } | undefined)?.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
 
     const ingresosMXN = Number(ingRow.total)       || 0;
     const egresosMXN  = Number(egrRow.total)       || 0;
     const utilidad    = Math.max(ingresosMXN - egresosMXN, 0);
     const isrRetenido = Number(ingRow.isrRetenido) || 0;
-    const regimen     = String((regimenRes.recordset[0] as { regimenFiscal: string } | undefined)?.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
-
 
     // Estima ISR provisional mensual según régimen fiscal
     function estimarISR(reg: string, ing: number, util: number, retenido: number): number {

@@ -632,3 +632,81 @@ export async function fetchPagosData(
     `);
   return result.recordset;
 }
+
+// ─── Estados Financieros ──────────────────────────────────────────────────────
+
+export interface ConceptoRow {
+  descripcion:   string;
+  claveProdServ: string;
+  cantidad:      number;
+  importe:       number;
+  numFacturas:   number;
+}
+
+export interface EstadosFinancierosData {
+  ingresos: ConceptoRow[];
+  egresos:  ConceptoRow[];
+}
+
+export async function fetchEstadosFinancieros(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  limit?: number
+): Promise<EstadosFinancierosData> {
+  const db  = await getDb();
+  const top = limit !== undefined ? `TOP ${limit}` : '';
+
+  const [ingRes, egrRes] = await Promise.all([
+    // Ingresos: conceptos emitidos por el RFC
+    // — filtra por rfc_cliente+movimiento+fecha (usa índice), sin funciones en GROUP BY
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<ConceptoRow>(`
+        SELECT ${top || 'TOP 100'}
+          ISNULL(NULLIF(c.Descripcion,''), 'Sin descripción') AS descripcion,
+          ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
+          SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
+          SUM(ISNULL(c.Importe,  0))                         AS importe,
+          COUNT(DISTINCT c.UUID)                             AS numFacturas
+        FROM facturalo_conceptos c WITH (NOLOCK)
+        WHERE c.rfc_cliente = @rfc
+          AND c.movimiento  = 'Ingreso'
+          AND c.fecha >= @dateFrom AND c.fecha < @dateTo
+        GROUP BY c.Descripcion, c.ClaveProductoServicio
+        ORDER BY SUM(ISNULL(c.Importe, 0)) DESC
+        OPTION (RECOMPILE)
+      `),
+
+    // Egresos: conceptos de facturas recibidas por el RFC
+    // — INNER JOIN en lugar de IN (subquery): mejor uso del índice IX_conceptos_uuid
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<ConceptoRow>(`
+        SELECT ${top || 'TOP 100'}
+          ISNULL(NULLIF(c.Descripcion,''), 'Sin descripción') AS descripcion,
+          ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
+          SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
+          SUM(ISNULL(c.Importe,  0))                         AS importe,
+          COUNT(DISTINCT c.UUID)                             AS numFacturas
+        FROM facturalo_cfdis f WITH (NOLOCK)
+        INNER JOIN facturalo_conceptos c WITH (NOLOCK) ON c.UUID = f.UUID
+        WHERE f.RFC_Receptor    = @rfc
+          AND f.TipoComprobante = 'I'
+          AND f.Status          = 'Vigente'
+          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        GROUP BY c.Descripcion, c.ClaveProductoServicio
+        ORDER BY SUM(ISNULL(c.Importe, 0)) DESC
+        OPTION (RECOMPILE)
+      `),
+  ]);
+
+  return {
+    ingresos: ingRes.recordset,
+    egresos:  egrRes.recordset,
+  };
+}
