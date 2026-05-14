@@ -9,6 +9,12 @@ interface Member {
   created_at: string
 }
 
+interface RfcOption {
+  id: string
+  rfc: string
+  assigned: boolean
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })
 }
@@ -33,6 +39,14 @@ export default function UsuariosView() {
   // Delete state
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmId,  setConfirmId]  = useState<string | null>(null)
+
+  // RFC assignment modal state
+  const [rfcMember,       setRfcMember]       = useState<Member | null>(null)
+  const [rfcOptions,      setRfcOptions]      = useState<RfcOption[]>([])
+  const [rfcSelected,     setRfcSelected]     = useState<Set<string>>(new Set())
+  const [rfcModalLoading, setRfcModalLoading] = useState(false)
+  const [rfcSaving,       setRfcSaving]       = useState(false)
+  const [rfcModalResult,  setRfcModalResult]  = useState<{ ok: boolean; text: string } | null>(null)
 
   async function loadMembers() {
     setLoading(true)
@@ -72,6 +86,55 @@ export default function UsuariosView() {
       setResult({ ok: false, text: 'Error de red. Intenta de nuevo.' })
     } finally {
       setAdding(false)
+    }
+  }
+
+  async function openRfcModal(m: Member) {
+    setRfcMember(m)
+    setRfcModalResult(null)
+    setRfcModalLoading(true)
+    try {
+      const res = await fetch(`/api/team/${m.id}/rfcs`)
+      const data = await res.json()
+      const opts: RfcOption[] = data.rfcs ?? []
+      setRfcOptions(opts)
+      setRfcSelected(new Set(opts.filter((r) => r.assigned).map((r) => r.id)))
+    } catch {
+      setRfcOptions([])
+      setRfcSelected(new Set())
+    } finally {
+      setRfcModalLoading(false)
+    }
+  }
+
+  function toggleRfc(id: string) {
+    setRfcSelected((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  async function handleSaveRfcs() {
+    if (!rfcMember) return
+    setRfcSaving(true)
+    setRfcModalResult(null)
+    try {
+      const res = await fetch(`/api/team/${rfcMember.id}/rfcs`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rfcIds: Array.from(rfcSelected) }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setRfcModalResult({ ok: false, text: data.error ?? 'Error al guardar' })
+      } else {
+        setRfcModalResult({ ok: true, text: 'RFCs asignados correctamente.' })
+      }
+    } catch {
+      setRfcModalResult({ ok: false, text: 'Error de red. Intenta de nuevo.' })
+    } finally {
+      setRfcSaving(false)
     }
   }
 
@@ -244,6 +307,13 @@ export default function UsuariosView() {
                     <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 dark:bg-zinc-800 px-2 py-0.5 text-xs font-semibold text-slate-400 dark:text-zinc-500">
                       Solo lectura
                     </span>
+                    {/* Assign RFCs */}
+                    <button
+                      onClick={() => openRfcModal(m)}
+                      className="shrink-0 rounded-lg border border-[#7B6FE8]/40 dark:border-[#91eb78]/30 px-3 py-1.5 text-xs font-semibold text-[#7B6FE8] dark:text-[#91eb78] hover:bg-[#ebe9fb] dark:hover:bg-[#5E6957] transition-colors"
+                    >
+                      Asignar RFCs
+                    </button>
                     {/* Delete */}
                     <button
                       onClick={() => handleDelete(m.id)}
@@ -280,6 +350,87 @@ export default function UsuariosView() {
 
         </div>
       </div>
+
+      {/* ── RFC assignment modal ── */}
+      {rfcMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setRfcMember(null)} />
+          <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-700 shadow-2xl overflow-hidden">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
+              <div>
+                <h2 className="text-sm font-bold text-[#7B6FE8] dark:text-[#91eb78]">Asignar RFCs</h2>
+                <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5 truncate max-w-[260px]">{rfcMember.name}</p>
+              </div>
+              <button
+                onClick={() => setRfcMember(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+                aria-label="Cerrar"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal body */}
+            <div className="px-6 py-4 max-h-64 overflow-y-auto">
+              {rfcModalLoading ? (
+                <div className="flex justify-center py-6">
+                  <div className="h-4 w-32 rounded bg-slate-100 dark:bg-zinc-800 animate-pulse" />
+                </div>
+              ) : rfcOptions.length === 0 ? (
+                <p className="text-sm text-slate-400 dark:text-zinc-500 text-center py-6">No hay RFCs registrados en tu cuenta.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {rfcOptions.map((r) => (
+                    <li key={r.id}>
+                      <label className="flex items-center gap-3 cursor-pointer rounded-xl px-3 py-2.5 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={rfcSelected.has(r.id)}
+                          onChange={() => toggleRfc(r.id)}
+                          className="h-4 w-4 rounded border-slate-300 dark:border-zinc-600 accent-[#7B6FE8] dark:accent-[#91eb78] cursor-pointer"
+                        />
+                        <span className="text-sm font-mono font-semibold text-slate-700 dark:text-zinc-200">{r.rfc}</span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Result banner */}
+            {rfcModalResult && (
+              <div className={[
+                'mx-6 mb-0 rounded-xl px-4 py-2.5 text-xs font-medium',
+                rfcModalResult.ok
+                  ? 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+              ].join(' ')}>
+                {rfcModalResult.text}
+              </div>
+            )}
+
+            {/* Modal footer */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 dark:border-zinc-800">
+              <button
+                onClick={() => setRfcMember(null)}
+                className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 hover:bg-slate-50 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 text-sm font-semibold px-5 py-2 transition-colors"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={handleSaveRfcs}
+                disabled={rfcSaving || rfcModalLoading}
+                className="rounded-xl bg-[#7B6FE8] hover:bg-[#6a5fd6] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 transition-colors"
+              >
+                {rfcSaving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
