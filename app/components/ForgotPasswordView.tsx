@@ -83,7 +83,7 @@ export default function ForgotPasswordView() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_75%_75%,rgba(20,86,73,0.18),transparent_55%)]" />
         <div className="relative flex flex-col items-center text-center">
           <Image
-            src="/logo3.webp"
+            src="/logo4.png"
             alt="AIcuenta"
             width={360}
             height={360}
@@ -91,7 +91,7 @@ export default function ForgotPasswordView() {
             style={{ width: 360, height: 'auto' }}
             priority
           />
-          <p className="mt-2 max-w-[220px] text-sm leading-6 text-[#4932d7]">
+          <p className="mt-2 max-w-[220px] text-sm leading-6 text-[#aedb4a]">
             Claridad fiscal desde tus datos, sin captura manual.
           </p>
         </div>

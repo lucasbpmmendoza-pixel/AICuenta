@@ -143,13 +143,10 @@ export default function Sidebar({ userName, accountType }: Props) {
   const navContent = (
     <div className="flex h-full flex-col">
       {/* Logo */}
-      <div className="flex items-center gap-2.5 px-5 py-5 border-b border-slate-200 dark:border-zinc-800">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600">{/*aqui esta el logo*/}
-          <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5z" />
-            <path d="M2 17l10 5 10-5" />
-            <path d="M2 12l10 5 10-5" />
-          </svg>
+      <div className="flex items-center gap-4 px-2 py-1 border-b border-slate-200 dark:border-zinc-800">
+        <div className="flex items-center justify-center" style={{ width: 75, height: 75 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={dark ? '/logo6-negro.png' : '/logo6-blanco.png'} alt="AIcuenta" style={{ width: '75%', height: '75%', objectFit: 'contain' }} />
         </div>
         <span className="  text-sm font-black tracking-tight text-[#7b6fe8] dark:text-[#91EB78]">AIcuenta</span>
         {accountType === 'multi' && (
