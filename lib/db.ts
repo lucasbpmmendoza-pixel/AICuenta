@@ -35,3 +35,20 @@ export async function getDb(): Promise<sql.ConnectionPool> {
     throw err;
   }
 }
+
+// Pool con timeout extendido (300 s) para queries analíticas pesadas
+const configLong: sql.config = { ...config, requestTimeout: 300_000 };
+let poolLong: sql.ConnectionPool | null = null;
+
+export async function getDbLong(): Promise<sql.ConnectionPool> {
+  if (poolLong && poolLong.connected) return poolLong;
+
+  try {
+    poolLong = await new sql.ConnectionPool(configLong).connect();
+    return poolLong;
+  } catch (err) {
+    poolLong = null;
+    console.error("[db] Long connection failed:", (err as Error).message);
+    throw err;
+  }
+}

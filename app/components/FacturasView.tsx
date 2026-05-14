@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
+import NotificationBell from './NotificationBell'
 import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, EfectivamentePagadoRow } from '@/lib/facturas-query'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-interface RfcOption { id: string; rfc: string }
+interface RfcOption { id: string; rfc: string; alias: string | null }
 interface FacturasData {
   ingresos: IngresoCFDI[]
   egresos: EgresoCFDI[]
@@ -302,11 +303,11 @@ export default function FacturasView({ session, accountType }: Props) {
                   onChange={e => setSelectedRfc(e.target.value)}
                   className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.rfc}</option>)}
+                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ? `${r.alias} (${r.rfc})` : r.rfc}</option>)}
                 </select>
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">
-                  {selectedRfc}
+                  {rfcs[0]?.alias ? `${rfcs[0].alias} (${selectedRfc})` : selectedRfc}
                 </span>
               ) : null}
 
@@ -401,6 +402,7 @@ export default function FacturasView({ session, accountType }: Props) {
                   {exporting ? 'Generando…' : 'Descargar Excel'}
                 </button>
               )}
+              <NotificationBell />
             </div>
           </div>
         </div>

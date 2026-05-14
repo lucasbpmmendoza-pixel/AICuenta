@@ -1,5 +1,10 @@
 import sql from "mssql";
-import { getDb } from "@/lib/db";
+import { getDb, getDbLong } from "@/lib/db";
+
+// ─── Cache en memoria para fetchEstadosFinancieros ────────────────────────────
+// TTL 15 min: consulta muy pesada (~2 min) — se cachea por RFC+rango+limit
+const _efCache = new Map<string, { data: EstadosFinancierosData; exp: number }>();
+const EF_TTL_MS = 15 * 60 * 1000;
 
 const TC = "ISNULL(NULLIF(tipoCambio,0),1)";
 
@@ -644,12 +649,17 @@ export async function fetchEstadosFinancieros(
   dateTo: Date,
   limit?: number
 ): Promise<EstadosFinancierosData> {
-  const db  = await getDb();
+  const cacheKey = `${rfc}|${dateFrom.toISOString()}|${dateTo.toISOString()}|${limit ?? 'all'}`;
+  const hit = _efCache.get(cacheKey);
+  if (hit && hit.exp > Date.now()) return hit.data;
+
+  const db  = await getDbLong();
   const top = limit !== undefined ? `TOP ${limit}` : '';
 
   const [ingRes, egrRes] = await Promise.all([
     // Ingresos: conceptos emitidos por el RFC
-    // — filtra por rfc_cliente+movimiento+fecha (usa índice), sin funciones en GROUP BY
+    // COUNT(*) en lugar de COUNT(DISTINCT UUID): elimina sort interno extra
+    // INDEX hint fuerza uso del índice compuesto; HASH GROUP evita sort de agregación
     db.request()
       .input("rfc",      sql.NVarChar, rfc)
       .input("dateFrom", sql.DateTime,  dateFrom)
@@ -660,18 +670,18 @@ export async function fetchEstadosFinancieros(
           ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
           SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
           SUM(ISNULL(c.Importe,  0))                         AS importe,
-          COUNT(DISTINCT c.UUID)                             AS numFacturas
-        FROM facturalo_conceptos c WITH (NOLOCK)
+          COUNT(*)                                           AS numFacturas
+        FROM facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_rfc_mov_fecha))
         WHERE c.rfc_cliente = @rfc
           AND c.movimiento  = 'Ingreso'
           AND c.fecha >= @dateFrom AND c.fecha < @dateTo
         GROUP BY c.Descripcion, c.ClaveProductoServicio
         ORDER BY SUM(ISNULL(c.Importe, 0)) DESC
-        OPTION (RECOMPILE)
+        OPTION (HASH GROUP, RECOMPILE)
       `),
 
     // Egresos: conceptos de facturas recibidas por el RFC
-    // — INNER JOIN en lugar de IN (subquery): mejor uso del índice IX_conceptos_uuid
+    // INNER JOIN con índice en cfdis + INDEX hint en conceptos
     db.request()
       .input("rfc",      sql.NVarChar, rfc)
       .input("dateFrom", sql.DateTime,  dateFrom)
@@ -682,21 +692,23 @@ export async function fetchEstadosFinancieros(
           ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
           SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
           SUM(ISNULL(c.Importe,  0))                         AS importe,
-          COUNT(DISTINCT c.UUID)                             AS numFacturas
-        FROM facturalo_cfdis f WITH (NOLOCK)
-        INNER JOIN facturalo_conceptos c WITH (NOLOCK) ON c.UUID = f.UUID
+          COUNT(*)                                           AS numFacturas
+        FROM facturalo_cfdis f WITH (NOLOCK, INDEX(IX_cfdis_receptor_tipo_status_fecha))
+        INNER JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
         WHERE f.RFC_Receptor    = @rfc
           AND f.TipoComprobante = 'I'
           AND f.Status          = 'Vigente'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
         GROUP BY c.Descripcion, c.ClaveProductoServicio
         ORDER BY SUM(ISNULL(c.Importe, 0)) DESC
-        OPTION (RECOMPILE)
+        OPTION (HASH GROUP, RECOMPILE)
       `),
   ]);
 
-  return {
+  const data: EstadosFinancierosData = {
     ingresos: ingRes.recordset,
     egresos:  egrRes.recordset,
   };
+  _efCache.set(cacheKey, { data, exp: Date.now() + EF_TTL_MS });
+  return data;
 }

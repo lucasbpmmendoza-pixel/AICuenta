@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
+import NotificationBell from './NotificationBell'
 import type { ConceptoRow } from '@/lib/facturas-query'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -14,7 +15,7 @@ const MXN = (v: number) =>
 const NUM = (v: number) =>
   new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 }).format(v)
 
-interface RfcOption { id: string; rfc: string }
+interface RfcOption { id: string; rfc: string; alias: string | null }
 
 interface Props {
   session: JWTPayload
@@ -208,7 +209,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
-              <h1 className="text-lg font-bold text-[#7B6FE8] dark:text-[#91eb78]">Estados Financieros</h1>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">Estados Financieros</h1>
               <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Principales ingresos y egresos por producto o servicio</p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
@@ -219,11 +220,11 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                   onChange={e => setSelectedRfc(e.target.value)}
                   className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.rfc}</option>)}
+                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ? `${r.alias} (${r.rfc})` : r.rfc}</option>)}
                 </select>
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">
-                  {selectedRfc}
+                  {rfcs[0]?.alias ? `${rfcs[0].alias} (${selectedRfc})` : selectedRfc}
                 </span>
               ) : null}
 
@@ -255,6 +256,8 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                   {exporting ? 'Generando…' : 'Descargar Excel'}
                 </button>
               )}
+
+              <NotificationBell />
             </div>
           </div>
         </div>
@@ -296,7 +299,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                       </svg>
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold text-emerald-700 dark:text-emerald-300">Principales Ingresos</h2>
+                      <h2 className="text-sm font-bold text-slate-900 dark:text-white">Principales Ingresos</h2>
                       <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Por producto o servicio — facturas emitidas</p>
                     </div>
                   </div>
@@ -320,7 +323,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                       </svg>
                     </div>
                     <div>
-                      <h2 className="text-sm font-bold text-rose-700 dark:text-rose-300">Principales Egresos</h2>
+                      <h2 className="text-sm font-bold text-slate-900 dark:text-white">Principales Egresos</h2>
                       <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Por producto o servicio — facturas recibidas</p>
                     </div>
                   </div>
