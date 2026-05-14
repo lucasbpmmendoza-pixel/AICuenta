@@ -55,7 +55,13 @@ export default function ResetPasswordView() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6">
         <div className="w-full max-w-[400px] text-center">
           <p className="text-sm text-slate-500">Enlace no valido.</p>
-          <a href="/login" className="mt-4 inline-block text-sm font-bold text-slate-700 hover:underline">
+          <a
+            href="/login"
+            className="mt-4 inline-block text-sm font-bold transition hover:underline"
+            style={{ color: '#450c7d' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#7B6FE8')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#450c7d')}
+          >
             Volver al inicio de sesion
           </a>
         </div>
@@ -71,10 +77,10 @@ export default function ResetPasswordView() {
           <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-green-50 text-3xl">
             ✅
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-950">
+          <h1 className="text-2xl font-black tracking-tight" style={{ color: '#450c7d' }}>
             Contrasena actualizada
           </h1>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
+          <p className="mt-3 text-sm leading-6" style={{ color: '#7B6FE8' }}>
             Tu contrasena fue restablecida correctamente.<br />
             Redirigiendo al inicio de sesion...
           </p>
@@ -87,18 +93,28 @@ export default function ResetPasswordView() {
     <div className="flex min-h-screen">
       {/* ── Left panel ── */}
       <div className="relative hidden w-[46%] flex-col items-center justify-center overflow-hidden bg-slate-950 px-12 py-12 lg:flex xl:w-[42%]">
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-20"
+          src="/Video.mp4"
+          onLoadedData={e => { (e.target as HTMLVideoElement).playbackRate = 2 }}
+        />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(99,102,241,0.15),transparent_55%)]" />
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_75%_75%,rgba(20,86,73,0.18),transparent_55%)]" />
         <div className="relative flex flex-col items-center text-center">
           <Image
-            src="/logo.webp"
+            src="/logo3.webp"
             alt="AIcuenta"
             width={360}
             height={360}
-            className="mb-2 rounded-3xl"
+            className="mb-2"
+            style={{ width: 360, height: 'auto' }}
             priority
           />
-          <p className="mt-2 max-w-[220px] text-sm leading-6 text-white/45 text-color-brand-deep-light-300"> 
+          <p className="mt-2 max-w-[220px] text-sm leading-6 text-[#4932d7]">
             Claridad fiscal desde tus datos, sin captura manual.
           </p>
         </div>
@@ -111,10 +127,10 @@ export default function ResetPasswordView() {
         </p>
 
         <div className="w-full max-w-[400px]">
-          <h1 className="text-3xl font-black tracking-tight text-slate-950">
+          <h1 className="text-3xl font-black tracking-tight" style={{ color: '#450c7d' }}>
             Nueva contrasena
           </h1>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm" style={{ color: '#7B6FE8' }}>
             Elige una contrasena segura para tu cuenta.
           </p>
 
@@ -123,6 +139,7 @@ export default function ResetPasswordView() {
               <label
                 htmlFor="password"
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
+                style={{ color: '#450c7d' }}
               >
                 Nueva contrasena
               </label>
@@ -159,6 +176,7 @@ export default function ResetPasswordView() {
               <label
                 htmlFor="confirm"
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
+                style={{ color: '#450c7d' }}
               >
                 Confirmar contrasena
               </label>
@@ -183,7 +201,10 @@ export default function ResetPasswordView() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 flex h-12 w-full items-center justify-center rounded-2xl bg-slate-950 text-sm font-extrabold text-white transition hover:bg-slate-800 disabled:opacity-60"
+              className="mt-2 flex h-12 w-full items-center justify-center rounded-2xl text-sm font-extrabold text-white transition disabled:opacity-60"
+              style={{ backgroundColor: '#450c7d' }}
+              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#7B6FE8')}
+              onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#450c7d')}
             >
               {loading ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
@@ -192,6 +213,18 @@ export default function ResetPasswordView() {
               )}
             </button>
           </form>
+
+          <p className="mt-8 text-center text-sm text-slate-400">
+            <a
+              href="/login"
+              className="font-bold transition hover:underline"
+              style={{ color: '#450c7d' }}
+              onMouseEnter={e => (e.currentTarget.style.color = '#7B6FE8')}
+              onMouseLeave={e => (e.currentTarget.style.color = '#450c7d')}
+            >
+              Volver al inicio de sesion
+            </a>
+          </p>
         </div>
       </div>
     </div>

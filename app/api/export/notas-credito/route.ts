@@ -49,12 +49,29 @@ export async function GET(req: NextRequest) {
   if (!session) return new Response("No autorizado", { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const rfc   = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
-  const year  = parseInt(searchParams.get("year")  ?? String(new Date().getFullYear()), 10);
-  const month = parseInt(searchParams.get("month") ?? String(new Date().getMonth() + 1), 10);
+  const rfc      = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
+  const year     = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()), 10);
+  const monthP   = searchParams.get("month");
+  const quarterP = searchParams.get("quarter");
 
-  if (!rfc || isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-    return new Response("Parámetros inválidos", { status: 400 });
+  if (!rfc || isNaN(year)) return new Response("Parámetros inválidos", { status: 400 });
+
+  let dateFrom: Date;
+  let dateTo: Date;
+
+  if (quarterP !== null) {
+    const q = parseInt(quarterP, 10);
+    if (isNaN(q) || q < 1 || q > 4) return new Response("quarter inválido", { status: 400 });
+    dateFrom = new Date(year, (q - 1) * 3, 1);
+    dateTo   = new Date(year, q * 3, 1);
+  } else if (monthP !== null) {
+    const month = parseInt(monthP, 10);
+    if (isNaN(month) || month < 1 || month > 12) return new Response("month inválido", { status: 400 });
+    dateFrom = new Date(year, month - 1, 1);
+    dateTo   = new Date(year, month, 1);
+  } else {
+    dateFrom = new Date(year, 0, 1);
+    dateTo   = new Date(year + 1, 0, 1);
   }
 
   const effectiveUserId = session.ownerId ?? session.sub;
@@ -64,7 +81,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [rows, nombreEmpresa] = await Promise.all([
-      fetchNotasCreditoData(rfc, year, month),
+      fetchNotasCreditoData(rfc, dateFrom, dateTo),
       fetchNombreEmpresa(rfc),
     ]);
 

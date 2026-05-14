@@ -17,6 +17,14 @@ interface FacturasData {
 }
 
 type Tab = 'ingresos' | 'egresos' | 'nomina' | 'retenciones'
+type PeriodType = 'month' | 'quarter' | 'year'
+
+const QUARTERS = [
+  { id: 1, label: 'Q1', months: 'Ene–Mar' },
+  { id: 2, label: 'Q2', months: 'Abr–Jun' },
+  { id: 3, label: 'Q3', months: 'Jul–Sep' },
+  { id: 4, label: 'Q4', months: 'Oct–Dic' },
+]
 
 const MXN = (v: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(v)
@@ -45,6 +53,8 @@ export default function FacturasView({ session, accountType }: Props) {
   const [selectedRfc, setSelectedRfc] = useState<string>('')
   const [year,  setYear]              = useState(now.getFullYear())
   const [month, setMonth]             = useState(now.getMonth() + 1)
+  const [periodType, setPeriodType]   = useState<PeriodType>('month')
+  const [quarter, setQuarter]         = useState<number>(Math.ceil((now.getMonth() + 1) / 3))
   const [data,  setData]              = useState<FacturasData | null>(null)
   const [loading, setLoading]         = useState(false)
   const [exporting, setExporting]     = useState(false)
@@ -67,12 +77,12 @@ export default function FacturasView({ session, accountType }: Props) {
     }).catch(() => {})
   }, [])
 
-  const fetchData = useCallback(async (rfc: string, y: number, m: number) => {
+  const fetchData = useCallback(async (rfc: string, params: string) => {
     if (!rfc) return
     setLoading(true)
     setData(null)
     try {
-      const res = await fetch(`/api/facturas/data?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`)
+      const res = await fetch(`/api/facturas/data?rfc=${encodeURIComponent(rfc)}&${params}`)
       const d = await res.json()
       if (res.ok) setData(d)
     } catch {}
@@ -80,44 +90,44 @@ export default function FacturasView({ session, accountType }: Props) {
   }, [])
 
   useEffect(() => {
-    if (selectedRfc) fetchData(selectedRfc, year, month)
-  }, [selectedRfc, year, month, fetchData])
+    if (selectedRfc) fetchData(selectedRfc, periodParams())
+  }, [selectedRfc, year, month, quarter, periodType, fetchData])
 
   // Load pagos alongside facturas data
   useEffect(() => {
     if (!selectedRfc) return
     setPagosData(null)
     setLoadingPagos(true)
-    fetch(`/api/pagos/data?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`)
+    fetch(`/api/pagos/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.pagos)) setPagosData(d.pagos) })
       .catch(() => {})
       .finally(() => setLoadingPagos(false))
-  }, [selectedRfc, year, month])
+  }, [selectedRfc, year, month, quarter, periodType])
 
   // Load notas de crédito alongside facturas data
   useEffect(() => {
     if (!selectedRfc) return
     setNotasData(null)
     setLoadingNotas(true)
-    fetch(`/api/notas-credito/data?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`)
+    fetch(`/api/notas-credito/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.notas)) setNotasData(d.notas) })
       .catch(() => {})
       .finally(() => setLoadingNotas(false))
-  }, [selectedRfc, year, month])
+  }, [selectedRfc, year, month, quarter, periodType])
 
   // Load efectivamente pagado (tipo P + PUE)
   useEffect(() => {
     if (!selectedRfc) return
     setEfectivamentePagadoData(null)
     setLoadingEfectivamente(true)
-    fetch(`/api/efectivamente-pagado/data?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`)
+    fetch(`/api/efectivamente-pagado/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.rows)) setEfectivamentePagadoData(d.rows) })
       .catch(() => {})
       .finally(() => setLoadingEfectivamente(false))
-  }, [selectedRfc, year, month])
+  }, [selectedRfc, year, month, quarter, periodType])
 
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
@@ -130,19 +140,47 @@ export default function FacturasView({ session, accountType }: Props) {
     setMonth(nm)
     if (month === 12) setYear(y => y + 1)
   }
+  function prevQuarter() {
+    if (quarter === 1) { setQuarter(4); setYear(y => y - 1) }
+    else setQuarter(q => q - 1)
+  }
+  function nextQuarter() {
+    const nq = quarter === 4 ? 1 : quarter + 1
+    const ny = quarter === 4 ? year + 1 : year
+    const curQ = Math.ceil((now.getMonth() + 1) / 3)
+    if (ny > now.getFullYear() || (ny === now.getFullYear() && nq > curQ)) return
+    setQuarter(nq)
+    if (quarter === 4) setYear(y => y + 1)
+  }
+  function prevYear() { setYear(y => y - 1) }
+  function nextYear() { if (year < now.getFullYear()) setYear(y => y + 1) }
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
+  const isCurrentQuarter = year === now.getFullYear() && quarter === Math.ceil((now.getMonth() + 1) / 3)
+  const isCurrentYear = year === now.getFullYear()
+
+  function periodParams(): string {
+    if (periodType === 'quarter') return `year=${year}&quarter=${quarter}`
+    if (periodType === 'year') return `year=${year}`
+    return `year=${year}&month=${month}`
+  }
+
+  function periodLabel(): string {
+    if (periodType === 'quarter') return `Q${quarter}-${year}`
+    if (periodType === 'year') return String(year)
+    return `${String(month).padStart(2,'0')}-${year}`
+  }
 
   async function handleExportNotas() {
     if (!selectedRfc || exportingNotas) return
     setExportingNotas(true)
     try {
-      const url = `/api/export/notas-credito?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`
+      const url = `/api/export/notas-credito?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
       if (!res.ok) { alert('Error al generar el reporte'); return }
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `notas-credito_${selectedRfc}_${String(month).padStart(2,'0')}-${year}.xlsx`
+      a.download = `notas-credito_${selectedRfc}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -153,13 +191,13 @@ export default function FacturasView({ session, accountType }: Props) {
     if (!selectedRfc || exportingEfectivamente) return
     setExportingEfectivamente(true)
     try {
-      const url = `/api/export/efectivamente-pagado?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`
+      const url = `/api/export/efectivamente-pagado?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
       if (!res.ok) { alert('Error al generar el reporte'); return }
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `efectivamente-pagado_${selectedRfc}_${String(month).padStart(2,'0')}-${year}.xlsx`
+      a.download = `efectivamente-pagado_${selectedRfc}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -170,13 +208,13 @@ export default function FacturasView({ session, accountType }: Props) {
     if (!selectedRfc || exportingPagos) return
     setExportingPagos(true)
     try {
-      const url = `/api/export/pagos?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`
+      const url = `/api/export/pagos?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
       if (!res.ok) { alert('Error al generar el reporte'); return }
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `pagos_${selectedRfc}_${String(month).padStart(2,'0')}-${year}.xlsx`
+      a.download = `pagos_${selectedRfc}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -187,13 +225,13 @@ export default function FacturasView({ session, accountType }: Props) {
     if (!selectedRfc || exporting) return
     setExporting(true)
     try {
-      const url = `/api/export/facturas?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`
+      const url = `/api/export/facturas?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
       if (!res.ok) { alert('Error al generar el reporte'); return }
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `facturas_${selectedRfc}_${String(month).padStart(2,'0')}-${year}.xlsx`
+      a.download = `facturas_${selectedRfc}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -263,18 +301,61 @@ export default function FacturasView({ session, accountType }: Props) {
                 </span>
               ) : null}
 
-              {/* Mes */}
-              <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
-                <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
-                <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[130px] text-center">
-                  {MESES[month - 1]} {year}
-                </span>
-                <button onClick={nextMonth} disabled={isCurrentMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
+              {/* Period type selector */}
+              <div className="flex rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
+                {(['month', 'quarter', 'year'] as PeriodType[]).map(pt => (
+                  <button
+                    key={pt}
+                    onClick={() => setPeriodType(pt)}
+                    className={`px-3 py-1.5 text-xs font-semibold transition ${periodType === pt ? 'bg-[#7B6FE8] text-white dark:bg-[#91eb78] dark:text-black' : 'text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957]  dark:hover:text-[#6BDA4D]'}`}
+                  >
+                    {pt === 'month' ? 'Mes' : pt === 'quarter' ? 'Trimestre' : 'Ano'}
+                  </button>
+                ))}
               </div>
+
+              {/* Period navigator */}
+              {periodType === 'month' && (
+                <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
+                  <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[130px] text-center">
+                    {MESES[month - 1]} {year}
+                  </span>
+                  <button onClick={nextMonth} disabled={isCurrentMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+              )}
+
+              {periodType === 'quarter' && (
+                <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
+                  <button onClick={prevQuarter} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[140px] text-center">
+                    Q{quarter} ({QUARTERS[quarter - 1].months}) {year}
+                  </span>
+                  <button onClick={nextQuarter} disabled={isCurrentQuarter} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+              )}
+
+              {periodType === 'year' && (
+                <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
+                  <button onClick={prevYear} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                  <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[60px] text-center">
+                    {year}
+                  </span>
+                  <button onClick={nextYear} disabled={isCurrentYear} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                </div>
+              )}
 
               {/* Descargar Excel CFDIs */}
               {selectedRfc && (

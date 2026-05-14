@@ -391,22 +391,18 @@ export interface NotaCreditoRow {
 
 export async function fetchNotasCreditoData(
   rfc: string,
-  year: number,
-  month: number,
+  dateFrom: Date,
+  dateTo: Date,
   limit?: number
 ): Promise<NotaCreditoRow[]> {
   const db = await getDb();
-  const pad2 = (n: number) => String(n).padStart(2, "0");
-  const dateFrom = `${year}-${pad2(month)}-01`;
-  const lastDay  = new Date(year, month, 0).getDate();
-  const dateTo   = `${year}-${pad2(month)}-${pad2(lastDay)}`;
   const top = limit !== undefined ? `TOP ${limit}` : '';
 
   const result = await db
     .request()
     .input("rfc",      sql.NVarChar, rfc)
-    .input("dateFrom", sql.VarChar,  dateFrom)
-    .input("dateTo",   sql.VarChar,  dateTo)
+    .input("dateFrom", sql.DateTime,  dateFrom)
+    .input("dateTo",   sql.DateTime,  dateTo)
     .query<NotaCreditoRow>(`
       SELECT ${top}
         fact.UUID                                                           AS uuid,
@@ -433,8 +429,7 @@ export async function fetchNotasCreditoData(
       WHERE fact.Status = 'VIGENTE'
         AND fact.TipoComprobante = 'E'
         AND (fact.RFC_Emisor = @rfc OR fact.RFC_Receptor = @rfc)
-        AND CAST(fact.Fecha AS date) >= CAST(@dateFrom AS date)
-        AND CAST(fact.Fecha AS date) <= CAST(@dateTo   AS date)
+        AND fact.Fecha >= @dateFrom AND fact.Fecha < @dateTo
       ORDER BY fact.Fecha
     `);
   return result.recordset;
@@ -577,21 +572,18 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export async function fetchPagosData(
   rfc: string,
-  year: number,
-  month: number,
+  dateFrom: Date,
+  dateTo: Date,
   limit?: number
 ): Promise<PagoRow[]> {
   const db = await getDb();
-  const dateFrom = `${year}-${pad2(month)}-01`;
-  const lastDay  = new Date(year, month, 0).getDate();
-  const dateTo   = `${year}-${pad2(month)}-${pad2(lastDay)}`;
   const top = limit !== undefined ? `TOP ${limit}` : '';
 
   const result = await db
     .request()
     .input("rfc",      sql.NVarChar, rfc)
-    .input("dateFrom", sql.VarChar,  dateFrom)
-    .input("dateTo",   sql.VarChar,  dateTo)
+    .input("dateFrom", sql.DateTime,  dateFrom)
+    .input("dateTo",   sql.DateTime,  dateTo)
     .query<PagoRow>(`
       SELECT ${top}
         p.UUID                                           AS uuid_pago,
@@ -622,12 +614,10 @@ export async function fetchPagosData(
         FROM dbo.facturalo_cfdis WITH (NOLOCK)
         WHERE TipoComprobante = 'P'
           AND status = 'Vigente'
-          AND fecha >= CONVERT(date, @dateFrom, 23)
-          AND fecha <= CONVERT(date, @dateTo,   23)
+        AND fecha >= @dateFrom AND fecha < @dateTo
       ) fc ON fc.UUID = p.UUID
       WHERE (fc.RFC_emisor = @rfc OR fc.RFC_receptor = @rfc)
-        AND p.fecha_pago >= CONVERT(date, @dateFrom, 23)
-        AND p.fecha_pago <= CONVERT(date, @dateTo,   23)
+        AND p.fecha_pago >= @dateFrom AND p.fecha_pago < @dateTo
       ORDER BY p.fecha_pago, d.numParcialidad
     `);
   return result.recordset;

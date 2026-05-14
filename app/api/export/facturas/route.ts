@@ -197,23 +197,39 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const rfc    = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
-  const year   = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()), 10);
-  const monthP = searchParams.get("month");
-  const month  = monthP ? parseInt(monthP, 10) : null;
+  const rfc      = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
+  const year     = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()), 10);
+  const monthP   = searchParams.get("month");
+  const quarterP = searchParams.get("quarter");
 
   if (!rfc) return NextResponse.json({ error: "rfc requerido" }, { status: 400 });
   if (isNaN(year)) return NextResponse.json({ error: "year invalido" }, { status: 400 });
-  if (month !== null && (isNaN(month) || month < 1 || month > 12))
-    return NextResponse.json({ error: "month invalido" }, { status: 400 });
+
+  let dateFrom: Date;
+  let dateTo: Date;
+  let periodLabel: string;
+
+  if (quarterP !== null) {
+    const q = parseInt(quarterP, 10);
+    if (isNaN(q) || q < 1 || q > 4) return NextResponse.json({ error: "quarter invalido" }, { status: 400 });
+    dateFrom    = new Date(year, (q - 1) * 3, 1);
+    dateTo      = new Date(year, q * 3, 1);
+    periodLabel = `Q${q}-${year}`;
+  } else if (monthP !== null) {
+    const month = parseInt(monthP, 10);
+    if (isNaN(month) || month < 1 || month > 12) return NextResponse.json({ error: "month invalido" }, { status: 400 });
+    dateFrom    = new Date(year, month - 1, 1);
+    dateTo      = new Date(year, month, 1);
+    periodLabel = `${String(month).padStart(2, "0")}-${year}`;
+  } else {
+    dateFrom    = new Date(year, 0, 1);
+    dateTo      = new Date(year + 1, 0, 1);
+    periodLabel = String(year);
+  }
 
   const effectiveUserId = session.ownerId ?? session.sub;
   if (!(await validateRfc(effectiveUserId, rfc)))
     return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
-
-  const dateFrom = month !== null ? new Date(year, month - 1, 1) : new Date(year, 0, 1);
-  const dateTo   = month !== null ? new Date(year, month, 1)     : new Date(year + 1, 0, 1);
-  const periodLabel = month !== null ? `${String(month).padStart(2, "0")}-${year}` : String(year);
 
   try {
     const [rawRows, nombreEmpresa] = await Promise.all([

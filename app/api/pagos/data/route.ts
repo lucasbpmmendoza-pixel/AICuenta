@@ -20,13 +20,30 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const rfc   = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
-  const year  = parseInt(searchParams.get("year")  ?? String(new Date().getFullYear()), 10);
-  const month = parseInt(searchParams.get("month") ?? String(new Date().getMonth() + 1), 10);
+  const rfc      = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
+  const year     = parseInt(searchParams.get("year") ?? String(new Date().getFullYear()), 10);
+  const monthP   = searchParams.get("month");
+  const quarterP = searchParams.get("quarter");
 
   if (!rfc) return NextResponse.json({ error: "rfc requerido" }, { status: 400 });
-  if (isNaN(year) || isNaN(month) || month < 1 || month > 12) {
-    return NextResponse.json({ error: "year/month inválidos" }, { status: 400 });
+  if (isNaN(year)) return NextResponse.json({ error: "year inválido" }, { status: 400 });
+
+  let dateFrom: Date;
+  let dateTo: Date;
+
+  if (quarterP !== null) {
+    const q = parseInt(quarterP, 10);
+    if (isNaN(q) || q < 1 || q > 4) return NextResponse.json({ error: "quarter inválido" }, { status: 400 });
+    dateFrom = new Date(year, (q - 1) * 3, 1);
+    dateTo   = new Date(year, q * 3, 1);
+  } else if (monthP !== null) {
+    const month = parseInt(monthP, 10);
+    if (isNaN(month) || month < 1 || month > 12) return NextResponse.json({ error: "month inválido" }, { status: 400 });
+    dateFrom = new Date(year, month - 1, 1);
+    dateTo   = new Date(year, month, 1);
+  } else {
+    dateFrom = new Date(year, 0, 1);
+    dateTo   = new Date(year + 1, 0, 1);
   }
 
   const effectiveUserId = session.ownerId ?? session.sub;
@@ -35,7 +52,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const pagos = await fetchPagosData(rfc, year, month, 10);
+    const pagos = await fetchPagosData(rfc, dateFrom, dateTo, 10);
     return NextResponse.json({ pagos });
   } catch (err) {
     console.error("[pagos/data]", (err as Error).message);
