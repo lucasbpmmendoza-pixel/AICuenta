@@ -22,8 +22,8 @@ const EGR_BG      = "8B1A1A"; // rojo oscuro para egresos
 const MXN_FMT     = '"$"#,##0.00';
 const NUM_FMT     = "#,##0.00";
 
-const HEADERS = ["Descripción", "Clave Prod/Serv", "# Facturas", "Cantidad", "Importe"];
-const COL_WIDTHS = [55, 16, 12, 14, 18];
+const HEADERS = ["Descripción", "Clave Prod/Serv", "# Facturas", "Cantidad", "Subtotal", "IVA 8%", "IVA 16%", "Total c/IVA"];
+const COL_WIDTHS = [55, 16, 12, 14, 18, 16, 16, 18];
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
 
@@ -42,7 +42,7 @@ function buildSheet(
   titleBg: string,
   title: string,
   subtitleLine: string,
-  rows: { descripcion: string; claveProdServ: string; cantidad: number; importe: number; numFacturas: number }[]
+  rows: { descripcion: string; claveProdServ: string; cantidad: number; importe: number; iva8: number; iva16: number; numFacturas: number }[]
 ) {
   const ws = wb.addWorksheet(sheetName);
 
@@ -52,11 +52,14 @@ function buildSheet(
     { width: COL_WIDTHS[1] },                         // 2 Clave
     { width: COL_WIDTHS[2] },                         // 3 # Facturas
     { width: COL_WIDTHS[3], style: { numFmt: NUM_FMT } }, // 4 Cantidad
-    { width: COL_WIDTHS[4], style: { numFmt: MXN_FMT } }, // 5 Importe
+    { width: COL_WIDTHS[4], style: { numFmt: MXN_FMT } }, // 5 Subtotal
+    { width: COL_WIDTHS[5], style: { numFmt: MXN_FMT } }, // 6 IVA 8%
+    { width: COL_WIDTHS[6], style: { numFmt: MXN_FMT } }, // 7 IVA 16%
+    { width: COL_WIDTHS[7], style: { numFmt: MXN_FMT } }, // 8 Total c/IVA
   ];
 
   // Title row (merged, styled)
-  ws.mergeCells(1, 1, 1, 5);
+  ws.mergeCells(1, 1, 1, 8);
   const titleRow = ws.getRow(1);
   titleRow.height = 22;
   const titleCell = titleRow.getCell(1);
@@ -66,7 +69,7 @@ function buildSheet(
   setFill(titleCell, titleBg);
 
   // Subtitle row (merged, styled)
-  ws.mergeCells(2, 1, 2, 5);
+  ws.mergeCells(2, 1, 2, 8);
   const subRow = ws.getRow(2);
   subRow.height = 16;
   const subCell = subRow.getCell(1);
@@ -85,28 +88,35 @@ function buildSheet(
     cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
   });
 
-  // Data rows — no per-cell loop; numFmt comes from column default
+  // Data rows
   for (const row of rows) {
+    const total = Number(row.importe) + Number(row.iva8) + Number(row.iva16);
     ws.addRow([
       row.descripcion,
       row.claveProdServ,
       row.numFacturas,
       row.cantidad,
       row.importe,
+      row.iva8,
+      row.iva16,
+      total,
     ]);
   }
 
   // Totals row
   const totImporte  = rows.reduce((s, r) => s + Number(r.importe),   0);
+  const totIva8     = rows.reduce((s, r) => s + Number(r.iva8),      0);
+  const totIva16    = rows.reduce((s, r) => s + Number(r.iva16),     0);
+  const totTotal    = totImporte + totIva8 + totIva16;
   const totCantidad = rows.reduce((s, r) => s + Number(r.cantidad),  0);
   const totFacturas = rows.reduce((s, r) => s + Number(r.numFacturas), 0);
-  const totRow = ws.addRow(["TOTALES", null, totFacturas, totCantidad, totImporte]);
+  const totRow = ws.addRow(["TOTALES", null, totFacturas, totCantidad, totImporte, totIva8, totIva16, totTotal]);
   totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
     addBorder(cell);
     setFill(cell, HEADER_BG);
     cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
     if (ci === 4) cell.numFmt = NUM_FMT;
-    if (ci === 5) cell.numFmt = MXN_FMT;
+    if (ci >= 5) cell.numFmt = MXN_FMT;
   });
 }
 
@@ -136,7 +146,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [data, nombreEmpresa] = await Promise.all([
-      fetchEstadosFinancieros(rfc, dateFrom, dateTo, 1000),
+      fetchEstadosFinancieros(rfc, dateFrom, dateTo),
       fetchNombreEmpresa(rfc),
     ]);
 

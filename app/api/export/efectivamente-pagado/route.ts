@@ -127,10 +127,10 @@ export async function GET(req: NextRequest) {
         row.formaPago || "",                                  //  8 Forma Pago
         row.moneda,                                           //  9 Moneda
         tc,                                                   // 10 Tipo Cambio
-        isPago ? null : Number(row.subtotal) * tc,            // 11 Subtotal
-        isPago ? null : Number(row.iva)      * tc,            // 12 IVA
-        isPago ? null : Number(row.retISR)   * tc,            // 13 Ret. ISR
-        isPago ? null : Number(row.retIVA)   * tc,            // 14 Ret. IVA
+        Number(row.subtotal) * tc,                            // 11 Subtotal
+        Number(row.iva)      * tc,                            // 12 IVA
+        Number(row.retISR)   * tc,                            // 13 Ret. ISR
+        Number(row.retIVA)   * tc,                            // 14 Ret. IVA
         Number(row.total) * tc,                               // 15 Total
       ]);
 
@@ -145,11 +145,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Totals row
-    const totSubtotal = rows.reduce((s, r) => s + (r.fuente === "Complemento P" ? 0 : Number(r.subtotal) * (Number(r.tipoCambio) || 1)), 0);
-    const totIva      = rows.reduce((s, r) => s + (r.fuente === "Complemento P" ? 0 : Number(r.iva)      * (Number(r.tipoCambio) || 1)), 0);
-    const totRetISR   = rows.reduce((s, r) => s + (r.fuente === "Complemento P" ? 0 : Number(r.retISR)   * (Number(r.tipoCambio) || 1)), 0);
-    const totRetIVA   = rows.reduce((s, r) => s + (r.fuente === "Complemento P" ? 0 : Number(r.retIVA)   * (Number(r.tipoCambio) || 1)), 0);
-    const totTotal    = rows.reduce((s, r) => s + Number(r.total) * (Number(r.tipoCambio) || 1), 0);
+    const tc = (r: typeof rows[number]) => Number(r.tipoCambio) || 1;
+    const totSubtotal = rows.reduce((s, r) => s + Number(r.subtotal) * tc(r), 0);
+    const totIva      = rows.reduce((s, r) => s + Number(r.iva)      * tc(r), 0);
+    const totRetISR   = rows.reduce((s, r) => s + Number(r.retISR)   * tc(r), 0);
+    const totRetIVA   = rows.reduce((s, r) => s + Number(r.retIVA)   * tc(r), 0);
+    const totTotal    = rows.reduce((s, r) => s + Number(r.total)    * tc(r), 0);
 
     const totRow = ws.addRow([
       "TOTALES", null, null, null, null, null, null, null, null, null,
@@ -165,7 +166,12 @@ export async function GET(req: NextRequest) {
 
     const buf = await wb.xlsx.writeBuffer();
     const pad = (n: number) => String(n).padStart(2, "0");
-    const fileName = `efectivamente-pagado_${rfc}_${pad(month)}-${year}.xlsx`;
+    const fileTag = quarterP !== null
+      ? `T${quarterP}-${year}`
+      : monthP !== null
+      ? `${pad(parseInt(monthP, 10))}-${year}`
+      : `${year}`;
+    const fileName = `efectivamente-pagado_${rfc}_${fileTag}.xlsx`;
 
     return new Response(buf as ArrayBuffer, {
       headers: {

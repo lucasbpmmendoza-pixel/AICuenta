@@ -489,8 +489,8 @@ export async function fetchEfectivamentePagado(
           ISNULL(p.forma_pago,'')                                           AS formaPago,
           ISNULL(p.moneda,'MXN')                                            AS moneda,
           ISNULL(p.tipoCambio, 1)                                           AS tipoCambio,
-          0                                                                 AS subtotal,
-          0                                                                 AS iva,
+          ISNULL((SELECT SUM(ISNULL(dd.base,0))     FROM dbo.facturalo_pago_doc_relacionado dd WHERE dd.pago_id = p.id), 0) AS subtotal,
+          ISNULL((SELECT SUM(ISNULL(dd.impuesto,0)) FROM dbo.facturalo_pago_doc_relacionado dd WHERE dd.pago_id = p.id), 0) AS iva,
           0                                                                 AS retISR,
           0                                                                 AS retIVA,
           ISNULL(TRY_CONVERT(decimal(18,2), p.monto_total_pagos), 0)       AS total
@@ -635,6 +635,8 @@ export interface ConceptoRow {
   claveProdServ: string;
   cantidad:      number;
   importe:       number;
+  iva8:          number;
+  iva16:         number;
   numFacturas:   number;
 }
 
@@ -657,50 +659,81 @@ export async function fetchEstadosFinancieros(
   const top = limit !== undefined ? `TOP ${limit}` : '';
 
   const [ingRes, egrRes] = await Promise.all([
-    // Ingresos: conceptos emitidos por el RFC
-    // COUNT(*) en lugar de COUNT(DISTINCT UUID): elimina sort interno extra
-    // INDEX hint fuerza uso del índice compuesto; HASH GROUP evita sort de agregación
+    // Ingresos
     db.request()
       .input("rfc",      sql.NVarChar, rfc)
       .input("dateFrom", sql.DateTime,  dateFrom)
       .input("dateTo",   sql.DateTime,  dateTo)
       .query<ConceptoRow>(`
-        SELECT ${top || 'TOP 100'}
-          ISNULL(NULLIF(c.Descripcion,''), 'Sin descripción') AS descripcion,
+        SELECT ${top}
+          MIN(ISNULL(NULLIF(c.Descripcion,''), CASE WHEN c.UUID IS NULL THEN '(Sin concepto registrado)' ELSE 'Sin descripción' END)) AS descripcion,
           ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
           SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
-          SUM(ISNULL(c.Importe,  0))                         AS importe,
+          SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe, 0)
+                   ELSE ISNULL(f.Subtotal, 0) END
+              * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)) AS importe,
+          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
+            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
+                 / f.Subtotal
+                 * ISNULL(f.TotalTrasladadoIVAOcho, 0)
+                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
+            ELSE 0 END)                                      AS iva8,
+          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
+            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
+                 / f.Subtotal
+                 * ISNULL(f.TotalTrasladadoIVADieciseis, 0)
+                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
+            ELSE 0 END)                                      AS iva16,
           COUNT(*)                                           AS numFacturas
-        FROM facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_rfc_mov_fecha))
-        WHERE c.rfc_cliente = @rfc
-          AND c.movimiento  = 'Ingreso'
-          AND c.fecha >= @dateFrom AND c.fecha < @dateTo
-        GROUP BY c.Descripcion, c.ClaveProductoServicio
-        ORDER BY SUM(ISNULL(c.Importe, 0)) DESC
+        FROM facturalo_cfdis f WITH (NOLOCK)
+        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
+        WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+          AND UPPER(f.Movimiento)    = 'INGRESO'
+          AND f.TipoComprobante      IN ('I','E')
+          AND UPPER(f.Status)        = 'VIGENTE'
+          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        GROUP BY ISNULL(c.ClaveProductoServicio, '')
+        ORDER BY SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
+                     * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio),0),1)) DESC
         OPTION (HASH GROUP, RECOMPILE)
       `),
 
-    // Egresos: conceptos de facturas recibidas por el RFC
-    // INNER JOIN con índice en cfdis + INDEX hint en conceptos
+    // Egresos
     db.request()
       .input("rfc",      sql.NVarChar, rfc)
       .input("dateFrom", sql.DateTime,  dateFrom)
       .input("dateTo",   sql.DateTime,  dateTo)
       .query<ConceptoRow>(`
-        SELECT ${top || 'TOP 100'}
-          ISNULL(NULLIF(c.Descripcion,''), 'Sin descripción') AS descripcion,
+        SELECT ${top}
+          MIN(ISNULL(NULLIF(c.Descripcion,''), CASE WHEN c.UUID IS NULL THEN '(Sin concepto registrado)' ELSE 'Sin descripción' END)) AS descripcion,
           ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
           SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
-          SUM(ISNULL(c.Importe,  0))                         AS importe,
+          SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe, 0)
+                   ELSE ISNULL(f.Subtotal, 0) END
+              * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)) AS importe,
+          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
+            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
+                 / f.Subtotal
+                 * ISNULL(f.TotalTrasladadoIVAOcho, 0)
+                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
+            ELSE 0 END)                                      AS iva8,
+          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
+            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
+                 / f.Subtotal
+                 * ISNULL(f.TotalTrasladadoIVADieciseis, 0)
+                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
+            ELSE 0 END)                                      AS iva16,
           COUNT(*)                                           AS numFacturas
-        FROM facturalo_cfdis f WITH (NOLOCK, INDEX(IX_cfdis_receptor_tipo_status_fecha))
-        INNER JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
-        WHERE f.RFC_Receptor    = @rfc
-          AND f.TipoComprobante = 'I'
-          AND f.Status          = 'Vigente'
+        FROM facturalo_cfdis f WITH (NOLOCK)
+        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
+        WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+          AND UPPER(f.Movimiento)    = 'EGRESO'
+          AND f.TipoComprobante      IN ('I','E')
+          AND UPPER(f.Status)        = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
-        GROUP BY c.Descripcion, c.ClaveProductoServicio
-        ORDER BY SUM(ISNULL(c.Importe, 0)) DESC
+        GROUP BY ISNULL(c.ClaveProductoServicio, '')
+        ORDER BY SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
+                     * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio),0),1)) DESC
         OPTION (HASH GROUP, RECOMPILE)
       `),
   ]);
@@ -711,4 +744,192 @@ export async function fetchEstadosFinancieros(
   };
   _efCache.set(cacheKey, { data, exp: Date.now() + EF_TTL_MS });
   return data;
+}
+
+// ─── Chat Context ─────────────────────────────────────────────────────────────
+
+export interface CFDIConceptoChat {
+  descripcion:   string;
+  claveProdServ: string;
+  cantidad:      number;
+  importe:       number;
+  descuento:     number;
+}
+
+export interface CFDIPagoChat {
+  fechaPago:  string;
+  formaPago:  string;
+  moneda:     string;
+  tipoCambio: number;
+  monto:      number;
+}
+
+export interface CFDIForChat {
+  uuid:                string;
+  fecha:               Date;
+  tipoComprobante:     string;
+  movimiento:          string;
+  status:              string;
+  serie:               string;
+  folio:               string;
+  rfcEmisor:           string;
+  razonSocialEmisor:   string;
+  rfcReceptor:         string;
+  razonSocialReceptor: string;
+  usoCFDI:             string;
+  metodoPago:          string;
+  formaPago:           string;
+  moneda:              string;
+  tipoCambio:          number;
+  subtotal:            number;
+  descuento:           number;
+  totalIVA:            number;
+  totalIVA8:           number;
+  totalIVA16:          number;
+  totalISR:            number;
+  totalIVARet:         number;
+  total:               number;
+  regimenFiscal:       string;
+  lugarExpedicion:     string;
+  conceptos:           CFDIConceptoChat[];
+  pagos:               CFDIPagoChat[];
+}
+
+export async function countFacturasParaChat(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+): Promise<number> {
+  const db = await getDb();
+  const r = await db.request()
+    .input("rfc",      sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime,  dateFrom)
+    .input("dateTo",   sql.DateTime,  dateTo)
+    .query<{ total: number }>(`
+      SELECT COUNT(*) AS total
+      FROM facturalo_cfdis WITH (NOLOCK)
+      WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
+        AND Fecha >= @dateFrom AND Fecha < @dateTo
+        AND TipoComprobante IN ('I','E','N','P')
+    `);
+  return r.recordset[0]?.total ?? 0;
+}
+
+export async function fetchFacturasParaChat(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  maxCFDIs = 60,
+): Promise<CFDIForChat[]> {
+  const db = await getDb();
+
+  interface CFDIRow {
+    uuid: string; fecha: Date;
+    tipoComprobante: string; movimiento: string; status: string;
+    serie: string; folio: string;
+    rfcEmisor: string; razonSocialEmisor: string;
+    rfcReceptor: string; razonSocialReceptor: string;
+    usoCFDI: string; metodoPago: string; formaPago: string;
+    moneda: string; tipoCambio: number;
+    subtotal: number; descuento: number;
+    totalIVA: number; totalIVA8: number; totalIVA16: number; totalISR: number; totalIVARet: number; total: number;
+    regimenFiscal: string; lugarExpedicion: string;
+  }
+
+  const cfdisRes = await db.request()
+    .input("rfc",      sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime,  dateFrom)
+    .input("dateTo",   sql.DateTime,  dateTo)
+    .input("maxCFDIs", sql.Int,        maxCFDIs)
+    .query<CFDIRow>(`
+      SELECT TOP (@maxCFDIs)
+        UUID                                                           AS uuid,
+        Fecha                                                          AS fecha,
+        ISNULL(TipoComprobante,'')                                     AS tipoComprobante,
+        ISNULL(Movimiento,'')                                          AS movimiento,
+        ISNULL(Status,'')                                              AS status,
+        ISNULL(Serie,'')                                               AS serie,
+        ISNULL(Folio,'')                                               AS folio,
+        ISNULL(RFC_Emisor,'')                                          AS rfcEmisor,
+        ISNULL(RazonSocialEmisor,'')                                   AS razonSocialEmisor,
+        ISNULL(RFC_Receptor,'')                                        AS rfcReceptor,
+        ISNULL(RazonSocialReceptor,'')                                 AS razonSocialReceptor,
+        ISNULL(UsoCFDI,'')                                             AS usoCFDI,
+        ISNULL(MetodoPago,'')                                          AS metodoPago,
+        ISNULL(TipoPago,'')                                            AS formaPago,
+        ISNULL(Moneda,'MXN')                                           AS moneda,
+        ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)     AS tipoCambio,
+        ISNULL(TRY_CONVERT(decimal(18,2),Subtotal),0)                 AS subtotal,
+        ISNULL(TRY_CONVERT(decimal(18,2),Descuento),0)                AS descuento,
+        ISNULL(TRY_CONVERT(decimal(18,2),TotalTrasladado),0)          AS totalIVA,
+        ISNULL(TRY_CONVERT(decimal(18,2),TotalTrasladadoIVAOcho),0)    AS totalIVA8,
+        ISNULL(TRY_CONVERT(decimal(18,2),TotalTrasladadoIVADieciseis),0) AS totalIVA16,
+        ISNULL(TRY_CONVERT(decimal(18,2),TotalRetenidoISR),0)         AS totalISR,
+        ISNULL(TRY_CONVERT(decimal(18,2),TotalRetenidoIVA),0)         AS totalIVARet,
+        ISNULL(TRY_CONVERT(decimal(18,2),Total),0)                    AS total,
+        ISNULL(RegimenFiscal,'')                                       AS regimenFiscal,
+        ISNULL(LugarExpedicion,'')                                     AS lugarExpedicion
+      FROM facturalo_cfdis WITH (NOLOCK)
+      WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
+        AND Fecha >= @dateFrom AND Fecha < @dateTo
+        AND TipoComprobante IN ('I','E','N','P')
+      ORDER BY Fecha DESC
+    `);
+
+  const cfdis = cfdisRes.recordset;
+  if (cfdis.length === 0) return [];
+
+  const uuidList = cfdis.map(c => `'${c.uuid.replace(/'/g, "''")}'`).join(",");
+
+  interface ConceptoRaw extends CFDIConceptoChat { uuid: string }
+  const conceptosRes = await db.request().query<ConceptoRaw>(`
+    SELECT uuid, descripcion, claveProdServ, cantidad, importe, descuento
+    FROM (
+      SELECT
+        UUID                                                AS uuid,
+        ISNULL(NULLIF(Descripcion,''), '—')                AS descripcion,
+        ISNULL(ClaveProductoServicio,'')                   AS claveProdServ,
+        ISNULL(TRY_CONVERT(decimal(18,4),Cantidad),0)     AS cantidad,
+        ISNULL(TRY_CONVERT(decimal(18,2),Importe),0)      AS importe,
+        ISNULL(TRY_CONVERT(decimal(18,2),Descuento),0)    AS descuento,
+        ROW_NUMBER() OVER (PARTITION BY UUID ORDER BY (SELECT NULL)) AS rn
+      FROM facturalo_conceptos WITH (NOLOCK)
+      WHERE UUID IN (${uuidList})
+    ) t WHERE rn <= 100
+  `);
+
+  interface PagoRaw extends CFDIPagoChat { uuid: string }
+  const pagosRes = await db.request().query<PagoRaw>(`
+    SELECT uuid, fechaPago, formaPago, moneda, tipoCambio, monto
+    FROM (
+      SELECT
+        p.UUID                                                        AS uuid,
+        CONVERT(varchar(10), p.fecha_pago, 23)                        AS fechaPago,
+        ISNULL(p.forma_pago,'')                                        AS formaPago,
+        ISNULL(p.moneda,'MXN')                                         AS moneda,
+        ISNULL(p.tipoCambio,1)                                         AS tipoCambio,
+        ISNULL(TRY_CONVERT(decimal(18,2),p.monto_total_pagos),0)      AS monto,
+        ROW_NUMBER() OVER (PARTITION BY p.UUID ORDER BY p.fecha_pago) AS rn
+      FROM facturalo_pagos p WITH (NOLOCK)
+      WHERE p.UUID IN (${uuidList})
+    ) t WHERE rn <= 50
+  `);
+
+  const conceptosByUUID = new Map<string, CFDIConceptoChat[]>();
+  for (const { uuid, ...rest } of conceptosRes.recordset) {
+    if (!conceptosByUUID.has(uuid)) conceptosByUUID.set(uuid, []);
+    conceptosByUUID.get(uuid)!.push(rest);
+  }
+
+  const pagosByUUID = new Map<string, CFDIPagoChat[]>();
+  for (const { uuid, ...rest } of pagosRes.recordset) {
+    if (!pagosByUUID.has(uuid)) pagosByUUID.set(uuid, []);
+    pagosByUUID.get(uuid)!.push(rest);
+  }
+
+  return cfdis.map(c => ({
+    ...c,
+    conceptos: conceptosByUUID.get(c.uuid) ?? [],
+    pagos:     pagosByUUID.get(c.uuid) ?? [],
+  }));
 }

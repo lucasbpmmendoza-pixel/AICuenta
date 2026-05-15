@@ -189,7 +189,12 @@ export async function GET(req: NextRequest) {
     // Stream response
     const buf = await wb.xlsx.writeBuffer();
     const pad = (n: number) => String(n).padStart(2, "0");
-    const fileName = `pagos_${rfc}_${pad(month)}-${year}.xlsx`;
+    const fileTag = quarterP !== null
+      ? `T${quarterP}-${year}`
+      : monthP !== null
+      ? `${pad(parseInt(monthP, 10))}-${year}`
+      : `${year}`;
+    const fileName = `pagos_${rfc}_${fileTag}.xlsx`;
 
     return new Response(buf as ArrayBuffer, {
       headers: {

@@ -62,8 +62,8 @@ function formaDePago(c: string): string {
 // ─── Month helpers ─────────────────────────────────────────────────────────────
 
 function mesKey(fecha: Date): string {
-  const y = fecha.getFullYear();
-  const m = fecha.getMonth() + 1;
+  const y = fecha.getUTCFullYear();
+  const m = fecha.getUTCMonth() + 1;
   return `${y}-${String(m).padStart(2, "0")}`;
 }
 function mesLabel(key: string): string {
@@ -261,9 +261,9 @@ export async function GET(req: NextRequest) {
         buffers[mes] = { INGRESOS: [], GASTOS: [], "GASTOS - NOMINA": [] };
       }
 
-      const dd   = String(fecha.getDate()).padStart(2, "0");
-      const mm   = String(fecha.getMonth() + 1).padStart(2, "0");
-      const yyyy = fecha.getFullYear();
+      const dd   = String(fecha.getUTCDate()).padStart(2, "0");
+      const mm   = String(fecha.getUTCMonth() + 1).padStart(2, "0");
+      const yyyy = fecha.getUTCFullYear();
 
       const subtotal  = n(row.Subtotal) * tc;
       const iva8      = n(row.IVA8) * tc;

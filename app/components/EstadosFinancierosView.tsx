@@ -70,7 +70,10 @@ function TablaConceptos({
             <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-center">Clave</th>
             <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">Facturas</th>
             <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">Cantidad</th>
-            <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">Importe</th>
+            <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">Subtotal</th>
+            <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">IVA 8%</th>
+            <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">IVA 16%</th>
+            <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold text-right">Total</th>
             <th className="px-4 py-3 text-slate-500 dark:text-zinc-400 font-semibold w-36">Participación</th>
           </tr>
         </thead>
@@ -98,6 +101,15 @@ function TablaConceptos({
                 </td>
                 <td className="px-4 py-3 text-right font-semibold text-slate-800 dark:text-zinc-100">
                   {MXN(Number(row.importe))}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600 dark:text-zinc-300">
+                  {MXN(Number(row.iva8))}
+                </td>
+                <td className="px-4 py-3 text-right text-slate-600 dark:text-zinc-300">
+                  {MXN(Number(row.iva16))}
+                </td>
+                <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">
+                  {MXN(Number(row.importe) + Number(row.iva8) + Number(row.iva16))}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
@@ -196,8 +208,8 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
     finally { setExporting(false) }
   }
 
-  const totIngresos = ingresos.reduce((s, r) => s + Number(r.importe), 0)
-  const totEgresos  = egresos.reduce((s, r) => s + Number(r.importe), 0)
+  const totIngresos = ingresos.reduce((s, r) => s + Number(r.importe) + Number(r.iva8) + Number(r.iva16), 0)
+  const totEgresos  = egresos.reduce((s, r) => s + Number(r.importe) + Number(r.iva8) + Number(r.iva16), 0)
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
@@ -276,14 +288,16 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
               {!loading && (ingresos.length > 0 || egresos.length > 0) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-emerald-200 dark:border-emerald-900/40 shadow-sm px-6 py-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Total Ingresos (conceptos)</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-1">Total Ingresos (con IVA)</p>
                     <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">{MXN(totIngresos)}</p>
                     <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">{ingresos.length} producto{ingresos.length !== 1 ? 's' : ''} / servicio{ingresos.length !== 1 ? 's' : ''}</p>
+                    <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-1">* Parcial: primeros 20 conceptos. El Excel incluye el total completo.</p>
                   </div>
                   <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-rose-200 dark:border-rose-900/40 shadow-sm px-6 py-5">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">Total Egresos (conceptos)</p>
+                    <p className="text-xs font-semibold uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-1">Total Egresos (con IVA)</p>
                     <p className="text-2xl font-black text-rose-700 dark:text-rose-300">{MXN(totEgresos)}</p>
                     <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">{egresos.length} producto{egresos.length !== 1 ? 's' : ''} / servicio{egresos.length !== 1 ? 's' : ''}</p>
+                    <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-1">* Parcial: primeros 20 conceptos. El Excel incluye el total completo.</p>
                   </div>
                 </div>
               )}
