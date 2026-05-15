@@ -18,13 +18,13 @@ interface FacturasData {
 }
 
 type Tab = 'ingresos' | 'egresos' | 'nomina' | 'retenciones'
-type PeriodType = 'month' | 'quarter' | 'year'
+type PeriodType = 'month' | 'quarter' | 'year' | 'custom'
 
 const QUARTERS = [
-  { id: 1, label: 'Q1', months: 'Ene–Mar' },
-  { id: 2, label: 'Q2', months: 'Abr–Jun' },
-  { id: 3, label: 'Q3', months: 'Jul–Sep' },
-  { id: 4, label: 'Q4', months: 'Oct–Dic' },
+  { id: 1, label: '', months: 'Ene–Mar' },
+  { id: 2, label: '', months: 'Abr–Jun' },
+  { id: 3, label: '', months: 'Jul–Sep' },
+  { id: 4, label: '', months: 'Oct–Dic' },
 ]
 
 const MXN = (v: number) =>
@@ -56,6 +56,8 @@ export default function FacturasView({ session, accountType }: Props) {
   const [month, setMonth]             = useState(now.getMonth() + 1)
   const [periodType, setPeriodType]   = useState<PeriodType>('month')
   const [quarter, setQuarter]         = useState<number>(Math.ceil((now.getMonth() + 1) / 3))
+  const [customFrom, setCustomFrom]   = useState('')
+  const [customTo,   setCustomTo]     = useState('')
   const [data,  setData]              = useState<FacturasData | null>(null)
   const [loading, setLoading]         = useState(false)
   const [exporting, setExporting]     = useState(false)
@@ -91,12 +93,15 @@ export default function FacturasView({ session, accountType }: Props) {
   }, [])
 
   useEffect(() => {
-    if (selectedRfc) fetchData(selectedRfc, periodParams())
-  }, [selectedRfc, year, month, quarter, periodType, fetchData])
+    if (!selectedRfc) return
+    if (periodType === 'custom' && (!customFrom || !customTo)) return
+    fetchData(selectedRfc, periodParams())
+  }, [selectedRfc, year, month, quarter, periodType, customFrom, customTo, fetchData])
 
   // Load pagos alongside facturas data
   useEffect(() => {
     if (!selectedRfc) return
+    if (periodType === 'custom' && (!customFrom || !customTo)) return
     setPagosData(null)
     setLoadingPagos(true)
     fetch(`/api/pagos/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
@@ -104,11 +109,12 @@ export default function FacturasView({ session, accountType }: Props) {
       .then(d => { if (Array.isArray(d.pagos)) setPagosData(d.pagos) })
       .catch(() => {})
       .finally(() => setLoadingPagos(false))
-  }, [selectedRfc, year, month, quarter, periodType])
+  }, [selectedRfc, year, month, quarter, periodType, customFrom, customTo])
 
   // Load notas de crédito alongside facturas data
   useEffect(() => {
     if (!selectedRfc) return
+    if (periodType === 'custom' && (!customFrom || !customTo)) return
     setNotasData(null)
     setLoadingNotas(true)
     fetch(`/api/notas-credito/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
@@ -116,11 +122,12 @@ export default function FacturasView({ session, accountType }: Props) {
       .then(d => { if (Array.isArray(d.notas)) setNotasData(d.notas) })
       .catch(() => {})
       .finally(() => setLoadingNotas(false))
-  }, [selectedRfc, year, month, quarter, periodType])
+  }, [selectedRfc, year, month, quarter, periodType, customFrom, customTo])
 
   // Load efectivamente pagado (tipo P + PUE)
   useEffect(() => {
     if (!selectedRfc) return
+    if (periodType === 'custom' && (!customFrom || !customTo)) return
     setEfectivamentePagadoData(null)
     setLoadingEfectivamente(true)
     fetch(`/api/efectivamente-pagado/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
@@ -128,7 +135,7 @@ export default function FacturasView({ session, accountType }: Props) {
       .then(d => { if (Array.isArray(d.rows)) setEfectivamentePagadoData(d.rows) })
       .catch(() => {})
       .finally(() => setLoadingEfectivamente(false))
-  }, [selectedRfc, year, month, quarter, periodType])
+  }, [selectedRfc, year, month, quarter, periodType, customFrom, customTo])
 
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
@@ -160,12 +167,14 @@ export default function FacturasView({ session, accountType }: Props) {
   const isCurrentYear = year === now.getFullYear()
 
   function periodParams(): string {
+    if (periodType === 'custom') return `dateFrom=${customFrom}&dateTo=${customTo}`
     if (periodType === 'quarter') return `year=${year}&quarter=${quarter}`
     if (periodType === 'year') return `year=${year}`
     return `year=${year}&month=${month}`
   }
 
   function periodLabel(): string {
+    if (periodType === 'custom') return `${customFrom}_${customTo}`
     if (periodType === 'quarter') return `Q${quarter}-${year}`
     if (periodType === 'year') return String(year)
     return `${String(month).padStart(2,'0')}-${year}`
@@ -304,13 +313,13 @@ export default function FacturasView({ session, accountType }: Props) {
 
               {/* Period type selector */}
               <div className="flex rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
-                {(['month', 'quarter', 'year'] as PeriodType[]).map(pt => (
+                {(['month', 'quarter', 'year', 'custom'] as PeriodType[]).map(pt => (
                   <button
                     key={pt}
                     onClick={() => setPeriodType(pt)}
                     className={`px-3 py-1.5 text-xs font-semibold transition ${periodType === pt ? 'bg-[#7B6FE8] text-white dark:bg-[#91eb78] dark:text-black' : 'text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957]  dark:hover:text-[#6BDA4D]'}`}
                   >
-                    {pt === 'month' ? 'Mes' : pt === 'quarter' ? 'Trimestre' : 'Ano'}
+                    {pt === 'month' ? 'Mes' : pt === 'quarter' ? 'Trimestre' : pt === 'year' ? 'Ano' : 'Rango'}
                   </button>
                 ))}
               </div>
@@ -355,6 +364,26 @@ export default function FacturasView({ session, accountType }: Props) {
                   <button onClick={nextYear} disabled={isCurrentYear} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
+                </div>
+              )}
+
+              {periodType === 'custom' && (
+                <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 ">
+                  <input
+                    type="date"
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={e => setCustomFrom(e.target.value)}
+                    className="text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-transparent outline-none cursor-pointer "
+                  />
+                  <span className="text-slate-400 dark:text-zinc-500 text-xs font-bold select-none ">—</span>
+                  <input
+                    type="date"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    onChange={e => setCustomTo(e.target.value)}
+                    className="text-sm font-semibold text-slate-700 dark:text-zinc-300 bg-transparent outline-none cursor-pointer "
+                  />
                 </div>
               )}
 
