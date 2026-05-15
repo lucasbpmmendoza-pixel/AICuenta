@@ -3,6 +3,9 @@
 import { useEffect, useState } from 'react'
 
 export function useTheme() {
+  // Must start as false so server and client first render match (hydration).
+  // The inline script in layout.tsx already applied the 'dark' class before
+  // paint, so there is no visual flicker when useEffect syncs the state.
   const [dark, setDark] = useState(false)
 
   useEffect(() => {
