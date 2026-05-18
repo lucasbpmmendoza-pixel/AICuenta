@@ -9,6 +9,8 @@ export type AccountType = 'single' | 'multi'
 interface Props {
   userName: string
   accountType: AccountType
+  role?: 'owner' | 'member' | 'chikenelo'
+  ownerId?: string
 }
 
 interface NavItem {
@@ -16,6 +18,7 @@ interface NavItem {
   href: string
   icon: React.ReactNode
   onlyMulti?: boolean
+  ownerOnly?: boolean
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -61,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'RFCs',
     href: '/dashboard/rfcs',
     onlyMulti: true,
+    ownerOnly: true,
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
         >
@@ -73,6 +77,7 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Usuarios',
     href: '/dashboard/usuarios',
     onlyMulti: true,
+    ownerOnly: true,
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
         >
@@ -130,13 +135,20 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
-export default function Sidebar({ userName, accountType }: Props) {
+export default function Sidebar({ userName, accountType, role, ownerId }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { dark, toggle } = useTheme()
 
-  const visibleItems = NAV_ITEMS.filter((item) => !item.onlyMulti || accountType === 'multi')
+  // isOwner: true solo si role es 'owner' Y no tiene ownerId (subordinados siempre tienen ownerId)
+  const isOwner = role === 'owner' && !ownerId
+
+  const visibleItems = NAV_ITEMS.filter((item) => {
+    if (item.onlyMulti && accountType !== 'multi') return false
+    if (item.ownerOnly && !isOwner) return false
+    return true
+  })
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })

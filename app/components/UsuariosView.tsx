@@ -423,7 +423,7 @@ export default function UsuariosView() {
               <button
                 onClick={handleSaveRfcs}
                 disabled={rfcSaving || rfcModalLoading}
-                className="rounded-xl bg-[#7B6FE8] hover:bg-[#6a5fd6] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 transition-colors"
+                className="rounded-xl bg-[#7B6FE8] hover:bg-[#6a5fd6] dark:bg-[#91eb78] dark:hover:bg-[#7bbf5f] disabled:opacity-50 disabled:cursor-not-allowed text-white dark:text-black text-sm font-semibold px-5 py-2 transition-colors"
               >
                 {rfcSaving ? 'Guardando...' : 'Guardar'}
               </button>

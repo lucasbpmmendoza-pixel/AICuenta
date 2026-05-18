@@ -271,8 +271,8 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
             </form>
           </div>
 
-          {/* ── RFC propio (solo cuentas multi sin RFC asignado) ── */}
-          {accountType === 'multi' && !rfcFromDb && (
+          {/* ── RFC propio (solo cuentas multi sin RFC asignado, solo owners) ── */}
+          {accountType === 'multi' && !rfcFromDb && !session.ownerId && (
             <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 overflow-hidden shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
                 <h2 className="text-sm font-bold text-slate-800 dark:text-zinc-100">Tu RFC y FIEL</h2>

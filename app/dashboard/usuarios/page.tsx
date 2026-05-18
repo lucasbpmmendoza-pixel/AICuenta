@@ -33,7 +33,7 @@ export default async function UsuariosPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType="multi" />
+      <Sidebar userName={session.name} accountType="multi" role={session.role} ownerId={session.ownerId} />
       <div className="flex-1 flex flex-col">
         <UsuariosView />
         <DashboardFooter />

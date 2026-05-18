@@ -10,25 +10,40 @@ interface Props {
   accountType: 'single' | 'multi'
   rfcFromDb: string
   ownerRfc: string | null
+  allRfcs: string[]
 }
 
-export default function DashboardUneteView({ session, accountType, rfcFromDb, ownerRfc }: Props) {
+export default function DashboardUneteView({ session, accountType, rfcFromDb, ownerRfc, allRfcs }: Props) {
   const [nombre, setNombre] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  // Checkboxes: por defecto todos seleccionados
+  const [checkedRfcs, setCheckedRfcs] = useState<Set<string>>(new Set(allRfcs))
+  // RFC principal para el mensaje de WhatsApp (el primero seleccionado)
+  const selectedRfc = allRfcs.find(r => checkedRfcs.has(r)) ?? ''
+
+  function toggleRfc(rfc: string) {
+    setCheckedRfcs(prev => {
+      const next = new Set(prev)
+      if (next.has(rfc)) next.delete(rfc)
+      else next.add(rfc)
+      return next
+    })
+  }
 
   async function handleAceptar() {
     setSending(true)
     setError('')
     try {
+      const rfcsToSend = allRfcs.filter(r => checkedRfcs.has(r))
       const res = await fetch('/api/unete/registro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre }),
+        body: JSON.stringify({ nombre, selectedRfc, rfcs: rfcsToSend }),
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Error al registrar'); return }
-      const mensaje = encodeURIComponent(`${nombre.trim()} RFC:${data.rfc} ID:${data.id}`)
+      const mensaje = encodeURIComponent(`${nombre.trim()} RFC:${selectedRfc} UserCode:${data.userCode} Code:${data.code}`)
       window.open(`https://wa.me/526563138465?text=${mensaje}`, '_blank')
     } catch {
       setError('Error de red, intenta de nuevo.')
@@ -39,7 +54,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType={accountType} />
+      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
 
       <main className="flex-1 flex flex-col lg:ml-0">
         <div className="lg:hidden h-14" />
@@ -79,19 +94,30 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
                 />
               </div>
 
-              {/* Tu RFC (users.rfc) */}
-              {ownerRfc && (
+              {/* RFCs del usuario — seleccion con checkboxes */}
+              {allRfcs.length > 0 && (
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">
-                    Tu RFC
+                    RFC(s) a registrar
                   </label>
-                  <input
-                    type="text"
-                    value={ownerRfc}
-                    readOnly
-                    className="rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-100 dark:bg-zinc-700 px-4 py-2.5 text-zinc-500 dark:text-zinc-400 cursor-not-allowed text-sm font-mono"
-                  />
-                  <p className="text-xs text-zinc-400 dark:text-zinc-500">RFC registrado en tu cuenta - no editable.</p>
+                  <div className="flex flex-col gap-1.5">
+                    {allRfcs.map(rfc => (
+                      <label
+                        key={rfc}
+                        className="flex items-center gap-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2.5 cursor-pointer hover:border-green-500 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checkedRfcs.has(rfc)}
+                          onChange={() => toggleRfc(rfc)}
+                          className="w-4 h-4 accent-green-500 cursor-pointer shrink-0"
+                        />
+                        <span className="font-mono text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                          {rfc}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -104,7 +130,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
               <button
                 type="button"
                 onClick={handleAceptar}
-                disabled={sending || nombre.trim() === '' || !ownerRfc}
+                disabled={sending || nombre.trim() === '' || checkedRfcs.size === 0}
                 className="rounded-xl bg-brand-green hover:bg-[#25D366] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm"
               >
                 {sending ? 'Registrando...' : 'Aceptar - Ir a WhatsApp'}

@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 6. Firmar JWT y setear cookie ──────────────────────
-  const role = (user.role ?? 'owner') as 'owner' | 'member';
+  const role = (user.role ?? 'owner') as 'owner' | 'member' | 'chikenelo';
   const token = await signToken({
     sub: user.id,
     email: user.email,
@@ -109,8 +109,8 @@ export async function POST(req: NextRequest) {
   });
   await setAuthCookie(token);
 
-  // Members siempre van al dashboard (no necesitan configurar EFIEL)
-  const redirectTo = role === 'member'
+  // Members y chikenelo siempre van al dashboard (no necesitan configurar EFIEL)
+  const redirectTo = (role === 'member' || role === 'chikenelo')
     ? '/dashboard'
     : await getPostLoginRedirect(user.id);
   return NextResponse.json({ ok: true, redirectTo });

@@ -24,6 +24,9 @@ export default async function RFCsPage() {
   }
   if (!accountType) redirect("/upload-fiel");
 
+  // Bloquear acceso para usuarios chikenelo y member
+  if (session.role === 'chikenelo' || session.role === 'member') redirect("/dashboard");
+
   // Esta sección solo aplica para cuentas multi
   if (accountType !== "multi") redirect("/dashboard");
 
@@ -31,7 +34,7 @@ export default async function RFCsPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType="multi" />
+      <Sidebar userName={session.name} accountType="multi" role={session.role} ownerId={session.ownerId} />
       <div className="flex-1 flex flex-col">
         <RFCsView readOnly={readOnly} />
         <DashboardFooter />

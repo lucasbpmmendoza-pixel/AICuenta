@@ -23,9 +23,12 @@ export default async function ConfiguracionPage() {
         "SELECT account_type, rfc FROM users WHERE id = @id"
       );
     accountType = userResult.recordset[0]?.account_type ?? null;
-    rfcFromDb = userResult.recordset[0]?.rfc ?? null;
+    // Miembros no ven su RFC personal en configuracion
+    rfcFromDb = session.role === 'member' || session.ownerId
+      ? null
+      : (userResult.recordset[0]?.rfc ?? null);
 
-    if (accountType === "multi") {
+    if (accountType === "multi" && session.role !== "member") {
       const efielesResult = await db
         .request()
         .input("user_id", effectiveId)
@@ -41,7 +44,7 @@ export default async function ConfiguracionPage() {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType={accountType as "single" | "multi"} />
+      <Sidebar userName={session.name} accountType={accountType as "single" | "multi"} role={session.role} ownerId={session.ownerId} />
       <div className="flex-1 flex flex-col">
         <ConfiguracionView
           session={session}
