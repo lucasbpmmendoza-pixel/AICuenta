@@ -27,7 +27,7 @@ export default async function SoportePage() {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType as "single" | "multi"} role={session.role} ownerId={session.ownerId} />
-      <div className="flex-1 flex flex-col">
+    <div className="flex-1 flex flex-col lg:ml-60">
         <SoporteView />
         <DashboardFooter />
       </div>

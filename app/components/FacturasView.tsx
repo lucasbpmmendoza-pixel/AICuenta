@@ -285,7 +285,7 @@ export default function FacturasView({ session, accountType }: Props) {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
-      <main className="flex-1 min-w-0 flex flex-col lg:ml-0">
+      <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
         <div className="lg:hidden h-14" />
 
         {/* Header */}
@@ -795,30 +795,33 @@ function TablaEfectivamentePagado({ rows, loading }: { rows: EfectivamentePagado
       <thead>
         <tr>
           <TH>Fuente</TH><TH>F. Emisión</TH><TH>F. Pago</TH>
-          <TH>RFC Receptor</TH><TH>Razón Social</TH>
+          <TH>RFC Emisor</TH><TH>Razón Social Emisor</TH>
           <TH>Forma Pago</TH><TH>Total</TH>
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={7} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => {
-          const tc = Number(r.tipoCambio) || 1
-          const isPago = r.fuente === 'Complemento P'
-          return (
-            <tr key={`${r.uuid}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
-              <TD>
-                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${isPago ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'}`}>
-                  {r.fuente}
-                </span>
-              </TD>
-              <TD>{fmt(r.fechaEmision)}</TD>
-              <TD>{r.fechaPago ? fmt(r.fechaPago) : '—'}</TD>
-              <TD><span className="font-mono text-xs">{r.RFC_receptor}</span></TD>
-              <TD><span className="truncate block">{r.RazonSocialReceptor || r.RFC_receptor}</span></TD>
-              <TD>{r.formaPago || '—'}</TD>
-              <TD right><span className="font-semibold">{MXN(Number(r.total) * tc)}</span></TD>
-            </tr>
-          )
-        })}
+        {rows.length === 0
+          ? <EmptyRow cols={7} />
+          : rows.slice(0, PREVIEW_LIMIT).map((r, i) => {
+            const tc = Number(r.tipoCambio) || 1
+              const isPago = r.fuente === 'Complemento P'
+              return (
+                <tr key={`${r.uuid}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
+                  <TD>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold whitespace-nowrap ${isPago ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' : 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'}`}>
+                      {r.fuente}
+                    </span>
+                  </TD>
+                  <TD>{fmt(r.fechaEmision)}</TD>
+                  <TD>{r.fechaPago ? fmt(r.fechaPago) : '—'}</TD>
+                  <TD><span className="font-mono text-xs">{r.RFC_emisor}</span></TD>
+                  <TD><span className="truncate block">{r.RazonSocialEmisor || r.RFC_emisor}</span></TD>
+                  <TD>{r.formaPago || '—'}</TD>
+                  <TD right><span className="font-semibold">{MXN(Number(r.total) * tc)}</span></TD>
+                </tr>
+              )
+            })
+        }
       </tbody>
       <LimitNote count={rows.length} cols={7} />
     </table>

@@ -246,7 +246,7 @@ export default function ChatbotView({ session, accountType }: Props) {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
-      <main className="flex-1 min-w-0 flex flex-col lg:ml-0">
+    <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
         <div className="lg:hidden h-14" />
 
         {/* ── Header ── */}

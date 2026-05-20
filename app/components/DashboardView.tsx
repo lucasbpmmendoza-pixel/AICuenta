@@ -9,7 +9,7 @@ import DashboardCharts, { type DashboardData } from "./DashboardCharts";
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
-interface RfcOption { id: string; rfc: string }
+interface RfcOption { id: string; rfc: string; alias: string | null }
 
 interface Props {
   session: JWTPayload;
@@ -84,8 +84,8 @@ export default function DashboardView({ session, accountType }: Props) {
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
 
-      <main className="flex-1 flex flex-col lg:ml-0">
-        <div className="lg:hidden h-14" />
+    <main className="flex-1 flex flex-col lg:ml-60">
+          <div className="lg:hidden h-14" />
 
         {/* Header */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
@@ -102,7 +102,7 @@ export default function DashboardView({ session, accountType }: Props) {
                   onChange={e => setSelectedRfc(e.target.value)}
                   className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-deep-light-500"
                 >
-                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.rfc}</option>)}
+                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ? `${r.alias} (${r.rfc})` : r.rfc}</option>)}
                 </select>
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-deep-light-50 dark:bg-deep-light-light-900/30 px-3 py-1 text-xs font-bold text-deep-light-700 dark:text-deep-light-300 tracking-wide">
