@@ -252,8 +252,7 @@ export default function Sidebar({ userName, accountType, role, ownerId }: Props)
   return (
     <>
       {/* ── Desktop sidebar ── */}
-      <aside className="hidden lg:flex w-60 shrink-0 flex-col bg-white dark:bg-zinc-900 border-r border-slate-200 dark:border-zinc-800 min-h-screen">
-        {navContent}
+      <aside className="hidden lg:flex fixed top-0 left-0 h-screen w-60 flex-col bg-white dark:bg-zinc-900 border-r border-slate-200 dark:border-zinc-800 z-20 overflow-hidden">        {navContent}
       </aside>
 
       {/* ── Mobile top bar ── */}

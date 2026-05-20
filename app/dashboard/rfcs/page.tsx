@@ -30,11 +30,13 @@ export default async function RFCsPage() {
   // Esta sección solo aplica para cuentas multi
   if (accountType !== "multi") redirect("/dashboard");
 
+  const readOnly = session.role === "member";
+
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType="multi" role={session.role} ownerId={session.ownerId} />
       <div className="flex-1 flex flex-col">
-        <RFCsView readOnly={false} />
+        <RFCsView readOnly={readOnly} />
         <DashboardFooter />
       </div>
     </div>

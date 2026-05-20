@@ -19,12 +19,13 @@ export async function GET() {
         .query<{
           id: string;
           rfc: string;
+          alias: string | null;
           fiel: string;
           downloads_enabled: boolean;
           created_at: string;
           last_update: string;
         }>(
-          `SELECT e.id, e.rfc, e.fiel, e.downloads_enabled, e.created_at, e.last_update
+          `SELECT e.id, e.rfc, alias, e.fiel, e.downloads_enabled, e.created_at, e.last_update
            FROM EFIELES e
            INNER JOIN member_rfcs mr ON mr.efiel_id = e.id AND mr.member_id = @memberId
            ORDER BY e.created_at DESC`
@@ -38,12 +39,13 @@ export async function GET() {
       .query<{
         id: string;
         rfc: string;
+        alias: string | null;
         fiel: string;
         downloads_enabled: boolean;
         created_at: string;
         last_update: string;
       }>(
-        `SELECT id, rfc, fiel, downloads_enabled, created_at, last_update
+        `SELECT id, rfc, alias, fiel, downloads_enabled, created_at, last_update
          FROM EFIELES
          WHERE user_id = @user_id
          ORDER BY created_at DESC`
