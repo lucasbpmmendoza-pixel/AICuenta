@@ -30,7 +30,7 @@ export default async function RFCsPage() {
   // Esta sección solo aplica para cuentas multi
   if (accountType !== "multi") redirect("/dashboard");
 
-  const readOnly = session.role === "member";
+  const readOnly = session.role === false;
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">

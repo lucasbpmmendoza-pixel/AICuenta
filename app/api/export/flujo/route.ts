@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
-import { fetchEfectivamentePagado, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [rows, nombreEmpresa] = await Promise.all([
-      fetchEfectivamentePagado(rfc, dateFrom, dateTo),
+      fetchflujo(rfc, dateFrom, dateTo),
       fetchNombreEmpresa(rfc),
     ]);
 
@@ -184,7 +184,7 @@ export async function GET(req: NextRequest) {
         : monthP !== null
           ? `${pad(parseInt(monthP, 10))}-${year}`
           : String(year);
-    const fileName = `efectivamente-pagado_${rfc}_${periodLabel}.xlsx`;
+    const fileName = `Flujo_${rfc}_${periodLabel}.xlsx`;
 
     return new Response(buf as ArrayBuffer, {
       headers: {
@@ -193,7 +193,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("[export/efectivamente-pagado]", (err as Error).message);
+    console.error("[export/Flujo]", (err as Error).message);
     return new Response("Error al generar el reporte", { status: 503 });
   }
 }

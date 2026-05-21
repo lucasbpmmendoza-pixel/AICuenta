@@ -89,14 +89,29 @@ export async function PATCH(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  let body: { password?: string };
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ error: "Cuerpo invalido" }, { status: 400 });
+  }
+  if (!body.password) return NextResponse.json({ error: "Contrasena requerida" }, { status: 400 });
 
   let db;
   try { db = await getDb(); } catch {
     return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
   }
+
+  const userRes = await db.request()
+    .input("id", session.sub)
+    .query<{ password_hash: string }>("SELECT password_hash FROM users WHERE id = @id");
+  const user = userRes.recordset[0];
+  if (!user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
+
+  const valid = await bcrypt.compare(body.password, user.password_hash);
+  if (!valid) return NextResponse.json({ error: "Contrasena incorrecta" }, { status: 403 });
 
   await db.request().input("id", session.sub).query("DELETE FROM users WHERE id = @id");
   await clearAuthCookie();

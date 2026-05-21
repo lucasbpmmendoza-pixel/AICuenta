@@ -5,7 +5,7 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
-import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, EfectivamentePagadoRow } from '@/lib/facturas-query'
+import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, flujoRow } from '@/lib/facturas-query'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -68,7 +68,7 @@ export default function FacturasView({ session, accountType }: Props) {
   const [notasData, setNotasData]             = useState<NotaCreditoRow[] | null>(null)
   const [loadingNotas, setLoadingNotas]       = useState(false)
   const [exportingNotas, setExportingNotas]   = useState(false)
-  const [efectivamentePagadoData, setEfectivamentePagadoData]   = useState<EfectivamentePagadoRow[] | null>(null)
+  const [flujoData, setflujoData]   = useState<flujoRow[] | null>(null)
   const [loadingEfectivamente, setLoadingEfectivamente]         = useState(false)
   const [exportingEfectivamente, setExportingEfectivamente]     = useState(false)
 
@@ -128,11 +128,11 @@ export default function FacturasView({ session, accountType }: Props) {
   useEffect(() => {
     if (!selectedRfc) return
     if (periodType === 'custom' && (!customFrom || !customTo)) return
-    setEfectivamentePagadoData(null)
+    setflujoData(null)
     setLoadingEfectivamente(true)
     fetch(`/api/efectivamente-pagado/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
-      .then(d => { if (Array.isArray(d.rows)) setEfectivamentePagadoData(d.rows) })
+      .then(d => { if (Array.isArray(d.rows)) setflujoData(d.rows) })
       .catch(() => {})
       .finally(() => setLoadingEfectivamente(false))
   }, [selectedRfc, year, month, quarter, periodType, customFrom, customTo])
@@ -201,13 +201,13 @@ export default function FacturasView({ session, accountType }: Props) {
     if (!selectedRfc || exportingEfectivamente) return
     setExportingEfectivamente(true)
     try {
-      const url = `/api/export/efectivamente-pagado?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
+      const url = `/api/export/flujo?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
       if (!res.ok) { alert('Error al generar el reporte'); return }
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `efectivamente-pagado_${selectedRfc}_${periodLabel()}.xlsx`
+      a.download = `flujo_${selectedRfc}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -502,13 +502,13 @@ export default function FacturasView({ session, accountType }: Props) {
             <div className="mt-6 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
                 <div>
-                  <h2 className="text-sm font-bold text-sky-700 dark:text-sky-300">Efectivamente pagado</h2>
+                  <h2 className="text-sm font-bold text-sky-700 dark:text-sky-300">flujo</h2>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Complementos de pago (P) + Facturas PUE del período</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!loadingEfectivamente && efectivamentePagadoData && (
+                  {!loadingEfectivamente && flujoData && (
                     <span className="rounded-full bg-sky-50 dark:bg-sky-900/30 px-2.5 py-0.5 text-xs font-bold text-sky-700 dark:text-sky-300">
-                      {efectivamentePagadoData.length} registros
+                      {flujoData.length} registros
                     </span>
                   )}
                   <button
@@ -526,7 +526,7 @@ export default function FacturasView({ session, accountType }: Props) {
                 </div>
               </div>
               <div className="w-full">
-                <TablaEfectivamentePagado rows={efectivamentePagadoData ?? []} loading={loadingEfectivamente} />
+                <Tablaflujo rows={flujoData ?? []} loading={loadingEfectivamente} />
               </div>
             </div>
           )}
@@ -780,7 +780,7 @@ function TablaPagos({ rows, loading }: { rows: PagoRow[]; loading: boolean }) {
   )
 }
 
-function TablaEfectivamentePagado({ rows, loading }: { rows: EfectivamentePagadoRow[]; loading: boolean }) {
+function Tablaflujo({ rows, loading }: { rows: flujoRow[]; loading: boolean }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-slate-400 dark:text-zinc-500 gap-2">

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
-import { fetchEfectivamentePagado } from "@/lib/facturas-query";
+import { fetchflujo } from "@/lib/facturas-query";
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const rows = await fetchEfectivamentePagado(rfc, dateFrom, dateTo, 10);
+    const rows = await fetchflujo(rfc, dateFrom, dateTo, 10);
     return NextResponse.json({ rows });
   } catch (err) {
     console.error("[efectivamente-pagado/data]", (err as Error).message);

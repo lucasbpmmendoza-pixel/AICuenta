@@ -42,8 +42,7 @@ function buildSheet(
   titleBg: string,
   title: string,
   subtitleLine: string,
-  rows: { descripcion: string; claveProdServ: string; cantidad: number; importe: number; iva8: number; iva16: number; numFacturas: number }[]
-) {
+  rows: { descripcion: string; claveProdServ: string; cantidad: number; importe: number; iva8: number; iva16: number; numFacturas: number }[]) {
   const ws = wb.addWorksheet(sheetName);
 
   // Column widths + default numFmt (avoids per-cell formatting in data loop)

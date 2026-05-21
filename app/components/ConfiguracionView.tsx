@@ -32,6 +32,8 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
+  const [showDeletePassword, setShowDeletePassword] = useState(false)
 
   // RFC management state (multi only)
   const [selectedRfc, setSelectedRfc] = useState(efieles[0] ?? '')
@@ -116,10 +118,15 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
   }
 
   async function handleDelete() {
+    if (!deletePassword) { setDeleteError('Ingresa tu contrasena para confirmar.'); return }
     setDeleting(true)
     setDeleteError('')
     try {
-      const res = await fetch('/api/auth/profile', { method: 'DELETE' })
+      const res = await fetch('/api/auth/profile', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: deletePassword }),
+      })
       if (!res.ok) {
         const data = await res.json()
         setDeleteError(data.error ?? 'Error al eliminar la cuenta.')
@@ -431,6 +438,26 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
                   <p className="text-sm font-semibold text-red-600 dark:text-red-400">
                     ¿Estas seguro? Esta accion no se puede deshacer.
                   </p>
+                  <div className="relative">
+                    <input
+                      type={showDeletePassword ? 'text' : 'password'}
+                      value={deletePassword}
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                      placeholder="Ingresa tu contrasena para confirmar"
+                      className="w-full rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeletePassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition"
+                      aria-label={showDeletePassword ? 'Ocultar' : 'Mostrar'}
+                    >
+                      {showDeletePassword
+                        ? <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        : <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      }
+                    </button>
+                  </div>
                   {deleteError && (
                     <p className="text-xs text-red-500 dark:text-red-400">{deleteError}</p>
                   )}
@@ -438,14 +465,14 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
                     <button
                       type="button"
                       onClick={handleDelete}
-                      disabled={deleting}
+                      disabled={deleting || !deletePassword}
                       className="flex-1 rounded-xl bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-semibold py-2.5 transition-colors"
                     >
-                      {deleting ? 'Eliminando...' : 'Sí, eliminar mi cuenta'}
+                      {deleting ? 'Eliminando...' : 'Si, eliminar mi cuenta'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setShowDeleteConfirm(false); setDeleteError('') }}
+                      onClick={() => { setShowDeleteConfirm(false); setDeleteError(''); setDeletePassword(''); setShowDeletePassword(false) }}
                       className="flex-1 rounded-xl border border-slate-300 dark:border-zinc-700 text-sm font-semibold text-slate-600 dark:text-zinc-300 py-2.5 hover:bg-slate-50 dark:hover:bg-zinc-800 transition-colors"
                     >
                       Cancelar

@@ -6,6 +6,8 @@ import { getDb, getDbLong } from "@/lib/db";
 const _efCache = new Map<string, { data: EstadosFinancierosData; exp: number }>();
 const EF_TTL_MS = 15 * 60 * 1000;
 
+export function clearEfCache() { _efCache.clear(); }
+
 const TC = "ISNULL(NULLIF(tipoCambio,0),1)";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -354,16 +356,25 @@ export async function fetchRawCFDIForExport(
         TRY_CONVERT(decimal(18,2), ISNULL(Total,0))                        AS Total,
         ISNULL(Moneda,'MXN')                                                AS Moneda,
         ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)          AS tipoCambio,
-        ISNULL(Movimiento,'')                                               AS Movimiento,
+        CASE
+          WHEN TipoComprobante = 'N' THEN 'Nomina'
+          WHEN RFC_Emisor = @rfc AND TipoComprobante = 'I' THEN 'Ingreso'
+          WHEN RFC_Receptor = @rfc AND TipoComprobante = 'I' THEN 'Egreso'
+          WHEN RFC_Emisor = @rfc AND TipoComprobante = 'E' THEN 'Egreso'
+          WHEN RFC_Receptor = @rfc AND TipoComprobante = 'E' THEN 'Ingreso'
+          ELSE ISNULL(Movimiento,'')
+        END                                                                 AS Movimiento,
         ISNULL(TipoComprobante,'')                                          AS TipoComprobante,
         ISNULL(TipoPago,'')                                                 AS TipoPago,
         ISNULL(MetodoPago,'')                                               AS MetodoPago,
         ISNULL(UsoCFDI,'')                                                  AS UsoCFDI
       FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
-        AND TipoComprobante IN ('I','E','N')
-        AND UPPER(Status)='VIGENTE'
-        AND Fecha>=@dateFrom AND Fecha<@dateTo
+      WHERE (
+              (RFC_Emisor   = @rfc AND TipoComprobante IN ('I','E','N'))
+           OR (RFC_Receptor = @rfc AND TipoComprobante IN ('I','E'))
+            )
+        AND UPPER(Status) = 'VIGENTE'
+        AND Fecha >= @dateFrom AND Fecha < @dateTo
       ORDER BY Fecha
     `);
   return result.recordset;
@@ -442,7 +453,7 @@ export async function fetchNotasCreditoData(
 
 // ─── Efectivamente Pagado ─────────────────────────────────────────────────────
 
-export interface EfectivamentePagadoRow {
+export interface flujoRow {
   uuid:                string;
   fuente:              string;   // 'Complemento P' | 'Factura PUE'
   fechaEmision:        Date;
@@ -461,12 +472,12 @@ export interface EfectivamentePagadoRow {
   total:               number;
 }
 
-export async function fetchEfectivamentePagado(
+export async function fetchflujo(
   rfc: string,
   dateFrom: Date,
   dateTo: Date,
   limit?: number
-): Promise<EfectivamentePagadoRow[]> {
+): Promise<flujoRow[]> {
   const db = await getDb();
   const top = limit !== undefined ? `TOP ${limit}` : '';
   const result = await db
@@ -474,7 +485,7 @@ export async function fetchEfectivamentePagado(
     .input("rfc",      sql.NVarChar, rfc)
     .input("dateFrom", sql.DateTime,  dateFrom)
     .input("dateTo",   sql.DateTime,  dateTo)
-    .query<EfectivamentePagadoRow>(`
+    .query<flujoRow>(`
       SELECT ${top} * FROM (
         -- Complementos de pago (tipo P) — monto tomado de facturalo_pagos
         SELECT
@@ -643,6 +654,8 @@ export interface ConceptoRow {
 export interface EstadosFinancierosData {
   ingresos: ConceptoRow[];
   egresos:  ConceptoRow[];
+  totalFacturasIngresos: number;
+  totalFacturasEgresos:  number;
 }
 
 export async function fetchEstadosFinancieros(
@@ -658,7 +671,7 @@ export async function fetchEstadosFinancieros(
   const db  = await getDbLong();
   const top = limit !== undefined ? `TOP ${limit}` : '';
 
-  const [ingRes, egrRes] = await Promise.all([
+  const [ingRes, egrRes, totIngRes, totEgrRes] = await Promise.all([
     // Ingresos
     db.request()
       .input("rfc",      sql.NVarChar, rfc)
@@ -684,13 +697,14 @@ export async function fetchEstadosFinancieros(
                  * ISNULL(f.TotalTrasladadoIVADieciseis, 0)
                  * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
             ELSE 0 END)                                      AS iva16,
-          COUNT(*)                                           AS numFacturas
+          COUNT(DISTINCT f.UUID)                             AS numFacturas
         FROM facturalo_cfdis f WITH (NOLOCK)
         LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
-        WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
-          AND UPPER(f.Movimiento)    = 'INGRESO'
-          AND f.TipoComprobante      IN ('I','E')
-          AND UPPER(f.Status)        = 'VIGENTE'
+        WHERE (
+                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I')
+             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E')
+              )
+          AND UPPER(f.Status) = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
         GROUP BY ISNULL(c.ClaveProductoServicio, '')
         ORDER BY SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
@@ -723,24 +737,59 @@ export async function fetchEstadosFinancieros(
                  * ISNULL(f.TotalTrasladadoIVADieciseis, 0)
                  * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
             ELSE 0 END)                                      AS iva16,
-          COUNT(*)                                           AS numFacturas
+          COUNT(DISTINCT f.UUID)                             AS numFacturas
         FROM facturalo_cfdis f WITH (NOLOCK)
         LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
-        WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
-          AND UPPER(f.Movimiento)    = 'EGRESO'
-          AND f.TipoComprobante      IN ('I','E')
-          AND UPPER(f.Status)        = 'VIGENTE'
+        WHERE (
+                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I')
+             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E')
+              )
+          AND UPPER(f.Status) = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
         GROUP BY ISNULL(c.ClaveProductoServicio, '')
         ORDER BY SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
                      * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio),0),1)) DESC
         OPTION (HASH GROUP, RECOMPILE)
       `),
+
+    // Total facturas ingresos
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<{ total: number }>(`
+        SELECT COUNT(DISTINCT f.UUID) AS total
+        FROM facturalo_cfdis f WITH (NOLOCK)
+        WHERE (
+                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I')
+             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E')
+              )
+          AND UPPER(f.Status) = 'VIGENTE'
+          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+      `),
+
+    // Total facturas egresos
+    db.request()
+      .input("rfc",      sql.NVarChar, rfc)
+      .input("dateFrom", sql.DateTime,  dateFrom)
+      .input("dateTo",   sql.DateTime,  dateTo)
+      .query<{ total: number }>(`
+        SELECT COUNT(DISTINCT f.UUID) AS total
+        FROM facturalo_cfdis f WITH (NOLOCK)
+        WHERE (
+                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I')
+             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E')
+              )
+          AND UPPER(f.Status) = 'VIGENTE'
+          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+      `),
   ]);
 
   const data: EstadosFinancierosData = {
     ingresos: ingRes.recordset,
     egresos:  egrRes.recordset,
+    totalFacturasIngresos: totIngRes.recordset[0]?.total ?? 0,
+    totalFacturasEgresos:  totEgrRes.recordset[0]?.total ?? 0,
   };
   _efCache.set(cacheKey, { data, exp: Date.now() + EF_TTL_MS });
   return data;
