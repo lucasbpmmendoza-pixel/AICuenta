@@ -1,13 +1,61 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback, useRef } from 'react'
+
+const MAX_IMAGES = 3
+const MAX_BYTES  = 2 * 1024 * 1024 // 2 MB por imagen
+
+interface ImageAttach { name: string; dataUrl: string }
 
 export default function SoporteView() {
-  const [subject, setSubject] = useState('')
-  const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
+  const [subject, setSubject]   = useState('')
+  const [message, setMessage]   = useState('')
+  const [sending, setSending]   = useState(false)
+  const [result,  setResult]    = useState<{ ok: boolean; text: string } | null>(null)
+  const [images,  setImages]    = useState<ImageAttach[]>([])
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef            = useRef<HTMLInputElement>(null)
 
+  // ── helpers ────────────────────────────────────────────────────────────────
+  function addFiles(files: FileList | File[]) {
+    const list = Array.from(files).filter(f => f.type.startsWith('image/'))
+    const errors: string[] = []
+    setImages(prev => {
+      let next = [...prev]
+      for (const file of list) {
+        if (next.length >= MAX_IMAGES) { errors.push(`Maximo ${MAX_IMAGES} imagenes.`); break }
+        if (file.size > MAX_BYTES)     { errors.push(`"${file.name}" supera 2 MB.`); continue }
+        const reader = new FileReader()
+        reader.onload = () => setImages(p => p.length < MAX_IMAGES
+          ? [...p, { name: file.name, dataUrl: reader.result as string }]
+          : p)
+        reader.readAsDataURL(file)
+      }
+      if (errors.length) setResult({ ok: false, text: errors[0] })
+      return next
+    })
+  }
+
+  function removeImage(i: number) {
+    setImages(prev => prev.filter((_, idx) => idx !== i))
+  }
+
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = Array.from(e.clipboardData.items)
+    const imgFiles = items
+      .filter(it => it.kind === 'file' && it.type.startsWith('image/'))
+      .map(it => it.getAsFile())
+      .filter(Boolean) as File[]
+    if (imgFiles.length) addFiles(imgFiles)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    addFiles(e.dataTransfer.files)
+  }, [])
+
+  // ── submit ─────────────────────────────────────────────────────────────────
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setResult(null)
@@ -16,7 +64,15 @@ export default function SoporteView() {
       const res = await fetch('/api/support', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject, message }),
+        body: JSON.stringify({
+          subject,
+          message,
+          images: images.map(img => ({
+            name:    img.name,
+            data:    img.dataUrl.split(',')[1],   // solo base64, sin prefijo
+            mimeType: img.dataUrl.split(';')[0].replace('data:', ''),
+          })),
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -25,6 +81,7 @@ export default function SoporteView() {
         setResult({ ok: true, text: 'Tu mensaje fue enviado. Te responderemos pronto.' })
         setSubject('')
         setMessage('')
+        setImages([])
       }
     } catch {
       setResult({ ok: false, text: 'Error de red. Intenta de nuevo.' })
@@ -58,7 +115,7 @@ export default function SoporteView() {
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+            <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" onPaste={handlePaste}>
               {/* Subject */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
@@ -92,6 +149,66 @@ export default function SoporteView() {
                 <p className="text-right text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                   {message.length} / 4000
                 </p>
+              </div>
+
+              {/* ── Image attachments ── */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+                  Capturas / imagenes <span className="normal-case font-normal">(opcional, max {MAX_IMAGES})</span>
+                </label>
+
+                {/* Drop zone */}
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={[
+                    'flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 cursor-pointer transition-colors select-none',
+                    dragOver
+                      ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                      : 'border-slate-300 dark:border-zinc-600 hover:border-blue-400 dark:hover:border-blue-500 bg-slate-50 dark:bg-zinc-800/50',
+                  ].join(' ')}
+                >
+                  <svg className="h-6 w-6 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+                    <polyline points="21 15 16 10 5 21"/>
+                  </svg>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 text-center">
+                    Arrastra una imagen, pega con <kbd className="rounded bg-slate-200 dark:bg-zinc-700 px-1 py-0.5 font-mono text-[10px]">Ctrl+V</kbd> o haz clic para seleccionar
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-zinc-500">PNG, JPG, WEBP — max 2 MB c/u</p>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { if (e.target.files) addFiles(e.target.files); e.target.value = '' }}
+                />
+
+                {/* Thumbnails */}
+                {images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {images.map((img, i) => (
+                      <div key={i} className="relative group w-20 h-20 rounded-lg overflow-hidden border border-slate-200 dark:border-zinc-700 bg-slate-100 dark:bg-zinc-800">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.dataUrl} alt={img.name} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeImage(i)}
+                          className="absolute top-0.5 right-0.5 rounded-full bg-black/60 p-0.5 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                          aria-label="Eliminar imagen"
+                        >
+                          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {result && (

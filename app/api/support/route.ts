@@ -4,9 +4,16 @@ import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { sendSupportEmail } from "@/lib/email";
 
+const imageSchema = z.object({
+  name:     z.string().max(200),
+  data:     z.string().max(3_000_000), // base64 ~2 MB raw
+  mimeType: z.string().max(50),
+});
+
 const supportSchema = z.object({
   subject: z.string().trim().min(3, "El asunto es demasiado corto").max(160, "El asunto es demasiado largo"),
   message: z.string().trim().min(10, "El mensaje es demasiado corto").max(4000, "El mensaje no puede exceder 4000 caracteres"),
+  images:  z.array(imageSchema).max(3).optional().default([]),
 });
 
 export async function POST(req: NextRequest) {
@@ -23,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 422 });
   }
 
-  const { subject, message } = parsed.data;
+  const { subject, message, images } = parsed.data;
 
   // Guardar en BD
   try {
@@ -49,6 +56,7 @@ export async function POST(req: NextRequest) {
       fromEmail: session.email,
       subject,
       message,
+      images,
     });
   } catch (err) {
     console.error("[support] Error al enviar correo:", (err as Error).message);

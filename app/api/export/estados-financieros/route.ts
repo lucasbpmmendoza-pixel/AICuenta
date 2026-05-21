@@ -137,8 +137,8 @@ export async function GET(req: NextRequest) {
   if (!(await validateRfc(effectiveUserId, rfc)))
     return new Response("RFC no encontrado", { status: 403 });
 
-  const dateFrom = new Date(year, month - 1, 1);
-  const dateTo   = new Date(year, month, 1);
+  const dateFrom = new Date(Date.UTC(year, month - 1, 1));
+  const dateTo   = new Date(Date.UTC(year, month, 1));
 
   const MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
   const periodoLabel = `${MESES[month - 1]} ${year}`;

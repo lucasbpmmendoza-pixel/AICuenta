@@ -370,8 +370,11 @@ export async function fetchRawCFDIForExport(
         ISNULL(UsoCFDI,'')                                                  AS UsoCFDI
       FROM facturalo_cfdis WITH (NOLOCK)
       WHERE (
-              (RFC_Emisor   = @rfc AND TipoComprobante IN ('I','E','N'))
-           OR (RFC_Receptor = @rfc AND TipoComprobante IN ('I','E'))
+              (RFC_Emisor   = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'INGRESO')
+           OR (RFC_Emisor   = @rfc AND TipoComprobante = 'N')
+           OR (RFC_Emisor   = @rfc AND TipoComprobante = 'E' AND UPPER(Movimiento) = 'EGRESO')
+           OR (RFC_Receptor = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'EGRESO')
+           OR (RFC_Receptor = @rfc AND TipoComprobante = 'E' AND UPPER(Movimiento) = 'INGRESO')
             )
         AND UPPER(Status) = 'VIGENTE'
         AND Fecha >= @dateFrom AND Fecha < @dateTo
@@ -701,8 +704,8 @@ export async function fetchEstadosFinancieros(
         FROM facturalo_cfdis f WITH (NOLOCK)
         LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
         WHERE (
-                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I')
-             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E')
+                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
+             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
               )
           AND UPPER(f.Status) = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
@@ -741,8 +744,8 @@ export async function fetchEstadosFinancieros(
         FROM facturalo_cfdis f WITH (NOLOCK)
         LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
         WHERE (
-                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I')
-             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E')
+                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
+             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
               )
           AND UPPER(f.Status) = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
@@ -761,8 +764,8 @@ export async function fetchEstadosFinancieros(
         SELECT COUNT(DISTINCT f.UUID) AS total
         FROM facturalo_cfdis f WITH (NOLOCK)
         WHERE (
-                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I')
-             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E')
+                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
+             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
               )
           AND UPPER(f.Status) = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
@@ -777,8 +780,8 @@ export async function fetchEstadosFinancieros(
         SELECT COUNT(DISTINCT f.UUID) AS total
         FROM facturalo_cfdis f WITH (NOLOCK)
         WHERE (
-                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I')
-             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E')
+                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
+             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
               )
           AND UPPER(f.Status) = 'VIGENTE'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo

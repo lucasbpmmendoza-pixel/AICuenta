@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
   const owns = await validateRfc(effectiveUserId, rfc);
   if (!owns) return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
 
-  const dateFrom = new Date(year, month - 1, 1)
-  const dateTo   = new Date(year, month, 1)
+  const dateFrom = new Date(Date.UTC(year, month - 1, 1))
+  const dateTo   = new Date(Date.UTC(year, month, 1))
 
   try {
     const db = await getDb();

@@ -75,12 +75,19 @@ export async function sendSupportEmail(opts: {
   fromEmail: string;
   subject: string;
   message: string;
+  images?: { name: string; data: string; mimeType: string }[];
 }) {
+  const attachments = (opts.images ?? []).map((img, i) => ({
+    filename: img.name || `imagen-${i + 1}.png`,
+    content:  img.data,   // base64 string
+  }));
+
   return resend.emails.send({
     from: FROM,
     to: process.env.SUPPORT_EMAIL ?? "soporte@aicuenta.mx",
     replyTo: opts.fromEmail,
     subject: `[Soporte] ${opts.subject}`,
+    attachments,
     html: `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:32px">
         <h2 style="font-size:20px;font-weight:900;color:#0f172a;margin-bottom:4px">

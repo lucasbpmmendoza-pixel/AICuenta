@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
-import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { fetchFlujo, fetchNombreEmpresa } from "@/lib/facturas-query";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [rows, nombreEmpresa] = await Promise.all([
-      fetchflujo(rfc, dateFrom, dateTo),
+      fetchFlujo(rfc, dateFrom, dateTo),
       fetchNombreEmpresa(rfc),
     ]);
 

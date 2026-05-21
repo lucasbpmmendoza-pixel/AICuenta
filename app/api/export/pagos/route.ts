@@ -66,22 +66,22 @@ export async function GET(req: NextRequest) {
     const dt = new Date(dateToP);
     if (isNaN(df.getTime()) || isNaN(dt.getTime())) return new Response("fechas inválidas", { status: 400 });
     dateFrom = df;
-    dateTo   = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + 1);
+    dateTo   = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() + 1));
   } else {
     if (isNaN(year)) return new Response("Parámetros inválidos", { status: 400 });
     if (quarterP !== null) {
       const q = parseInt(quarterP, 10);
       if (isNaN(q) || q < 1 || q > 4) return new Response("quarter inválido", { status: 400 });
-      dateFrom = new Date(year, (q - 1) * 3, 1);
-      dateTo   = new Date(year, q * 3, 1);
+      dateFrom = new Date(Date.UTC(year, (q - 1) * 3, 1));
+      dateTo   = new Date(Date.UTC(year, q * 3, 1));
     } else if (monthP !== null) {
       const month = parseInt(monthP, 10);
       if (isNaN(month) || month < 1 || month > 12) return new Response("month inválido", { status: 400 });
-      dateFrom = new Date(year, month - 1, 1);
-      dateTo   = new Date(year, month, 1);
+      dateFrom = new Date(Date.UTC(year, month - 1, 1));
+      dateTo   = new Date(Date.UTC(year, month, 1));
     } else {
-      dateFrom = new Date(year, 0, 1);
-      dateTo   = new Date(year + 1, 0, 1);
+      dateFrom = new Date(Date.UTC(year, 0, 1));
+      dateTo   = new Date(Date.UTC(year + 1, 0, 1));
     }
   }
 
