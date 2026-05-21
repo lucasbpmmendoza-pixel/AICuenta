@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
+import sql from "mssql";
 import { getSession } from "@/lib/session";
-import { getDb } from "@/lib/db";
+import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -19,11 +20,26 @@ function addBorder(cell: ExcelJS.Cell) {
 const HEADER_BG   = "595959";
 const ING_BG      = "1A6B3C"; // verde oscuro para ingresos
 const EGR_BG      = "8B1A1A"; // rojo oscuro para egresos
+const AUD_BG      = "1F4E79";
 const MXN_FMT     = '"$"#,##0.00';
 const NUM_FMT     = "#,##0.00";
 
 const HEADERS = ["Descripción", "Clave Prod/Serv", "# Facturas", "Cantidad", "Subtotal", "IVA 8%", "IVA 16%", "Total c/IVA"];
 const COL_WIDTHS = [55, 16, 12, 14, 18, 16, 16, 18];
+
+interface AuditoriaConceptoRow {
+  uuidFactura: string;
+  fecha: Date;
+  movimiento: string;
+  tipoComprobante: string;
+  rfcEmisor: string;
+  rfcReceptor: string;
+  claveProdServ: string;
+  descripcion: string;
+  cantidad: number;
+  importe: number;
+  descuento: number;
+}
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
 
@@ -119,6 +135,41 @@ function buildSheet(
   });
 }
 
+async function fetchAuditoriaConceptos(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+): Promise<AuditoriaConceptoRow[]> {
+  const db = await getDbLong();
+  const result = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .query<AuditoriaConceptoRow>(`
+      SELECT
+        f.UUID                                                        AS uuidFactura,
+        f.Fecha                                                       AS fecha,
+        CASE WHEN f.RFC_Emisor = @rfc THEN 'INGRESO' ELSE 'EGRESO' END AS movimiento,
+        ISNULL(f.TipoComprobante,'')                                  AS tipoComprobante,
+        ISNULL(f.RFC_Emisor,'')                                       AS rfcEmisor,
+        ISNULL(f.RFC_Receptor,'')                                     AS rfcReceptor,
+        ISNULL(NULLIF(c.ClaveProductoServicio,''), '')                AS claveProdServ,
+        ISNULL(NULLIF(c.Descripcion,''), 'Sin descripción')           AS descripcion,
+        ISNULL(TRY_CONVERT(decimal(18,4), c.Cantidad), 0)             AS cantidad,
+        ISNULL(TRY_CONVERT(decimal(18,2), c.Importe), 0)              AS importe,
+        ISNULL(TRY_CONVERT(decimal(18,2), c.Descuento), 0)            AS descuento
+      FROM facturalo_cfdis f WITH (NOLOCK)
+      INNER JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID))
+        ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
+      WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+        AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        AND f.TipoComprobante IN ('I','E','N','P')
+      ORDER BY claveProdServ ASC, f.Fecha DESC, f.UUID DESC, descripcion ASC
+    `);
+
+  return result.recordset;
+}
+
 // ─── GET ───────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
@@ -157,6 +208,83 @@ export async function GET(req: NextRequest) {
 
     buildSheet(wb, "Ingresos por Concepto", ING_BG, "PRINCIPALES INGRESOS POR PRODUCTO / SERVICIO", subtitle, data.ingresos);
     buildSheet(wb, "Egresos por Concepto",  EGR_BG, "PRINCIPALES EGRESOS POR PRODUCTO / SERVICIO",  subtitle, data.egresos);
+
+    const auditRows = await fetchAuditoriaConceptos(rfc, dateFrom, dateTo);
+    const auditWs = wb.addWorksheet("Auditoria Conceptos");
+    auditWs.columns = [
+      { width: 38 },
+      { width: 13 },
+      { width: 12 },
+      { width: 10 },
+      { width: 17 },
+      { width: 17 },
+      { width: 18 },
+      { width: 58 },
+      { width: 12, style: { numFmt: NUM_FMT } },
+      { width: 18, style: { numFmt: MXN_FMT } },
+      { width: 18, style: { numFmt: MXN_FMT } },
+    ];
+
+    auditWs.mergeCells(1, 1, 1, 11);
+    const auditTitleRow = auditWs.getRow(1);
+    auditTitleRow.height = 22;
+    const auditTitleCell = auditTitleRow.getCell(1);
+    auditTitleCell.value = "AUDITORÍA DE CONCEPTOS";
+    auditTitleCell.font = { bold: true, size: 13, color: { argb: "FFFFFFFF" } };
+    auditTitleCell.alignment = { vertical: "middle", horizontal: "center" };
+    setFill(auditTitleCell, AUD_BG);
+
+    auditWs.mergeCells(2, 1, 2, 11);
+    const auditSubRow = auditWs.getRow(2);
+    auditSubRow.height = 16;
+    const auditSubCell = auditSubRow.getCell(1);
+    auditSubCell.value = subtitle;
+    auditSubCell.font = { size: 10, color: { argb: "FFFFFFFF" } };
+    auditSubCell.alignment = { vertical: "middle", horizontal: "center" };
+    setFill(auditSubCell, HEADER_BG);
+
+    const auditHeaders = [
+      "UUID Factura",
+      "Fecha",
+      "Movimiento",
+      "Tipo",
+      "RFC Emisor",
+      "RFC Receptor",
+      "Clave Prod/Serv",
+      "Descripción Concepto",
+      "Cantidad",
+      "Importe",
+      "Descuento",
+    ];
+    const auditHeaderRow = auditWs.addRow(auditHeaders);
+    auditHeaderRow.eachCell({ includeEmpty: true }, (cell) => {
+      addBorder(cell);
+      setFill(cell, AUD_BG);
+      cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
+    });
+
+    for (const row of auditRows) {
+      const auditDataRow = auditWs.addRow([
+        row.uuidFactura,
+        row.fecha,
+        row.movimiento,
+        row.tipoComprobante,
+        row.rfcEmisor,
+        row.rfcReceptor,
+        row.claveProdServ,
+        row.descripcion,
+        row.cantidad,
+        row.importe,
+        row.descuento,
+      ]);
+
+      auditDataRow.getCell(2).numFmt = "dd/mm/yyyy";
+      auditDataRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+        addBorder(cell);
+        if (ci >= 9) cell.numFmt = ci === 9 ? NUM_FMT : MXN_FMT;
+      });
+    }
 
     const buf = await wb.xlsx.writeBuffer();
     return new Response(buf, {

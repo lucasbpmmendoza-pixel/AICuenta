@@ -461,6 +461,7 @@ export interface flujoRow {
   fuente:              string;   // 'Complemento P' | 'Factura PUE'
   fechaEmision:        Date;
   fechaPago:           Date | null;
+  uuidDocumentoRelacionado: string;
   RFC_emisor:          string;
   RazonSocialEmisor:   string;
   RFC_receptor:        string;
@@ -473,6 +474,8 @@ export interface flujoRow {
   retISR:              number;
   retIVA:              number;
   total:               number;
+  movimiento:          "INGRESO" | "EGRESO";
+
 }
 
 export async function fetchflujo(
@@ -493,7 +496,13 @@ export async function fetchflujo(
         -- Complementos de pago (tipo P) — monto tomado de facturalo_pagos
         SELECT
           fc.UUID                                                           AS uuid,
+          ISNULL((
+            SELECT STRING_AGG(CONVERT(nvarchar(50), ISNULL(dd.uuid_doc_relacionado,'')), ', ')
+            FROM dbo.facturalo_pago_doc_relacionado dd
+            WHERE dd.pago_id = p.id
+          ), '')                                                            AS uuidDocumentoRelacionado,
           'Complemento P'                                                   AS fuente,
+          CASE WHEN fc.RFC_Emisor = @rfc THEN 'INGRESO' ELSE 'EGRESO' END  AS movimiento,
           fc.Fecha                                                          AS fechaEmision,
           p.fecha_pago                                                      AS fechaPago,
           ISNULL(fc.RFC_Emisor,'')                                          AS RFC_emisor,
@@ -510,7 +519,7 @@ export async function fetchflujo(
           ISNULL(TRY_CONVERT(decimal(18,2), p.monto_total_pagos), 0)       AS total
         FROM dbo.facturalo_cfdis fc WITH (NOLOCK)
         INNER JOIN dbo.facturalo_pagos p WITH (NOLOCK) ON p.UUID = fc.UUID
-        WHERE fc.RFC_Emisor = @rfc
+        WHERE (fc.RFC_Emisor = @rfc OR fc.RFC_Receptor = @rfc)
           AND fc.TipoComprobante = 'P'
           AND fc.Status = 'Vigente'
           AND fc.Fecha >= @dateFrom AND fc.Fecha < @dateTo
@@ -520,7 +529,9 @@ export async function fetchflujo(
         -- Facturas PUE (tipo I, MetodoPago = 'PUE') — pago en una sola exhibición
         SELECT
           UUID                                                              AS uuid,
+          ''                                                                AS uuidDocumentoRelacionado,
           'Factura PUE'                                                     AS fuente,
+          CASE WHEN RFC_Emisor = @rfc THEN 'INGRESO' ELSE 'EGRESO' END     AS movimiento,
           Fecha                                                             AS fechaEmision,
           NULL                                                              AS fechaPago,
           ISNULL(RFC_Emisor,'')                                             AS RFC_emisor,
@@ -536,7 +547,7 @@ export async function fetchflujo(
           TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoIVA,0))           AS retIVA,
           TRY_CONVERT(decimal(18,2), ISNULL(Total,0))                      AS total
         FROM dbo.facturalo_cfdis WITH (NOLOCK)
-        WHERE RFC_Emisor = @rfc
+        WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
           AND TipoComprobante = 'I'
           AND MetodoPago = 'PUE'
           AND Status = 'Vigente'
@@ -681,37 +692,42 @@ export async function fetchEstadosFinancieros(
       .input("dateFrom", sql.DateTime,  dateFrom)
       .input("dateTo",   sql.DateTime,  dateTo)
       .query<ConceptoRow>(`
+        WITH base AS (
+          SELECT
+            ISNULL(NULLIF(c.ClaveProductoServicio,''), '') AS claveProdServ,
+            ISNULL(NULLIF(cat.descripcion,''), CASE WHEN c.UUID IS NULL THEN '(Sin concepto registrado)' ELSE 'Sin descripción SAT' END) AS descripcion,
+            ISNULL(c.Cantidad, 0) AS cantidad,
+            CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe, 0) ELSE ISNULL(f.Subtotal, 0) END AS importeBase,
+            ISNULL(f.Subtotal, 0) AS subtotalBase,
+            ISNULL(f.TotalTrasladadoIVAOcho, 0) AS iva8Base,
+            ISNULL(f.TotalTrasladadoIVADieciseis, 0) AS iva16Base,
+            ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1) AS tipoCambio,
+            f.UUID AS uuid
+          FROM facturalo_cfdis f WITH (NOLOCK)
+          LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
+          LEFT JOIN tb_catprodserv cat WITH (NOLOCK) ON cat.clave = c.ClaveProductoServicio
+          WHERE (
+                  (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
+               OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
+                )
+            AND UPPER(f.Status) = 'VIGENTE'
+            AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        )
         SELECT ${top}
-          MIN(ISNULL(NULLIF(c.Descripcion,''), CASE WHEN c.UUID IS NULL THEN '(Sin concepto registrado)' ELSE 'Sin descripción' END)) AS descripcion,
-          ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
-          SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
-          SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe, 0)
-                   ELSE ISNULL(f.Subtotal, 0) END
-              * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)) AS importe,
-          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
-            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
-                 / f.Subtotal
-                 * ISNULL(f.TotalTrasladadoIVAOcho, 0)
-                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
-            ELSE 0 END)                                      AS iva8,
-          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
-            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
-                 / f.Subtotal
-                 * ISNULL(f.TotalTrasladadoIVADieciseis, 0)
-                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
-            ELSE 0 END)                                      AS iva16,
-          COUNT(DISTINCT f.UUID)                             AS numFacturas
-        FROM facturalo_cfdis f WITH (NOLOCK)
-        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
-        WHERE (
-                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
-             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
-              )
-          AND UPPER(f.Status) = 'VIGENTE'
-          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
-        GROUP BY ISNULL(c.ClaveProductoServicio, '')
-        ORDER BY SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
-                     * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio),0),1)) DESC
+          MIN(descripcion) AS descripcion,
+          claveProdServ,
+          SUM(cantidad) AS cantidad,
+          SUM(importeBase * tipoCambio) AS importe,
+          SUM(CASE WHEN subtotalBase > 0
+              THEN (importeBase / subtotalBase) * iva8Base * tipoCambio
+              ELSE 0 END) AS iva8,
+          SUM(CASE WHEN subtotalBase > 0
+              THEN (importeBase / subtotalBase) * iva16Base * tipoCambio
+              ELSE 0 END) AS iva16,
+          COUNT(DISTINCT uuid) AS numFacturas
+        FROM base
+        GROUP BY claveProdServ
+        ORDER BY SUM(importeBase * tipoCambio) DESC
         OPTION (HASH GROUP, RECOMPILE)
       `),
 
@@ -721,37 +737,42 @@ export async function fetchEstadosFinancieros(
       .input("dateFrom", sql.DateTime,  dateFrom)
       .input("dateTo",   sql.DateTime,  dateTo)
       .query<ConceptoRow>(`
+        WITH base AS (
+          SELECT
+            ISNULL(NULLIF(c.ClaveProductoServicio,''), '') AS claveProdServ,
+            ISNULL(NULLIF(cat.descripcion,''), CASE WHEN c.UUID IS NULL THEN '(Sin concepto registrado)' ELSE 'Sin descripción SAT' END) AS descripcion,
+            ISNULL(c.Cantidad, 0) AS cantidad,
+            CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe, 0) ELSE ISNULL(f.Subtotal, 0) END AS importeBase,
+            ISNULL(f.Subtotal, 0) AS subtotalBase,
+            ISNULL(f.TotalTrasladadoIVAOcho, 0) AS iva8Base,
+            ISNULL(f.TotalTrasladadoIVADieciseis, 0) AS iva16Base,
+            ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1) AS tipoCambio,
+            f.UUID AS uuid
+          FROM facturalo_cfdis f WITH (NOLOCK)
+          LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
+          LEFT JOIN tb_catprodserv cat WITH (NOLOCK) ON cat.clave = c.ClaveProductoServicio
+          WHERE (
+                  (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
+               OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
+                )
+            AND UPPER(f.Status) = 'VIGENTE'
+            AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        )
         SELECT ${top}
-          MIN(ISNULL(NULLIF(c.Descripcion,''), CASE WHEN c.UUID IS NULL THEN '(Sin concepto registrado)' ELSE 'Sin descripción' END)) AS descripcion,
-          ISNULL(c.ClaveProductoServicio, '')                 AS claveProdServ,
-          SUM(ISNULL(c.Cantidad, 0))                         AS cantidad,
-          SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe, 0)
-                   ELSE ISNULL(f.Subtotal, 0) END
-              * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)) AS importe,
-          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
-            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
-                 / f.Subtotal
-                 * ISNULL(f.TotalTrasladadoIVAOcho, 0)
-                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
-            ELSE 0 END)                                      AS iva8,
-          SUM(CASE WHEN ISNULL(f.Subtotal,0) > 0
-            THEN CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
-                 / f.Subtotal
-                 * ISNULL(f.TotalTrasladadoIVADieciseis, 0)
-                 * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1)
-            ELSE 0 END)                                      AS iva16,
-          COUNT(DISTINCT f.UUID)                             AS numFacturas
-        FROM facturalo_cfdis f WITH (NOLOCK)
-        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
-        WHERE (
-                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
-             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
-              )
-          AND UPPER(f.Status) = 'VIGENTE'
-          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
-        GROUP BY ISNULL(c.ClaveProductoServicio, '')
-        ORDER BY SUM(CASE WHEN c.UUID IS NOT NULL THEN ISNULL(c.Importe,0) ELSE ISNULL(f.Subtotal,0) END
-                     * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio),0),1)) DESC
+          MIN(descripcion) AS descripcion,
+          claveProdServ,
+          SUM(cantidad) AS cantidad,
+          SUM(importeBase * tipoCambio) AS importe,
+          SUM(CASE WHEN subtotalBase > 0
+              THEN (importeBase / subtotalBase) * iva8Base * tipoCambio
+              ELSE 0 END) AS iva8,
+          SUM(CASE WHEN subtotalBase > 0
+              THEN (importeBase / subtotalBase) * iva16Base * tipoCambio
+              ELSE 0 END) AS iva16,
+          COUNT(DISTINCT uuid) AS numFacturas
+        FROM base
+        GROUP BY claveProdServ
+        ORDER BY SUM(importeBase * tipoCambio) DESC
         OPTION (HASH GROUP, RECOMPILE)
       `),
 

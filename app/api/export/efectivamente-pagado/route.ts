@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
-import { fetchFlujo, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
+import type { flujoRow } from "@/lib/facturas-query";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -19,10 +20,12 @@ function addBorder(cell: ExcelJS.Cell) {
 const HEADER_BG = "595959";
 const DATE_FMT  = "dd/mm/yyyy";
 const MXN_FMT   = '"$"#,##0.00';
+const INGRESOS_BG = "1E7E34";
+const EGRESOS_BG = "8A1C1C";
 const TC_FMT    = "#,##0.0000";
 
 const EP_HEADERS = [
-  "Fuente", "Fecha Emisión", "Fecha Pago",
+  "Fuente", "UUID Complemento Pago", "UUID Documento Relacionado", "Fecha Emisión", "Fecha Pago",
   "RFC Emisor", "Razón Social Emisor",
   "RFC Receptor", "Razón Social Receptor",
   "Forma Pago", "Moneda", "Tipo Cambio",
@@ -91,10 +94,38 @@ export async function GET(req: NextRequest) {
 
   try {
     const [rows, nombreEmpresa] = await Promise.all([
-      fetchFlujo(rfc, dateFrom, dateTo),
+      fetchflujo(rfc, dateFrom, dateTo),
       fetchNombreEmpresa(rfc),
     ]);
 
+    const computePagoIva = (subtotalMx: number, totalMx: number) => {
+      const inferredIva = totalMx - subtotalMx;
+      return inferredIva > 0 ? inferredIva : 0;
+    };
+
+    const normalizedRows = rows.map((row: flujoRow) => {
+      const tc = Number(row.tipoCambio) || 1;
+      const subtotalMx = Number(row.subtotal) * tc;
+      const totalMx = Number(row.total) * tc;
+      const rawIvaMx = Number(row.iva) * tc;
+      const ivaMx = row.fuente === "Complemento P"
+        ? computePagoIva(subtotalMx, totalMx)
+        : rawIvaMx;
+
+      return {
+        ...row,
+        movimiento: row.movimiento,
+        tc,
+        subtotalMx,
+        ivaMx,
+        retIsrMx: Number(row.retISR) * tc,
+        retIvaMx: Number(row.retIVA) * tc,
+        totalMx,
+      };
+    });
+
+    const ingresos = normalizedRows.filter((r: typeof normalizedRows[number]) => r.movimiento === "INGRESO");
+    const egresos = normalizedRows.filter((r: typeof normalizedRows[number]) => r.movimiento === "EGRESO");
     // ─── Build workbook ────────────────────────────────────────────────────────
 
     const wb = new ExcelJS.Workbook();
@@ -115,64 +146,97 @@ export async function GET(req: NextRequest) {
     // Blank row
     ws.addRow([]);
 
-    // Table headers
-    const thRow = ws.addRow(EP_HEADERS);
-    thRow.font = { bold: true };
-    thRow.eachCell({ includeEmpty: true }, (cell) => {
-      addBorder(cell);
-      cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
-    });
+    const writeSection = (title: string, sectionRows: typeof normalizedRows) => {
+      const sectionBg = title === "INGRESOS" ? INGRESOS_BG : EGRESOS_BG;
 
-    // Data rows
-    for (const row of rows) {
-      const tc = Number(row.tipoCambio) || 1;
-      const isPago = row.fuente === "Complemento P";
-      const dr = ws.addRow([
-        row.fuente,                                           //  1 Fuente
-        row.fechaEmision,                                     //  2 Fecha Emisión
-        row.fechaPago ?? null,                                //  3 Fecha Pago
-        row.RFC_emisor,                                       //  4 RFC Emisor
-        row.RazonSocialEmisor || row.RFC_emisor,              //  5 Razón Social Emisor
-        row.RFC_receptor,                                     //  6 RFC Receptor
-        row.RazonSocialReceptor || row.RFC_receptor,          //  7 Razón Social Receptor
-        row.formaPago || "",                                  //  8 Forma Pago
-        row.moneda,                                           //  9 Moneda
-        tc,                                                   // 10 Tipo Cambio
-        Number(row.subtotal) * tc,                            // 11 Subtotal
-        Number(row.iva)      * tc,                            // 12 IVA
-        Number(row.retISR)   * tc,                            // 13 Ret. ISR
-        Number(row.retIVA)   * tc,                            // 14 Ret. IVA
-        Number(row.total) * tc,                               // 15 Total
-      ]);
+      const tRow = ws.addRow([title]);
+      const tCell = tRow.getCell(1);
+      tCell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      tCell.alignment = { vertical: "middle", horizontal: "left" };
+      setFill(tCell, sectionBg);
+      addBorder(tCell);
+      ws.mergeCells(tRow.number, 1, tRow.number, COL_COUNT);
 
-      dr.getCell(2).numFmt = DATE_FMT;
-      if (!isPago) dr.getCell(3).numFmt = DATE_FMT;
-      dr.getCell(10).numFmt = TC_FMT;
-
-      dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+      const thRow = ws.addRow(EP_HEADERS);
+      thRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+      thRow.eachCell({ includeEmpty: true }, (cell) => {
+        setFill(cell, sectionBg);
         addBorder(cell);
-        if (ci >= 11 && ci <= 15) cell.numFmt = MXN_FMT;
+        cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
       });
-    }
 
-    // Totals row
-    const tc = (r: typeof rows[number]) => Number(r.tipoCambio) || 1;
-    const totSubtotal = rows.reduce((s, r) => s + Number(r.subtotal) * tc(r), 0);
-    const totIva      = rows.reduce((s, r) => s + Number(r.iva)      * tc(r), 0);
-    const totRetISR   = rows.reduce((s, r) => s + Number(r.retISR)   * tc(r), 0);
-    const totRetIVA   = rows.reduce((s, r) => s + Number(r.retIVA)   * tc(r), 0);
-    const totTotal    = rows.reduce((s, r) => s + Number(r.total)    * tc(r), 0);
+      for (const row of sectionRows) {
+        const isPago = row.fuente === "Complemento P";
+        const dr = ws.addRow([
+          row.fuente,
+          row.uuid,
+          row.uuidDocumentoRelacionado || "",
+          row.fechaEmision,
+          row.fechaPago ?? null,
+          row.RFC_emisor,
+          row.RazonSocialEmisor || row.RFC_emisor,
+          row.RFC_receptor,
+          row.RazonSocialReceptor || row.RFC_receptor,
+          row.formaPago || "",
+          row.moneda,
+          row.tc,
+          row.subtotalMx,
+          row.ivaMx,
+          row.retIsrMx,
+          row.retIvaMx,
+          row.totalMx,
+        ]);
 
-    const totRow = ws.addRow([
-      "TOTALES", null, null, null, null, null, null, null, null, null,
-      totSubtotal, totIva, totRetISR, totRetIVA, totTotal,
+        dr.getCell(4).numFmt = DATE_FMT;
+        if (isPago && row.fechaPago) dr.getCell(5).numFmt = DATE_FMT;
+        dr.getCell(12).numFmt = TC_FMT;
+
+        dr.eachCell({ includeEmpty: true }, (cell, ci) => {
+          addBorder(cell);
+          if (ci >= 13 && ci <= 17) cell.numFmt = MXN_FMT;
+        });
+      }
+
+      const totSubtotal = sectionRows.reduce((s, r) => s + r.subtotalMx, 0);
+      const totIva = sectionRows.reduce((s, r) => s + r.ivaMx, 0);
+      const totRetISR = sectionRows.reduce((s, r) => s + r.retIsrMx, 0);
+      const totRetIVA = sectionRows.reduce((s, r) => s + r.retIvaMx, 0);
+      const totTotal = sectionRows.reduce((s, r) => s + r.totalMx, 0);
+
+      const totRow = ws.addRow([
+        `TOTAL ${title}`, null, null, null, null, null, null, null, null, null, null, null,
+        totSubtotal, totIva, totRetISR, totRetIVA, totTotal,
+      ]);
+      totRow.font = { bold: true };
+      totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+        addBorder(cell);
+        setFill(cell, HEADER_BG);
+        cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+        if (ci >= 13 && ci <= 17) cell.numFmt = MXN_FMT;
+      });
+
+      ws.addRow([]);
+    };
+
+    writeSection("INGRESOS", ingresos);
+    writeSection("EGRESOS", egresos);
+
+    const grandSubtotal = normalizedRows.reduce((s, r) => s + r.subtotalMx, 0);
+    const grandIva = normalizedRows.reduce((s, r) => s + r.ivaMx, 0);
+    const grandRetISR = normalizedRows.reduce((s, r) => s + r.retIsrMx, 0);
+    const grandRetIVA = normalizedRows.reduce((s, r) => s + r.retIvaMx, 0);
+    const grandTotal = normalizedRows.reduce((s, r) => s + r.totalMx, 0);
+
+    const grandRow = ws.addRow([
+      "TOTAL GENERAL", null, null, null, null, null, null, null, null, null, null, null,
+      grandSubtotal, grandIva, grandRetISR, grandRetIVA, grandTotal,
     ]);
-    totRow.font = { bold: true };
-    totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
+    grandRow.font = { bold: true };
+    grandRow.eachCell({ includeEmpty: true }, (cell, ci) => {
       addBorder(cell);
       setFill(cell, HEADER_BG);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      if (ci >= 11 && ci <= 15) cell.numFmt = MXN_FMT;
+      if (ci >= 13 && ci <= 17) cell.numFmt = MXN_FMT;
     });
 
     const buf = await wb.xlsx.writeBuffer();
