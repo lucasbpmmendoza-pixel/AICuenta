@@ -3,142 +3,238 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getSession } from "@/lib/session";
 import {
-  countFacturasParaChat,
-  fetchFacturasParaChat,
-  CFDIForChat,
+  chatConciliarPagosRelacionados,
+  chatAggregateCFDIs,
+  chatGetCFDIDetail,
+  chatSearchCFDIs,
+  chatGetConceptosAnalysis,
+  chatGetTopFacturas,
 } from "@/lib/facturas-query";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// ─── Tipos de comprobante ─────────────────────────────────────────────────────
-const TIPO_LABEL: Record<string, string> = {
-  I: "Ingreso",
-  E: "Egreso / Nota de crédito",
-  N: "Nómina",
-  P: "Complemento de pago",
-};
+const SYSTEM_PROMPT = `Eres un asistente fiscal y contable especializado en México (SAT, CFDI, ISR, IVA).
+Tu trabajo es responder con datos reales obtenidos mediante tools SQL, nunca con supuestos.
 
-// ─── Formateadores ────────────────────────────────────────────────────────────
-const MXN = (v: number) =>
-  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(v);
+Reglas obligatorias:
+- Antes de responder preguntas numéricas, de conteos o comparativas, usa tools.
+- Si el usuario pide "top facturas", "facturas más grandes", "facturas de mayor importe", usa chat_get_top_facturas.
+- Si el usuario pide detalle de una factura, usa chat_get_cfdi_detail.
+- Si el usuario pide listados o filtros, usa chat_search_cfdis.
+- Si pide totales, top o comparativos, usa chat_aggregate_cfdis.
+- Si el usuario pide "ingreso total" o "egreso total", usa chat_aggregate_cfdis con groupBy="none" y movimiento correcto (INGRESO o EGRESO).
+- Para preguntas sobre "proveedores", "clientes", "quién me emitió facturas", "mis compradores", "mis vendedores", desglose por proveedor/cliente, usa chat_get_conceptos_analysis con groupBy="supplier" y movimiento=EGRESO (proveedores) o INGRESO (clientes).
+- Para preguntas sobre conceptos, gastos principales, desglose de items o gastos por tipo de producto, usa chat_get_conceptos_analysis con groupBy="clave" o "descripcion".
+- No calcules totales sumando resultados de chat_search_cfdis.
+- Si pide conciliación de complementos de pago tipo P o diferencias entre imp_pagado y monto_total_pagos, usa chat_conciliar_pagos.
+- Nunca inventes valores; si no hay datos, dilo explícitamente.
+- Responde siempre en español claro y profesional.
+- Mantén la clasificación: INGRESO = RFC cliente como emisor, EGRESO = RFC cliente como receptor.
+- "Proveedores" = quienes te emiten facturas (EGRESO, grupBy=supplier)
+- "Clientes" = quienes tu les emites facturas (INGRESO, groupBy=supplier)`;
 
-const fmtDate = (d: Date | string) => {
-  const dt = new Date(d);
-  return isNaN(dt.getTime())
-    ? String(d)
-    : dt.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "numeric" });
-};
+const CHAT_TOOLS = [
+  {
+    type: "function",
+    function: {
+      name: "chat_search_cfdis",
+      description: "Busca CFDIs por filtros y devuelve filas resumidas.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO"] },
+          tipoComprobante: { type: "string", enum: ["I", "E", "N", "P"] },
+          searchText: { type: "string", description: "Texto libre para UUID, RFC o razón social" },
+          limit: { type: "number", description: "Máximo de filas (1-200)", default: 50 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_aggregate_cfdis",
+      description: "Agrega CFDIs por grupo para obtener totales y comparativos.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
+          tipoComprobante: { type: "string", enum: ["I", "E", "N", "P"] },
+          groupBy: {
+            type: "string",
+            enum: ["none", "mes", "rfcEmisor", "rfcReceptor", "razonSocialEmisor", "razonSocialReceptor", "tipoComprobante"],
+            default: "none",
+          },
+          top: { type: "number", description: "Máximo de grupos (1-100)", default: 25 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_cfdi_detail",
+      description: "Obtiene detalle completo de un CFDI por UUID, incluyendo conceptos, pagos y docs relacionados.",
+      parameters: {
+        type: "object",
+        properties: {
+          uuid: { type: "string", description: "UUID exacto de la factura" },
+        },
+        required: ["uuid"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_conciliar_pagos",
+      description: "Concilia complementos de pago (tipo P) contra sus documentos relacionados y detecta diferencias.",
+      parameters: {
+        type: "object",
+        properties: {
+          limit: { type: "number", description: "Máximo de pagos a revisar (1-300)", default: 100 },
+          onlyWithDifferences: { type: "boolean", description: "Si true, devuelve solo pagos con diferencia", default: false },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_conceptos_analysis",
+      description: "Analiza conceptos de facturas agrupados por producto, descripción o proveedor para desglose de gastos e ingresos.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
+          tipoComprobante: { type: "string", enum: ["I", "E", "N", "P"] },
+          groupBy: {
+            type: "string",
+            enum: ["none", "clave", "supplier", "descripcion"],
+            default: "clave",
+            description: "Agrupar por: clave (ClaveProductoServicio), supplier (proveedor/cliente), descripcion (nombre del item), none (total general)",
+          },
+          limit: { type: "number", description: "Máximo de grupos (1-200)", default: 50 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_top_facturas",
+      description: "Obtiene las facturas individuales de mayor importe, ordenadas de forma descendente.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
+          tipoComprobante: { type: "string", enum: ["I", "E", "N", "P"] },
+          limit: { type: "number", description: "Máximo de facturas (1-200)", default: 20 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+];
 
-// ─── Builder de contexto TON ──────────────────────────────────────────────────
-function buildContext(
-  cfdis: CFDIForChat[],
-  rfc: string,
-  dateFrom: string,
-  dateTo: string,
-): string {
-  const lines: string[] = [
-    "=== CONTEXTO FISCAL ===",
-    `RFC: ${rfc}`,
-    `Período: ${dateFrom} — ${dateTo}`,
-    `CFDIs incluidos: ${cfdis.length}`,
-    "",
-  ];
-
-  for (let i = 0; i < cfdis.length; i++) {
-    const c = cfdis[i];
-    const movimiento = c.rfcEmisor.toUpperCase() === rfc.toUpperCase() ? "INGRESO" : "EGRESO";
-    lines.push(`━━━━ CFDI ${i + 1} ━━━━`);
-    lines.push(`UUID: ${c.uuid}`);
-    lines.push(
-      `Tipo: ${c.tipoComprobante} (${TIPO_LABEL[c.tipoComprobante] ?? c.tipoComprobante}) | Movimiento: ${movimiento} | Status: ${c.status}`,
-    );
-    lines.push(`Emisor:   ${c.rfcEmisor} — ${c.razonSocialEmisor}`);
-    lines.push(`Receptor: ${c.rfcReceptor} — ${c.razonSocialReceptor}`);
-    lines.push(`Fecha: ${fmtDate(c.fecha)} | Serie/Folio: ${c.serie || "—"}/${c.folio || "—"}`);
-    if (c.regimenFiscal)
-      lines.push(`Régimen: ${c.regimenFiscal} | Lugar exp.: ${c.lugarExpedicion}`);
-    lines.push(`Moneda: ${c.moneda} | TC: ${c.tipoCambio}`);
-    if (c.metodoPago || c.formaPago)
-      lines.push(`Método pago: ${c.metodoPago} | Forma pago: ${c.formaPago}`);
-    if (c.usoCFDI) lines.push(`Uso CFDI: ${c.usoCFDI}`);
-
-    lines.push("Importes:");
-    lines.push(`  Subtotal        ${MXN(c.subtotal)}`);
-    if (c.descuento > 0)   lines.push(`  Descuento       ${MXN(c.descuento)}`);
-    if (c.totalIVA > 0)    lines.push(`  IVA Total       ${MXN(c.totalIVA)}`);
-    if (c.totalIVA16 > 0)  lines.push(`  IVA 16%         ${MXN(c.totalIVA16)}`);
-    if (c.totalIVA8 > 0)   lines.push(`  IVA 8%          ${MXN(c.totalIVA8)}`);
-    if (c.totalISR > 0)    lines.push(`  ISR ret.        ${MXN(c.totalISR)}`);
-    if (c.totalIVARet > 0) lines.push(`  IVA ret.        ${MXN(c.totalIVARet)}`);
-    lines.push(`  TOTAL           ${MXN(c.total)}`);
-
-    if (c.conceptos.length > 0) {
-      lines.push(`Conceptos (${c.conceptos.length}):`);
-      c.conceptos.forEach((co, j) => {
-        lines.push(
-          `  ${j + 1}. [${co.claveProdServ || "?"}] ${co.descripcion}` +
-            ` — Cant: ${co.cantidad}` +
-            ` — Importe: ${MXN(co.importe)}` +
-            (co.descuento > 0 ? ` — Descuento: ${MXN(co.descuento)}` : ""),
-        );
-      });
-    }
-
-    if (c.pagos.length > 0) {
-      lines.push(`Pagos (${c.pagos.length}):`);
-      c.pagos.forEach((p) => {
-        lines.push(
-          `  • ${p.fechaPago} | Forma: ${p.formaPago} | ${p.moneda} TC:${p.tipoCambio} | ${MXN(p.monto)}`,
-        );
-      });
-    }
-
-    lines.push("");
+function parseToolArgs(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    return parsed as Record<string, unknown>;
+  } catch {
+    return {};
   }
-
-  return lines.join("\n");
 }
 
-const SYSTEM_PROMPT = `Eres un asistente fiscal y contable especializado en México (SAT, CFDI, ISR, IVA).
-Tienes cargado el contexto de los CFDIs del cliente para el período seleccionado.
-Tu objetivo: ayudar a entender, analizar y tomar decisiones sobre sus facturas.
+function sanitizeChatMessages(messages: unknown[]): ChatCompletionMessageParam[] {
+  return (messages as { role?: unknown; content?: unknown }[])
+    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .slice(-20)
+    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }));
+}
 
-REGLA FUNDAMENTAL — Clasificación de CFDIs:
-Cada CFDI en el contexto incluye el campo "Movimiento" que ya está calculado para el RFC del cliente:
-- Movimiento: INGRESO → el cliente es el EMISOR (él expidió la factura, recibe dinero).
-- Movimiento: EGRESO  → el cliente es el RECEPTOR (le facturaron a él, paga dinero).
-Cuando el usuario pregunte por "ingresos" o "lo que facturé/vendí/cobré", suma ÚNICAMENTE los CFDIs con Movimiento: INGRESO.
-Cuando pregunte por "egresos", "gastos", "lo que me facturaron/compré/pagué", suma ÚNICAMENTE los CFDIs con Movimiento: EGRESO.
-Nunca mezcles INGRESO y EGRESO al calcular totales de una sola categoría.
+function summarizeToolResult(result: unknown) {
+  if (!result || typeof result !== "object") return result;
+  const r = result as Record<string, unknown>;
+  return {
+    keys: Object.keys(r),
+    rows: Array.isArray(r.rows) ? r.rows.length : undefined,
+    count: typeof r.count === "number" ? r.count : undefined,
+    hasHeader: !!r.header,
+    resumenKeys: r.resumen && typeof r.resumen === "object" ? Object.keys(r.resumen as Record<string, unknown>) : undefined,
+  };
+}
 
-Instrucciones:
-- Responde siempre en español, de manera clara y profesional.
-- Usa los datos del contexto para responder preguntas sobre facturas, montos, clientes, proveedores, impuestos.
-- Si el usuario pregunta algo que no está en el contexto, indícalo claramente.
-- Puedes hacer cálculos, totalizaciones y comparativas con los datos disponibles.
-- Usa formato legible: listas, montos en pesos MXN con símbolo $.
-- Nunca inventes datos que no estén en el contexto.`;
-
-// ─── GET /api/chat — conteo de CFDIs para el período ─────────────────────────
-export async function GET(req: Request) {
-  const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  const { searchParams } = new URL(req.url);
-  const rfc      = searchParams.get("rfc")?.trim().toUpperCase();
-  const dateFrom = searchParams.get("dateFrom");
-  const dateTo   = searchParams.get("dateTo");
-
-  if (!rfc || !dateFrom || !dateTo)
-    return NextResponse.json({ error: "Faltan parámetros" }, { status: 400 });
-
-  try {
-    const count = await countFacturasParaChat(rfc, new Date(dateFrom), new Date(dateTo));
-    return NextResponse.json({ count });
-  } catch (err) {
-    console.error("[chat/count]", (err as Error).message);
-    return NextResponse.json({ error: "Error al contar CFDIs" }, { status: 500 });
+async function executeTool(
+  name: string,
+  args: Record<string, unknown>,
+  rfc: string,
+  dfrom: Date,
+  dto: Date,
+) {
+  if (name === "chat_search_cfdis") {
+    return chatSearchCFDIs(rfc, dfrom, dto, {
+      movimiento: args.movimiento as "INGRESO" | "EGRESO" | undefined,
+      tipoComprobante: args.tipoComprobante as "I" | "E" | "N" | "P" | undefined,
+      searchText: typeof args.searchText === "string" ? args.searchText : undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
   }
+
+  if (name === "chat_aggregate_cfdis") {
+    return chatAggregateCFDIs(rfc, dfrom, dto, {
+      movimiento: args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined,
+      tipoComprobante: args.tipoComprobante as "I" | "E" | "N" | "P" | undefined,
+      groupBy: args.groupBy as
+        | "none"
+        | "mes"
+        | "rfcEmisor"
+        | "rfcReceptor"
+        | "razonSocialEmisor"
+        | "razonSocialReceptor"
+        | "tipoComprobante"
+        | undefined,
+      top: typeof args.top === "number" ? args.top : undefined,
+    });
+  }
+
+  if (name === "chat_get_cfdi_detail") {
+    const uuid = typeof args.uuid === "string" ? args.uuid.trim() : "";
+    if (!uuid) return { error: "uuid requerido" };
+    return chatGetCFDIDetail(rfc, dfrom, dto, uuid);
+  }
+
+  if (name === "chat_conciliar_pagos") {
+    return chatConciliarPagosRelacionados(rfc, dfrom, dto, {
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+      onlyWithDifferences: typeof args.onlyWithDifferences === "boolean" ? args.onlyWithDifferences : undefined,
+    });
+  }
+
+  if (name === "chat_get_conceptos_analysis") {
+    return chatGetConceptosAnalysis(rfc, dfrom, dto, {
+      movimiento: args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined,
+      tipoComprobante: args.tipoComprobante as "I" | "E" | "N" | "P" | undefined,
+      groupBy: args.groupBy as "none" | "clave" | "supplier" | "descripcion" | undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
+  }
+
+  if (name === "chat_get_top_facturas") {
+    return chatGetTopFacturas(rfc, dfrom, dto, {
+      movimiento: args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined,
+      tipoComprobante: args.tipoComprobante as "I" | "E" | "N" | "P" | undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
+  }
+
+  return { error: `Tool no soportada: ${name}` };
 }
 
 // ─── POST /api/chat — streaming response ─────────────────────────────────────
@@ -163,60 +259,96 @@ export async function POST(req: Request) {
   if (isNaN(dfrom.getTime()) || isNaN(dto.getTime()))
     return NextResponse.json({ error: "Fechas inválidas" }, { status: 400 });
 
-  // Max 7 días por petición
-  const diffDays = (dto.getTime() - dfrom.getTime()) / 86_400_000;
-  if (diffDays > 8)
-    return NextResponse.json({ error: "El rango máximo es 7 días" }, { status: 400 });
-
   if (!process.env.OPENAI_API_KEY)
     return NextResponse.json({ error: "OPENAI_API_KEY no configurada" }, { status: 500 });
 
   try {
-    const cfdis   = await fetchFacturasParaChat(rfc, dfrom, dto);
-    const context = buildContext(cfdis, rfc, dateFrom, dateTo);
+    const reqId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const validMessages = sanitizeChatMessages(messages);
+    const lastUser = [...validMessages].reverse().find((m) => m.role === "user");
 
-    console.log("\n========== TON CONTEXT ==========");
-    console.log(`CFDIs cargados: ${cfdis.length}`);
-    console.log(context);
-    console.log("=================================\n");
+    console.log(`[chat][${reqId}] start rfc=${rfc} dateFrom=${dateFrom} dateTo=${dateTo} msgs=${validMessages.length}`);
+    if (lastUser) {
+      const preview = String(lastUser.content).replace(/\s+/g, " ").slice(0, 220);
+      console.log(`[chat][${reqId}] user="${preview}${preview.length >= 220 ? "..." : ""}"`);
+    }
 
-    const validMessages = (messages as { role: string; content: string }[])
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .slice(-20)
-      .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })) as ChatCompletionMessageParam[];
-
-    const stream = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      stream: true,
-      temperature: 0.3,
-      messages: [
-        { role: "system", content: `${SYSTEM_PROMPT}\n\n${context}` },
-        ...validMessages,
-      ],
-    });
-
-    return new Response(
-      new ReadableStream({
-        async start(controller) {
-          const enc = new TextEncoder();
-          try {
-            for await (const chunk of stream) {
-              const text = chunk.choices[0]?.delta?.content ?? "";
-              if (text) controller.enqueue(enc.encode(text));
-            }
-          } finally {
-            controller.close();
-          }
-        },
-      }),
+    const convo: any[] = [
+      { role: "system", content: SYSTEM_PROMPT },
       {
-        headers: {
-          "Content-Type": "text/plain; charset=utf-8",
-          "Cache-Control": "no-cache, no-store",
-          "X-Accel-Buffering": "no",
-        },
+        role: "system",
+        content: `Contexto fijo de sesión: RFC=${rfc}, periodo=${dateFrom}..${dateTo}. Nunca consultes fuera de este RFC/período.`,
       },
-    );
+      ...validMessages,
+    ];
+
+    for (let step = 0; step < 4; step++) {
+      const t0 = Date.now();
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        temperature: 0.2,
+        messages: convo,
+        tools: CHAT_TOOLS as any,
+        tool_choice: "auto",
+      });
+      console.log(`[chat][${reqId}] llm_step=${step + 1} ms=${Date.now() - t0}`);
+
+      const msg = completion.choices[0]?.message;
+      if (!msg) break;
+
+      const toolCalls = msg.tool_calls ?? [];
+      if (toolCalls.length === 0) {
+        const finalText = (msg.content ?? "No encontré información suficiente para responder.").toString();
+        console.log(`[chat][${reqId}] final_without_tools chars=${finalText.length}`);
+        return new Response(finalText, {
+          headers: {
+            "Content-Type": "text/plain; charset=utf-8",
+            "Cache-Control": "no-cache, no-store",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+
+      convo.push(msg);
+
+      for (const tc of toolCalls) {
+        if (tc.type !== "function") continue;
+
+        const args = parseToolArgs(tc.function.arguments ?? "{}");
+        console.log(`[chat][${reqId}] tool_call name=${tc.function.name} args=${JSON.stringify(args)}`);
+        const tTool = Date.now();
+        let result: unknown;
+        try {
+          result = await executeTool(tc.function.name, args, rfc, dfrom, dto);
+          console.log(
+            `[chat][${reqId}] tool_done name=${tc.function.name} ms=${Date.now() - tTool} summary=${JSON.stringify(summarizeToolResult(result))}`,
+          );
+        } catch (toolErr) {
+          const msgErr = (toolErr as Error).message;
+          console.error(`[chat][${reqId}] tool_error name=${tc.function.name} ms=${Date.now() - tTool} err=${msgErr}`);
+          result = {
+            error: "TOOL_EXECUTION_ERROR",
+            tool: tc.function.name,
+            message: msgErr,
+          };
+        }
+
+        convo.push({
+          role: "tool",
+          tool_call_id: tc.id,
+          content: JSON.stringify(result),
+        });
+      }
+    }
+
+    console.log(`[chat][${reqId}] max_steps_reached`);
+    return new Response("No pude completar la consulta en este momento.", {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache, no-store",
+        "X-Accel-Buffering": "no",
+      },
+    });
   } catch (err) {
     console.error("[chat] Error:", (err as Error).message);
     return NextResponse.json({ error: "Error al procesar la solicitud" }, { status: 500 });

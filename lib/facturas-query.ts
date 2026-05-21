@@ -982,3 +982,539 @@ export async function fetchFacturasParaChat(
     pagos:     pagosByUUID.get(c.uuid) ?? [],
   }));
 }
+
+export interface ChatCFDISearchFilters {
+  movimiento?: "INGRESO" | "EGRESO";
+  tipoComprobante?: "I" | "E" | "N" | "P";
+  searchText?: string;
+  limit?: number;
+}
+
+export interface ChatCFDIAggregateFilters {
+  movimiento?: "INGRESO" | "EGRESO" | "AMBOS";
+  tipoComprobante?: "I" | "E" | "N" | "P";
+  groupBy?: "none" | "mes" | "rfcEmisor" | "rfcReceptor" | "razonSocialEmisor" | "razonSocialReceptor" | "tipoComprobante";
+  top?: number;
+}
+
+export async function chatSearchCFDIs(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatCFDISearchFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 50, 200));
+  const searchText = (filters.searchText ?? "").trim();
+  const searchPrefix = searchText ? `${searchText}%` : null;
+  const searchContains = searchText.length >= 4 ? `%${searchText}%` : null;
+
+  const req = db.request();
+
+  const res = await req
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .input("movimiento", sql.NVarChar, filters.movimiento ?? null)
+    .input("tipo", sql.NVarChar, filters.tipoComprobante ?? null)
+    .input("searchExact", sql.NVarChar, searchText || null)
+    .input("searchPrefix", sql.NVarChar, searchPrefix)
+    .input("searchContains", sql.NVarChar, searchContains)
+    .query(`
+      SELECT TOP (@limit)
+        ISNULL(f.UUID,'')                                                     AS uuid,
+        f.Fecha                                                               AS fecha,
+        ISNULL(f.TipoComprobante,'')                                          AS tipoComprobante,
+        CASE WHEN f.RFC_Emisor = @rfc
+             THEN 'INGRESO' ELSE 'EGRESO' END                                 AS movimiento,
+        ISNULL(f.Status,'')                                                   AS status,
+        ISNULL(f.RFC_Emisor,'')                                               AS rfcEmisor,
+        ISNULL(f.RazonSocialEmisor,'')                                        AS razonSocialEmisor,
+        ISNULL(f.RFC_Receptor,'')                                             AS rfcReceptor,
+        ISNULL(f.RazonSocialReceptor,'')                                      AS razonSocialReceptor,
+        ISNULL(f.MetodoPago,'')                                               AS metodoPago,
+        ISNULL(f.TipoPago,'')                                                 AS formaPago,
+        ISNULL(f.Moneda,'MXN')                                                AS moneda,
+        ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)          AS tipoCambio,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.TotalTrasladado),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS iva,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.Total),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS total
+      FROM facturalo_cfdis f WITH (NOLOCK)
+      WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+        AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        AND f.TipoComprobante IN ('I','E','N','P')
+        AND (
+          @movimiento IS NULL OR
+          @movimiento = 'AMBOS' OR
+          (@movimiento = 'INGRESO' AND f.RFC_Emisor = @rfc) OR
+          (@movimiento = 'EGRESO' AND f.RFC_Receptor = @rfc AND f.RFC_Emisor <> @rfc)
+        )
+        AND (@tipo IS NULL OR f.TipoComprobante = @tipo)
+        AND (
+          @searchExact IS NULL OR
+          f.UUID = @searchExact OR
+          ISNULL(f.RFC_Emisor,'') LIKE @searchPrefix OR
+          ISNULL(f.RFC_Receptor,'') LIKE @searchPrefix OR
+          (@searchContains IS NOT NULL AND (
+            ISNULL(f.RazonSocialEmisor,'') LIKE @searchContains OR
+            ISNULL(f.RazonSocialReceptor,'') LIKE @searchContains
+          ))
+        )
+      ORDER BY f.Fecha DESC
+    `);
+
+  return {
+    count: res.recordset.length,
+    rows: res.recordset,
+  };
+}
+
+export async function chatAggregateCFDIs(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatCFDIAggregateFilters = {},
+) {
+  const db = await getDbLong();
+  const top = Math.max(1, Math.min(filters.top ?? 25, 100));
+  const movimiento = filters.movimiento ?? "AMBOS";
+  const groupBy = filters.groupBy ?? "none";
+
+  const req = db.request();
+
+  const res = await req
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("top", sql.Int, top)
+    .input("movimiento", sql.NVarChar, movimiento)
+    .input("tipo", sql.NVarChar, filters.tipoComprobante ?? null)
+    .input("groupBy", sql.NVarChar, groupBy)
+    .query(`
+      WITH base AS (
+        SELECT
+          f.Fecha                                                          AS fecha,
+          ISNULL(f.TipoComprobante,'')                                     AS tipoComprobante,
+          CASE WHEN f.RFC_Emisor = @rfc
+               THEN 'INGRESO' ELSE 'EGRESO' END                            AS movimiento,
+          ISNULL(f.RFC_Emisor,'')                                          AS rfcEmisor,
+          ISNULL(f.RFC_Receptor,'')                                        AS rfcReceptor,
+          ISNULL(f.RazonSocialEmisor,'')                                   AS razonSocialEmisor,
+          ISNULL(f.RazonSocialReceptor,'')                                 AS razonSocialReceptor,
+          ISNULL(TRY_CONVERT(decimal(18,2),f.Subtotal),0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)  AS subtotal,
+          ISNULL(TRY_CONVERT(decimal(18,2),f.TotalTrasladado),0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)  AS iva,
+          ISNULL(TRY_CONVERT(decimal(18,2),f.TotalRetenidoISR),0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)  AS retISR,
+          ISNULL(TRY_CONVERT(decimal(18,2),f.TotalRetenidoIVA),0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)  AS retIVA,
+          ISNULL(TRY_CONVERT(decimal(18,2),f.Total),0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)  AS total
+        FROM facturalo_cfdis f WITH (NOLOCK)
+        WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+          AND f.TipoComprobante IN ('I','E','N','P')
+          AND (
+            @movimiento = 'AMBOS' OR
+            (@movimiento = 'INGRESO' AND f.RFC_Emisor = @rfc) OR
+            (@movimiento = 'EGRESO' AND f.RFC_Receptor = @rfc AND f.RFC_Emisor <> @rfc)
+          )
+          AND (@tipo IS NULL OR f.TipoComprobante = @tipo)
+      )
+      SELECT TOP (@top)
+        CASE
+          WHEN @groupBy = 'mes' THEN CONVERT(varchar(7), fecha, 120)
+          WHEN @groupBy = 'rfcEmisor' THEN rfcEmisor
+          WHEN @groupBy = 'rfcReceptor' THEN rfcReceptor
+          WHEN @groupBy = 'razonSocialEmisor' THEN razonSocialEmisor
+          WHEN @groupBy = 'razonSocialReceptor' THEN razonSocialReceptor
+          WHEN @groupBy = 'tipoComprobante' THEN tipoComprobante
+          ELSE 'TOTAL'
+        END                                                                AS groupKey,
+        COUNT(1)                                                           AS cfdis,
+        SUM(subtotal)                                                      AS subtotal,
+        SUM(iva)                                                           AS iva,
+        SUM(retISR)                                                        AS retISR,
+        SUM(retIVA)                                                        AS retIVA,
+        SUM(total)                                                         AS total
+      FROM base
+      GROUP BY CASE
+          WHEN @groupBy = 'mes' THEN CONVERT(varchar(7), fecha, 120)
+          WHEN @groupBy = 'rfcEmisor' THEN rfcEmisor
+          WHEN @groupBy = 'rfcReceptor' THEN rfcReceptor
+          WHEN @groupBy = 'razonSocialEmisor' THEN razonSocialEmisor
+          WHEN @groupBy = 'razonSocialReceptor' THEN razonSocialReceptor
+          WHEN @groupBy = 'tipoComprobante' THEN tipoComprobante
+          ELSE 'TOTAL'
+        END
+      ORDER BY total DESC
+    `);
+
+  return {
+    movimiento,
+    groupBy,
+    rows: res.recordset,
+  };
+}
+
+export async function chatGetCFDIDetail(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  uuid: string,
+) {
+  const db = await getDb();
+
+  const headRes = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("uuid", sql.NVarChar, uuid)
+    .query(`
+      SELECT TOP (1)
+        ISNULL(f.UUID,'')                                                     AS uuid,
+        f.Fecha                                                               AS fecha,
+        ISNULL(f.TipoComprobante,'')                                          AS tipoComprobante,
+        CASE WHEN UPPER(ISNULL(f.RFC_Emisor,'')) = UPPER(@rfc)
+             THEN 'INGRESO' ELSE 'EGRESO' END                                 AS movimiento,
+        ISNULL(f.Status,'')                                                   AS status,
+        ISNULL(f.RFC_Emisor,'')                                               AS rfcEmisor,
+        ISNULL(f.RazonSocialEmisor,'')                                        AS razonSocialEmisor,
+        ISNULL(f.RFC_Receptor,'')                                             AS rfcReceptor,
+        ISNULL(f.RazonSocialReceptor,'')                                      AS razonSocialReceptor,
+        ISNULL(f.MetodoPago,'')                                               AS metodoPago,
+        ISNULL(f.TipoPago,'')                                                 AS formaPago,
+        ISNULL(f.Moneda,'MXN')                                                AS moneda,
+        ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)          AS tipoCambio,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.Subtotal),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS subtotal,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.TotalTrasladado),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS iva,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.TotalRetenidoISR),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS retISR,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.TotalRetenidoIVA),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS retIVA,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.Total),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS total
+      FROM facturalo_cfdis f WITH (NOLOCK)
+      WHERE f.UUID = @uuid
+        AND (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+        AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+    `);
+
+  const header = headRes.recordset[0];
+  if (!header) return null;
+
+  const [conceptosRes, pagosRes, docsRes] = await Promise.all([
+    db.request().input("uuid", sql.NVarChar, uuid).query(`
+      SELECT TOP (60)
+        ISNULL(NULLIF(c.ClaveProductoServicio,''),'')                         AS claveProdServ,
+        ISNULL(NULLIF(c.Descripcion,''),'Sin descripción')                    AS descripcion,
+        ISNULL(TRY_CONVERT(decimal(18,4),c.Cantidad),0)                      AS cantidad,
+        ISNULL(TRY_CONVERT(decimal(18,2),c.Importe),0)                       AS importe,
+        ISNULL(TRY_CONVERT(decimal(18,2),c.Descuento),0)                     AS descuento
+      FROM facturalo_conceptos c WITH (NOLOCK)
+      WHERE c.UUID = @uuid
+    `),
+    db.request().input("uuid", sql.NVarChar, uuid).query(`
+      SELECT TOP (50)
+        CONVERT(varchar(10), p.fecha_pago, 23)                                AS fechaPago,
+        ISNULL(p.forma_pago,'')                                               AS formaPago,
+        ISNULL(p.moneda,'MXN')                                                AS moneda,
+        ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),p.tipoCambio),0),1)          AS tipoCambio,
+        ISNULL(TRY_CONVERT(decimal(18,2),p.monto_total_pagos),0)             AS monto
+      FROM facturalo_pagos p WITH (NOLOCK)
+      WHERE p.UUID = @uuid
+      ORDER BY p.fecha_pago ASC
+    `),
+    db.request().input("uuid", sql.NVarChar, uuid).query(`
+      SELECT TOP (80)
+        ISNULL(d.uuid_doc_relacionado,'')                                     AS uuidRelacionado,
+        ISNULL(TRY_CONVERT(decimal(18,2),d.imp_saldo_ant),0)                  AS saldoAnterior,
+        ISNULL(TRY_CONVERT(decimal(18,2),d.imp_pagado),0)                     AS impPagado,
+        ISNULL(TRY_CONVERT(decimal(18,2),d.imp_saldo_insoluto),0)             AS saldoInsoluto,
+        ISNULL(TRY_CONVERT(decimal(18,2),d.base),0)                           AS base,
+        ISNULL(TRY_CONVERT(decimal(18,2),d.impuesto),0)                       AS impuesto
+      FROM facturalo_pagos p WITH (NOLOCK)
+      INNER JOIN facturalo_pago_doc_relacionado d WITH (NOLOCK) ON d.pago_id = p.id
+      WHERE p.UUID = @uuid
+    `),
+  ]);
+
+  return {
+    header,
+    conceptos: conceptosRes.recordset,
+    pagos: pagosRes.recordset,
+    docsRelacionados: docsRes.recordset,
+  };
+}
+
+export interface ChatConciliacionPagosFilters {
+  limit?: number;
+  onlyWithDifferences?: boolean;
+}
+
+export async function chatConciliarPagosRelacionados(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatConciliacionPagosFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 100, 300));
+
+  const req = db.request();
+
+  const res = await req
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .input("onlyDiff", sql.Bit, filters.onlyWithDifferences ? 1 : 0)
+    .query(`
+      WITH pagosBase AS (
+        SELECT
+          p.id                                                              AS pagoId,
+          ISNULL(p.UUID,'')                                                 AS uuidPago,
+          p.fecha_pago                                                      AS fechaPago,
+          ISNULL(p.moneda,'MXN')                                            AS moneda,
+          ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),p.tipoCambio),0),1)      AS tipoCambio,
+          ISNULL(TRY_CONVERT(decimal(18,2),p.monto_total_pagos),0)         AS montoPago,
+          ISNULL(fc.RFC_Emisor,'')                                          AS rfcEmisor,
+          ISNULL(fc.RFC_Receptor,'')                                        AS rfcReceptor,
+          ISNULL(fc.RazonSocialEmisor,'')                                   AS razonSocialEmisor,
+          ISNULL(fc.RazonSocialReceptor,'')                                 AS razonSocialReceptor,
+          CASE WHEN fc.RFC_Emisor = @rfc
+               THEN 'INGRESO' ELSE 'EGRESO' END                            AS movimiento
+        FROM facturalo_pagos p WITH (NOLOCK)
+        INNER JOIN facturalo_cfdis fc WITH (NOLOCK) ON fc.UUID = p.UUID
+        WHERE fc.TipoComprobante = 'P'
+          AND (fc.RFC_Emisor = @rfc OR fc.RFC_Receptor = @rfc)
+          AND fc.Fecha >= @dateFrom AND fc.Fecha < @dateTo
+      ),
+      docsAgg AS (
+        SELECT
+          d.pago_id                                                         AS pagoId,
+          COUNT(1)                                                          AS docsRelacionados,
+          COUNT(DISTINCT ISNULL(d.uuid_doc_relacionado,''))                 AS facturasRelacionadas,
+          SUM(ISNULL(TRY_CONVERT(decimal(18,2),d.imp_pagado),0))           AS totalImpPagado,
+          SUM(ISNULL(TRY_CONVERT(decimal(18,2),d.base),0))                 AS totalBase,
+          SUM(ISNULL(TRY_CONVERT(decimal(18,2),d.impuesto),0))             AS totalImpuesto,
+          SUM(ISNULL(TRY_CONVERT(decimal(18,2),d.imp_saldo_ant),0))        AS totalSaldoAnterior,
+          SUM(ISNULL(TRY_CONVERT(decimal(18,2),d.imp_saldo_insoluto),0))   AS totalSaldoInsoluto
+        FROM facturalo_pago_doc_relacionado d WITH (NOLOCK)
+        INNER JOIN pagosBase pb ON pb.pagoId = d.pago_id
+        GROUP BY d.pago_id
+      )
+      SELECT TOP (@limit)
+        b.uuidPago,
+        CONVERT(varchar(10), b.fechaPago, 23)                               AS fechaPago,
+        b.movimiento,
+        b.moneda,
+        b.tipoCambio,
+        b.montoPago,
+        b.rfcEmisor,
+        b.razonSocialEmisor,
+        b.rfcReceptor,
+        b.razonSocialReceptor,
+        ISNULL(a.docsRelacionados, 0)                                       AS docsRelacionados,
+        ISNULL(a.facturasRelacionadas, 0)                                   AS facturasRelacionadas,
+        ISNULL(a.totalImpPagado, 0)                                         AS totalImpPagado,
+        ISNULL(a.totalBase, 0)                                              AS totalBase,
+        ISNULL(a.totalImpuesto, 0)                                          AS totalImpuesto,
+        ISNULL(a.totalSaldoAnterior, 0)                                     AS totalSaldoAnterior,
+        ISNULL(a.totalSaldoInsoluto, 0)                                     AS totalSaldoInsoluto,
+        ISNULL(a.totalImpPagado, 0) - b.montoPago                           AS diferenciaImpPagadoVsMonto
+      FROM pagosBase b
+      LEFT JOIN docsAgg a ON a.pagoId = b.pagoId
+      WHERE @onlyDiff = 0 OR ABS(ISNULL(a.totalImpPagado, 0) - b.montoPago) > 0.01
+      ORDER BY b.fechaPago DESC, b.uuidPago DESC
+    `);
+
+  const rows = res.recordset;
+
+  const resumen = rows.reduce(
+    (acc, r) => {
+      const montoPago = Number(r.montoPago) || 0;
+      const impPagado = Number(r.totalImpPagado) || 0;
+      const dif = Number(r.diferenciaImpPagadoVsMonto) || 0;
+      acc.pagos += 1;
+      acc.montoTotalPagos += montoPago;
+      acc.totalImpPagado += impPagado;
+      acc.diferenciaNeta += dif;
+      acc.diferenciaAbsoluta += Math.abs(dif);
+      if (Math.abs(dif) > 0.01) acc.pagosConDiferencia += 1;
+      return acc;
+    },
+    {
+      pagos: 0,
+      pagosConDiferencia: 0,
+      montoTotalPagos: 0,
+      totalImpPagado: 0,
+      diferenciaNeta: 0,
+      diferenciaAbsoluta: 0,
+    },
+  );
+
+  return {
+    limit,
+    onlyWithDifferences: !!filters.onlyWithDifferences,
+    resumen,
+    rows,
+  };
+}
+
+// ─── Chat: Conceptos Analysis (Suppliers, Expenses, Items) ──────────────────
+export interface ChatConceptosAnalysisFilters {
+  movimiento?: "INGRESO" | "EGRESO" | "AMBOS";
+  tipoComprobante?: "I" | "E" | "N" | "P";
+  groupBy?: "none" | "clave" | "supplier" | "descripcion";
+  limit?: number;
+}
+
+export async function chatGetConceptosAnalysis(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatConceptosAnalysisFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 50, 200));
+  const groupBy = filters.groupBy ?? "clave";
+  const movimiento = filters.movimiento ?? "AMBOS";
+
+  const req = db.request();
+
+  const res = await req
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .input("movimiento", sql.NVarChar, movimiento)
+    .input("tipo", sql.NVarChar, filters.tipoComprobante ?? null)
+    .input("groupBy", sql.NVarChar, groupBy)
+    .query(`
+      WITH conceptosBase AS (
+        SELECT
+          ISNULL(c.ClaveProductoServicio, '') AS clave,
+          ISNULL(c.Descripcion, '') AS descripcion,
+          ISNULL(f.RazonSocialEmisor, '') AS razonSocialEmisor,
+          ISNULL(f.RazonSocialReceptor, '') AS razonSocialReceptor,
+          CASE WHEN f.RFC_Emisor = @rfc
+               THEN 'INGRESO' ELSE 'EGRESO' END AS movimiento,
+          c.UUID,
+          ISNULL(TRY_CONVERT(decimal(18,4), c.Cantidad), 0) AS cantidad,
+          ISNULL(TRY_CONVERT(decimal(18,2), c.Importe), 0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), f.tipoCambio), 0), 1) AS importe
+        FROM facturalo_conceptos c WITH (NOLOCK)
+        INNER JOIN facturalo_cfdis f WITH (NOLOCK) ON f.UUID = c.UUID
+        WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+          AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+          AND f.TipoComprobante IN ('I','E','N','P')
+          AND (
+            @movimiento = 'AMBOS' OR
+            (@movimiento = 'INGRESO' AND f.RFC_Emisor = @rfc) OR
+            (@movimiento = 'EGRESO' AND f.RFC_Receptor = @rfc AND f.RFC_Emisor <> @rfc)
+          )
+          AND (@tipo IS NULL OR f.TipoComprobante = @tipo)
+      )
+      SELECT TOP (@limit)
+        CASE
+          WHEN @groupBy = 'clave' THEN clave
+          WHEN @groupBy = 'supplier' THEN CASE WHEN movimiento = 'INGRESO' THEN razonSocialReceptor ELSE razonSocialEmisor END
+          ELSE ISNULL(descripcion, clave)
+        END AS groupKey,
+        COUNT(DISTINCT UUID) AS cfdis,
+        COUNT(1) AS conceptos,
+        SUM(cantidad) AS cantidadTotal,
+        SUM(importe) AS importeTotal
+      FROM conceptosBase
+      GROUP BY CASE
+        WHEN @groupBy = 'clave' THEN clave
+        WHEN @groupBy = 'supplier' THEN CASE WHEN movimiento = 'INGRESO' THEN razonSocialReceptor ELSE razonSocialEmisor END
+        ELSE ISNULL(descripcion, clave)
+      END
+      ORDER BY SUM(importe) DESC
+    `);
+
+  return {
+    limit,
+    groupBy,
+    movimiento,
+    count: res.recordset.length,
+    rows: res.recordset,
+  };
+}
+
+// ─── Chat: Top Facturas by Importe (Individual Invoices) ───────────────────
+export interface ChatTopFacturasFilters {
+  movimiento?: "INGRESO" | "EGRESO" | "AMBOS";
+  tipoComprobante?: "I" | "E" | "N" | "P";
+  limit?: number;
+}
+
+export async function chatGetTopFacturas(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatTopFacturasFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 20, 200));
+  const movimiento = filters.movimiento ?? "AMBOS";
+
+  const req = db.request();
+
+  const res = await req
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .input("movimiento", sql.NVarChar, movimiento)
+    .input("tipo", sql.NVarChar, filters.tipoComprobante ?? null)
+    .query(`
+      SELECT TOP (@limit)
+        ISNULL(f.UUID,'')                                                     AS uuid,
+        f.Fecha                                                               AS fecha,
+        ISNULL(f.TipoComprobante,'')                                          AS tipoComprobante,
+        CASE WHEN f.RFC_Emisor = @rfc
+             THEN 'INGRESO' ELSE 'EGRESO' END                                 AS movimiento,
+        ISNULL(f.Status,'')                                                   AS status,
+        ISNULL(f.RFC_Emisor,'')                                               AS rfcEmisor,
+        ISNULL(f.RazonSocialEmisor,'')                                        AS razonSocialEmisor,
+        ISNULL(f.RFC_Receptor,'')                                             AS rfcReceptor,
+        ISNULL(f.RazonSocialReceptor,'')                                      AS razonSocialReceptor,
+        ISNULL(f.MetodoPago,'')                                               AS metodoPago,
+        ISNULL(f.TipoPago,'')                                                 AS formaPago,
+        ISNULL(f.Moneda,'MXN')                                                AS moneda,
+        ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)          AS tipoCambio,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.Subtotal),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS subtotal,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.TotalTrasladado),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS iva,
+        ISNULL(TRY_CONVERT(decimal(18,2),f.Total),0)
+          * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)      AS total
+      FROM facturalo_cfdis f WITH (NOLOCK)
+      WHERE (f.RFC_Emisor = @rfc OR f.RFC_Receptor = @rfc)
+        AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
+        AND f.TipoComprobante IN ('I','E','N','P')
+        AND (
+          @movimiento = 'AMBOS' OR
+          (@movimiento = 'INGRESO' AND f.RFC_Emisor = @rfc) OR
+          (@movimiento = 'EGRESO' AND f.RFC_Receptor = @rfc AND f.RFC_Emisor <> @rfc)
+        )
+        AND (@tipo IS NULL OR f.TipoComprobante = @tipo)
+      ORDER BY (ISNULL(TRY_CONVERT(decimal(18,2),f.Total),0) 
+                * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),f.tipoCambio),0),1)) DESC
+    `);
+
+  return {
+    limit,
+    movimiento,
+    count: res.recordset.length,
+    rows: res.recordset,
+  };
+}
