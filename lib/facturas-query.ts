@@ -702,7 +702,7 @@ export async function fetchEstadosFinancieros(
             ELSE 0 END)                                      AS iva16,
           COUNT(DISTINCT f.UUID)                             AS numFacturas
         FROM facturalo_cfdis f WITH (NOLOCK)
-        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
+        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
         WHERE (
                 (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
              OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
@@ -742,7 +742,7 @@ export async function fetchEstadosFinancieros(
             ELSE 0 END)                                      AS iva16,
           COUNT(DISTINCT f.UUID)                             AS numFacturas
         FROM facturalo_cfdis f WITH (NOLOCK)
-        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID
+        LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
         WHERE (
                 (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
              OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
