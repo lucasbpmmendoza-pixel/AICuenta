@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
@@ -20,20 +20,6 @@ interface Props {
   accountType: 'single' | 'multi'
 }
 
-const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
-const MESES_FULL = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
-
-function fmtPeriodLabel(from: Date, to: Date, gran: Granularity): string {
-  if (gran === 'day') {
-    return `${from.getDate()} de ${MESES_FULL[from.getMonth()]} de ${from.getFullYear()}`
-  }
-  const toDisplay = new Date(to.getTime() - 86_400_000) // un día antes del exclusivo
-  if (from.getMonth() === toDisplay.getMonth()) {
-    return `${from.getDate()}–${toDisplay.getDate()} ${MESES_FULL[from.getMonth()]} ${from.getFullYear()}`
-  }
-  return `${from.getDate()} ${MESES[from.getMonth()]} – ${toDisplay.getDate()} ${MESES[toDisplay.getMonth()]} ${from.getFullYear()}`
-}
-
 function toDateStr(d: Date): string {
   return d.toISOString().split('T')[0]
 }
@@ -46,12 +32,6 @@ function addDays(d: Date, n: number): Date {
 
 function startOfDay(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate())
-}
-
-function countLabel(n: number | null): string {
-  if (n === null) return '…'
-  if (n === 0) return 'Sin CFDIs'
-  return `${n} CFDI${n !== 1 ? 's' : ''}`
 }
 
 // ─── Spinner inline ───────────────────────────────────────────────────────────
@@ -95,13 +75,11 @@ function MessageBubble({ msg }: { msg: Message }) {
 
 export default function ChatbotView({ session, accountType }: Props) {
   const now = startOfDay(new Date())
+  const fixedDateFrom = new Date(now.getFullYear(), 0, 1)
+  const fixedDateTo = addDays(now, 1)
 
   const [rfcs,        setRfcs]        = useState<RfcOption[]>([])
   const [selectedRfc, setSelectedRfc] = useState<string>('')
-  const [gran,        setGran]        = useState<Granularity>('day')
-  const [dateFrom,    setDateFrom]    = useState<Date>(now)
-  const [count,       setCount]       = useState<number | null>(null)
-  const [loadingCount,setLoadingCount]= useState(false)
 
   const [messages,    setMessages]    = useState<Message[]>([])
   const [input,       setInput]       = useState('')
@@ -109,16 +87,6 @@ export default function ChatbotView({ session, accountType }: Props) {
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-
-  // dateTo siempre es exclusivo — memoizado para evitar referencias nuevas en cada render
-  const dateTo = useMemo(
-    () => (gran === 'day' ? addDays(dateFrom, 1) : addDays(dateFrom, 7)),
-    [gran, dateFrom]
-  )
-
-  const isToday    = dateFrom.getTime() === now.getTime()
-  const isFuture   = dateFrom > now
-  const canGoNext  = !isFuture && !(gran === 'day' && isToday)
 
   // Cargar RFCs
   useEffect(() => {
@@ -129,50 +97,14 @@ export default function ChatbotView({ session, accountType }: Props) {
     }).catch(() => {})
   }, [])
 
-  // Contar CFDIs cuando cambia RFC o período
-  const fetchCount = useCallback(async () => {
-    if (!selectedRfc) return
-    setCount(null)
-    setLoadingCount(true)
-    try {
-      const res = await fetch(
-        `/api/chat?rfc=${encodeURIComponent(selectedRfc)}&dateFrom=${toDateStr(dateFrom)}&dateTo=${toDateStr(dateTo)}`
-      )
-      if (res.ok) {
-        const d = await res.json()
-        setCount(d.count ?? 0)
-      }
-    } catch {}
-    finally { setLoadingCount(false) }
-  }, [selectedRfc, dateFrom, dateTo])
-
-  useEffect(() => { fetchCount() }, [fetchCount])
-
   // Auto-scroll al fondo
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  function prevPeriod() {
-    setDateFrom(d => addDays(d, gran === 'day' ? -1 : -7))
-    setMessages([])
-  }
-
-  function nextPeriod() {
-    if (!canGoNext) return
-    setDateFrom(d => addDays(d, gran === 'day' ? 1 : 7))
-    setMessages([])
-  }
-
-  function changeGran(g: Granularity) {
-    setGran(g)
-    setDateFrom(now)
-    setMessages([])
-  }
-
   async function sendMessage() {
     const text = input.trim()
-    if (!text || sending || !selectedRfc || count === 0) return
+    if (!text || sending || !selectedRfc) return
 
     const userMsg: Message = { role: 'user', content: text }
     const history = [...messages, userMsg]
@@ -186,8 +118,8 @@ export default function ChatbotView({ session, accountType }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rfc: selectedRfc,
-          dateFrom: toDateStr(dateFrom),
-          dateTo:   toDateStr(dateTo),
+          dateFrom: toDateStr(fixedDateFrom),
+          dateTo:   toDateStr(fixedDateTo),
           messages: history,
         }),
       })
@@ -229,19 +161,12 @@ export default function ChatbotView({ session, accountType }: Props) {
     }
   }
 
-  const periodLabel = fmtPeriodLabel(dateFrom, dateTo, gran)
   const selectedRfcObj = rfcs.find(r => r.rfc === selectedRfc)
   const rfcDisplay = selectedRfcObj?.alias
     ? `${selectedRfcObj.alias} (${selectedRfc})`
     : selectedRfc
 
-  const countBadgeColor =
-    count === null ? 'bg-slate-100 text-slate-500 dark:bg-zinc-800 dark:text-zinc-400'
-    : count === 0  ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-    : count > 40   ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-    :                'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-
-  const canSend = !!selectedRfc && (count ?? 0) > 0 && !!input.trim() && !sending
+  const canSend = !!selectedRfc && !!input.trim() && !sending
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
@@ -279,69 +204,10 @@ export default function ChatbotView({ session, accountType }: Props) {
                 </span>
               ) : null}
 
-              {/* Granularidad */}
-              <div className="flex rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
-                {(['day', 'week'] as Granularity[]).map(g => (
-                  <button
-                    key={g}
-                    onClick={() => changeGran(g)}
-                    className={`px-3 py-1.5 text-xs font-semibold transition ${
-                      gran === g
-                        ? 'bg-[#7B6FE8] text-white dark:bg-[#91eb78] dark:text-black'
-                        : 'text-slate-600 hover:bg-[#EBE9FB] dark:text-zinc-400 dark:hover:bg-[#5E6957]'
-                    }`}
-                  >
-                    {g === 'day' ? 'Día' : 'Semana'}
-                  </button>
-                ))}
-              </div>
-
-              {/* Navegador de período */}
-              <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
-                <button
-                  onClick={prevPeriod}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
-                <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[160px] text-center capitalize">
-                  {periodLabel}
-                </span>
-                <button
-                  onClick={nextPeriod}
-                  disabled={!canGoNext}
-                  className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Badge de conteo */}
-              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${countBadgeColor}`}>
-                {loadingCount && <Spinner className="h-3 w-3" />}
-                {countLabel(count)}
-              </span>
-
               <NotificationBell />
             </div>
           </div>
         </div>
-
-        {/* ── Aviso si no hay CFDIs ── */}
-        {count === 0 && !loadingCount && selectedRfc && (
-          <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3">
-            <svg className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-            </svg>
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              No hay CFDIs en el período seleccionado. Navega a otro día o semana.
-            </p>
-          </div>
-        )}
 
         {/* ── Área de chat ── */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -357,28 +223,26 @@ export default function ChatbotView({ session, accountType }: Props) {
                   Asistente Fiscal AIcuenta
                 </p>
                 <p className="text-sm text-slate-400 dark:text-zinc-500 mt-1 max-w-sm">
-                  Pregúntame sobre tus facturas del período seleccionado. Puedo analizar ingresos,
+                  Pregúntame sobre tus facturas. Puedo analizar ingresos,
                   egresos, proveedores, impuestos y más.
                 </p>
               </div>
-              {count !== null && count > 0 && (
-                <div className="flex flex-wrap gap-2 justify-center mt-2">
-                  {[
-                    '¿Cuál fue mi ingreso total?',
-                    '¿Qué proveedores me emitieron más facturas?',
-                    '¿Cuánto IVA retuvieron?',
-                    'Muéstrame las 5 facturas de mayor importe',
-                  ].map(s => (
-                    <button
-                      key={s}
-                      onClick={() => setInput(s)}
-                      className="rounded-full border border-slate-200 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-[#450c7d] dark:hover:text-[#6BDA4D] transition"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2 justify-center mt-2">
+                {[
+                  '¿Cuál fue mi ingreso total?',
+                  '¿Qué proveedores me emitieron más facturas?',
+                  '¿Cuánto IVA retuvieron?',
+                  'Muéstrame las 5 facturas de mayor importe',
+                ].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => setInput(s)}
+                    className="rounded-full border border-slate-200 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-zinc-300 hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-[#450c7d] dark:hover:text-[#6BDA4D] transition"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -403,10 +267,9 @@ export default function ChatbotView({ session, accountType }: Props) {
 
         {/* ── Input ── */}
         <div className="border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 backdrop-blur-sm px-4 py-3">
-          {count !== null && count > 0 && (
+          {selectedRfc && (
             <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-2 px-1">
-              Contexto: <span className="font-semibold">{count} CFDI{count !== 1 ? 's' : ''}</span> del período{' '}
-              <span className="font-semibold capitalize">{periodLabel}</span> · RFC {rfcDisplay}
+              Contexto: RFC <span className="font-semibold">{rfcDisplay}</span> · Acumulado del año actual
             </p>
           )}
           <div className="flex items-end gap-2">
@@ -415,12 +278,10 @@ export default function ChatbotView({ session, accountType }: Props) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!selectedRfc || (count ?? 0) === 0 || sending}
+              disabled={!selectedRfc || sending}
               placeholder={
                 !selectedRfc
                   ? 'Selecciona un RFC primero…'
-                  : count === 0
-                  ? 'Sin CFDIs en este período — navega a otro'
                   : 'Escribe tu pregunta… (Enter para enviar, Shift+Enter para salto de línea)'
               }
               rows={2}
