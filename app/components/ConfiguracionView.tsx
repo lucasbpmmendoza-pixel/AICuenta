@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { JWTPayload } from '@/lib/auth'
 import { registerOwnRfc } from '@/app/api/actions/registerOwnRfc'
+import { rfcDisplay } from '@/lib/rfc-aliases'
 import DropZone from './DropZone'
 
 interface Props {
@@ -58,7 +59,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
       })
       const data = await res.json()
       if (res.ok) {
-        setSetRfcMsg({ ok: true, text: `RFC ${selectedRfc} asignado correctamente.` })
+        setSetRfcMsg({ ok: true, text: `RFC ${rfcDisplay(selectedRfc)} asignado correctamente.` })
         router.refresh()
       } else {
         setSetRfcMsg({ ok: false, text: data.error ?? 'Error al asignar RFC.' })
@@ -302,7 +303,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
                         className="flex-1 rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-3 py-2.5 text-sm text-slate-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         {efieles.map((rfc) => (
-                          <option key={rfc} value={rfc}>{rfc}</option>
+                          <option key={rfc} value={rfc}>{rfcDisplay(rfc)}</option>
                         ))}
                       </select>
                       <button

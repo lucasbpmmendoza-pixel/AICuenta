@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
+import { rfcDisplay } from '@/lib/rfc-aliases'
 
 interface Props {
   session: JWTPayload
@@ -43,7 +44,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
       })
       const data = await res.json()
       if (!res.ok) { setError(data.error ?? 'Error al registrar'); return }
-      const mensaje = encodeURIComponent(`${nombre.trim()} RFC:${selectedRfc} UserCode:${data.userCode} Code:${data.code}`)
+      const mensaje = encodeURIComponent(`${nombre.trim()} RFC:${rfcDisplay(selectedRfc)} UserCode:${data.userCode} Code:${data.code}`)
       window.open(`https://wa.me/526563138465?text=${mensaje}`, '_blank')
     } catch {
       setError('Error de red, intenta de nuevo.')
@@ -113,7 +114,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
                           className="w-4 h-4 accent-green-500 cursor-pointer shrink-0"
                         />
                         <span className="font-mono text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                          {rfc}
+                          {rfcDisplay(rfc)}
                         </span>
                       </label>
                     ))}

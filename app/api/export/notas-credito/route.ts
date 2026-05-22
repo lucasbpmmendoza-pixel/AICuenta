@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchNotasCreditoData, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers (match variablesEstaticas.js / variablesEspecificas.js) ────
 
@@ -131,9 +132,9 @@ export async function GET(req: NextRequest) {
       const dr = ws.addRow([
         row.fecha,                              // 1  Fecha
         row.uuid,                               // 2  Folio (UUID)
-        row.RFC_emisor,                         // 3  Emisor
+        rfcDisplay(row.RFC_emisor),              // 3  Emisor
         row.RegimenFiscal,                      // 4  Régimen Emisor
-        row.RFC_receptor,                       // 5  Receptor
+        rfcDisplay(row.RFC_receptor),           // 5  Receptor
         row.RegimenFiscalReceptor,              // 6  Régimen Receptor
         Number(row.subtotal)       * tc,        // 7  Subtotal
         Number(row.iva8)           * tc,        // 8  IVA 8%

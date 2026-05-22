@@ -1,5 +1,6 @@
 import sql from "mssql";
 import { getDb, getDbLong } from "@/lib/db";
+import { rfcAlias } from "@/lib/rfc-aliases";
 
 // ─── Cache en memoria para fetchEstadosFinancieros ────────────────────────────
 // TTL 15 min: consulta muy pesada (~2 min) — se cachea por RFC+rango+limit
@@ -559,6 +560,8 @@ export async function fetchflujo(
 }
 
 export async function fetchNombreEmpresa(rfc: string): Promise<string> {
+  const alias = rfcAlias(rfc);
+  if (alias) return alias;
   const db = await getDb();
   const r = await db
     .request()

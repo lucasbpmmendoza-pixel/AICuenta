@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { rfcAlias } from "@/lib/rfc-aliases";
 
 export async function GET() {
   const session = await getSession();
@@ -30,7 +31,12 @@ export async function GET() {
            INNER JOIN member_rfcs mr ON mr.efiel_id = e.id AND mr.member_id = @memberId
            ORDER BY e.created_at DESC`
         );
-      return NextResponse.json({ rfcs: result.recordset });
+      return NextResponse.json({
+        rfcs: result.recordset.map(r => ({
+          ...r,
+          alias: rfcAlias(r.rfc) ?? r.alias,
+        })),
+      });
     }
 
     const result = await db
@@ -50,7 +56,12 @@ export async function GET() {
          WHERE user_id = @user_id
          ORDER BY created_at DESC`
       );
-    return NextResponse.json({ rfcs: result.recordset });
+    return NextResponse.json({
+      rfcs: result.recordset.map(r => ({
+        ...r,
+        alias: rfcAlias(r.rfc) ?? r.alias,
+      })),
+    });
   } catch (err) {
     console.error("[rfcs GET] DB error:", (err as Error).message);
     return NextResponse.json({ error: "Error al obtener los RFCs" }, { status: 503 });

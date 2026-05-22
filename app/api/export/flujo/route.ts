@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { rfcDisplay, rfcAlias } from "@/lib/rfc-aliases";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -167,10 +168,10 @@ export async function GET(req: NextRequest) {
           row.uuidDocumentoRelacionado || "",
           row.fechaEmision,
           row.fechaPago ?? null,
-          row.RFC_emisor,
-          row.RazonSocialEmisor || row.RFC_emisor,
-          row.RFC_receptor,
-          row.RazonSocialReceptor || row.RFC_receptor,
+          rfcDisplay(row.RFC_emisor),
+          rfcAlias(row.RFC_emisor) ?? (row.RazonSocialEmisor || row.RFC_emisor),
+          rfcDisplay(row.RFC_receptor),
+          rfcAlias(row.RFC_receptor) ?? (row.RazonSocialReceptor || row.RFC_receptor),
           row.formaPago || "",
           row.moneda,
           row.tc,

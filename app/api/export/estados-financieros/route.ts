@@ -4,6 +4,7 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
 
@@ -204,7 +205,7 @@ export async function GET(req: NextRequest) {
     wb.creator = "AIcuenta";
     wb.created = new Date();
 
-    const subtitle = `${nombreEmpresa} · ${rfc} · ${periodoLabel}`;
+    const subtitle = `${nombreEmpresa} · ${rfcDisplay(rfc)} · ${periodoLabel}`;
 
     buildSheet(wb, "Ingresos por Concepto", ING_BG, "PRINCIPALES INGRESOS POR PRODUCTO / SERVICIO", subtitle, data.ingresos);
     buildSheet(wb, "Egresos por Concepto",  EGR_BG, "PRINCIPALES EGRESOS POR PRODUCTO / SERVICIO",  subtitle, data.egresos);

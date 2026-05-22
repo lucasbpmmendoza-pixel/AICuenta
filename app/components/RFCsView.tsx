@@ -3,10 +3,12 @@
 import { useEffect, useState } from 'react'
 import DropZone from './DropZone'
 import { uploadRfc } from '@/app/api/actions/uploadRfc'
+import { rfcAlias } from '@/lib/rfc-aliases'
 
 interface Rfc {
   id: string
   rfc: string
+  alias: string | null
   fiel: string
   downloads_enabled: boolean
   created_at: string
@@ -324,7 +326,7 @@ export default function RFCsView({ readOnly = false }: Props) {
                       {/* Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 tracking-wide">{r.rfc}</span>
+                          <span className="text-sm font-bold text-slate-800 dark:text-zinc-100 tracking-wide">{rfcAlias(r.rfc) ?? r.alias ?? r.rfc}</span>
                           {/* Downloads badge */}
                           <span className={[
                             'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold',

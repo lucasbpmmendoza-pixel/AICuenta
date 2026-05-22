@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, flujoRow } from '@/lib/facturas-query'
+import { rfcDisplay } from '@/lib/rfc-aliases'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -190,7 +191,7 @@ export default function FacturasView({ session, accountType }: Props) {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `notas-credito_${selectedRfc}_${periodLabel()}.xlsx`
+      a.download = `notas-credito_${rfcDisplay(selectedRfc)}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -207,7 +208,7 @@ export default function FacturasView({ session, accountType }: Props) {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `flujo_${selectedRfc}_${periodLabel()}.xlsx`
+      a.download = `flujo_${rfcDisplay(selectedRfc)}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -224,7 +225,7 @@ export default function FacturasView({ session, accountType }: Props) {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `pagos_${selectedRfc}_${periodLabel()}.xlsx`
+      a.download = `pagos_${rfcDisplay(selectedRfc)}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -241,7 +242,7 @@ export default function FacturasView({ session, accountType }: Props) {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `facturas_${selectedRfc}_${periodLabel()}.xlsx`
+      a.download = `facturas_${rfcDisplay(selectedRfc)}_${periodLabel()}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -303,11 +304,11 @@ export default function FacturasView({ session, accountType }: Props) {
                   onChange={e => setSelectedRfc(e.target.value)}
                   className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ? `${r.alias} (${r.rfc})` : r.rfc}</option>)}
+                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ?? r.rfc}</option>)}
                 </select>
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">
-                  {rfcs[0]?.alias ? `${rfcs[0].alias} (${selectedRfc})` : selectedRfc}
+                  {rfcs[0]?.alias ?? selectedRfc}
                 </span>
               ) : null}
 
@@ -622,8 +623,8 @@ function TablaIngresos({ rows }: { rows: IngresoCFDI[] }) {
           <tr key={`${r.UUID}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs text-slate-400 dark:text-zinc-500">{uuid4(r.UUID)}</span></TD>
             <TD>{fmt(r.Fecha)}</TD>
-            <TD><span className="font-mono text-xs">{r.RFC_Receptor}</span></TD>
-            <TD><span className="max-w-[200px] truncate block">{r.RazonSocialReceptor || r.RFC_Receptor}</span></TD>
+            <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Receptor)}</span></TD>
+            <TD><span className="max-w-[200px] truncate block">{r.RazonSocialReceptor || rfcDisplay(r.RFC_Receptor)}</span></TD>
             <TD>{r.Serie}{r.Folio ? `-${r.Folio}` : ''}</TD>
             <TD><span className={badge(r.Status)}>{r.Status}</span></TD>
             <TD><span className="font-mono text-xs">{r.Moneda}</span></TD>
@@ -651,7 +652,7 @@ function TablaEgresos({ rows }: { rows: EgresoCFDI[] }) {
       <tbody>
         {rows.length === 0 ? <EmptyRow cols={9} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
           <tr key={`${r.RFC_Emisor}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
-            <TD><span className="font-mono text-xs">{r.RFC_Emisor}</span></TD>
+            <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Emisor)}</span></TD>
             <TD><span className="max-w-[220px] truncate block">{r.RazonSocialEmisor}</span></TD>
             <TD right>{r.NumFacturas}</TD>
             <TD right><span className="text-green-700 dark:text-green-300">{r.Vigentes}</span></TD>
@@ -687,9 +688,9 @@ function TablaNomina({ rows }: { rows: NominaCFDI[] }) {
               </span>
             </TD>
             <TD>{fmt(r.Fecha)}</TD>
-            <TD><span className="font-mono text-xs">{r.RFC_Emisor}</span></TD>
-            <TD><span className="max-w-[180px] truncate block">{r.RazonSocialEmisor || r.RFC_Emisor}</span></TD>
-            <TD><span className="font-mono text-xs">{r.RFC_Receptor}</span></TD>
+            <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Emisor)}</span></TD>
+            <TD><span className="max-w-[180px] truncate block">{r.RazonSocialEmisor || rfcDisplay(r.RFC_Emisor)}</span></TD>
+            <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Receptor)}</span></TD>
             <TD><span className={badge(r.Status)}>{r.Status}</span></TD>
             <TD right><span className="font-semibold">{MXN(Number(r.Total_MXN) || 0)}</span></TD>
             <TD right>{MXN(Number(r.TotalRetenidoISR) || 0)}</TD>
@@ -721,8 +722,8 @@ function TablaRetenciones({ rows }: { rows: RetencionCFDI[] }) {
             </TD>
             <TD><span className="font-mono text-xs">{r.TipoComprobante}</span></TD>
             <TD>{fmt(r.Fecha)}</TD>
-            <TD><span className="font-mono text-xs">{r.RFC_Emisor}</span></TD>
-            <TD><span className="max-w-[180px] truncate block">{r.RazonSocialEmisor || r.RFC_Emisor}</span></TD>
+            <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Emisor)}</span></TD>
+            <TD><span className="max-w-[180px] truncate block">{r.RazonSocialEmisor || rfcDisplay(r.RFC_Emisor)}</span></TD>
             <TD><span className={badge(r.Status)}>{r.Status}</span></TD>
             <TD right><span className="font-semibold">{MXN(Number(r.Total_MXN) || 0)}</span></TD>
             <TD right>{MXN(Number(r.ISR_MXN) || 0)}</TD>
@@ -762,8 +763,8 @@ function TablaPagos({ rows, loading }: { rows: PagoRow[]; loading: boolean }) {
             <tr key={`${r.uuid_pago}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
               <TD>{fmt(r.fechaEmision)}</TD>
               <TD>{fmt(r.fechaPago)}</TD>
-              <TD><span className="font-mono text-xs">{r.RFC_emisor}</span></TD>
-              <TD><span className="font-mono text-xs">{r.RFC_receptor}</span></TD>
+              <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_emisor)}</span></TD>
+              <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_receptor)}</span></TD>
               <TD>{r.forma_pago}</TD>
               <TD><span className="font-mono text-xs">{r.moneda_pago}</span></TD>
               <TD right><span className="font-semibold">{MXN(Number(r.total_pago) * tc)}</span></TD>
@@ -814,8 +815,8 @@ function Tablaflujo({ rows, loading }: { rows: flujoRow[]; loading: boolean }) {
                   </TD>
                   <TD>{fmt(r.fechaEmision)}</TD>
                   <TD>{r.fechaPago ? fmt(r.fechaPago) : '—'}</TD>
-                  <TD><span className="font-mono text-xs">{r.RFC_emisor}</span></TD>
-                  <TD><span className="truncate block">{r.RazonSocialEmisor || r.RFC_emisor}</span></TD>
+                  <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_emisor)}</span></TD>
+                  <TD><span className="truncate block">{r.RazonSocialEmisor || rfcDisplay(r.RFC_emisor)}</span></TD>
                   <TD>{r.formaPago || '—'}</TD>
                   <TD right><span className="font-semibold">{MXN(Number(r.total) * tc)}</span></TD>
                 </tr>
@@ -854,8 +855,8 @@ function TablaNotasCredito({ rows, loading }: { rows: NotaCreditoRow[]; loading:
           return (
             <tr key={`${r.uuid}-${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
               <TD>{fmt(r.fecha)}</TD>
-              <TD><span className="font-mono text-xs">{r.RFC_emisor}</span></TD>
-              <TD><span className="font-mono text-xs">{r.RFC_receptor}</span></TD>
+              <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_emisor)}</span></TD>
+              <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_receptor)}</span></TD>
               <TD right>{MXN(Number(r.subtotal) * tc)}</TD>
               <TD right>{MXN(Number(r.iva16) * tc)}</TD>
               <TD right>{MXN(Number(r.totaltrasladados) * tc)}</TD>

@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import type { ConceptoRow } from '@/lib/facturas-query'
+import { rfcDisplay } from '@/lib/rfc-aliases'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -201,7 +202,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = `estados-financieros_${selectedRfc}_${String(month).padStart(2,'0')}-${year}.xlsx`
+      a.download = `estados-financieros_${rfcDisplay(selectedRfc)}_${String(month).padStart(2,'0')}-${year}.xlsx`
       a.click()
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
@@ -232,11 +233,11 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                   onChange={e => setSelectedRfc(e.target.value)}
                   className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ? `${r.alias} (${r.rfc})` : r.rfc}</option>)}
+                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ?? r.rfc}</option>)}
                 </select>
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">
-                  {rfcs[0]?.alias ? `${rfcs[0].alias} (${selectedRfc})` : selectedRfc}
+                  {rfcs[0]?.alias ?? selectedRfc}
                 </span>
               ) : null}
 

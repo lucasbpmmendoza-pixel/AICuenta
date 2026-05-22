@@ -12,6 +12,7 @@ interface Member {
 interface RfcOption {
   id: string
   rfc: string
+  alias: string | null
   assigned: boolean
 }
 
@@ -392,7 +393,7 @@ export default function UsuariosView() {
                           onChange={() => toggleRfc(r.id)}
                           className="h-4 w-4 rounded border-slate-300 dark:border-zinc-600 accent-[#7B6FE8] dark:accent-[#91eb78] cursor-pointer"
                         />
-                        <span className="text-sm font-mono font-semibold text-slate-700 dark:text-zinc-200">{r.rfc}</span>
+                        <span className="text-sm font-mono font-semibold text-slate-700 dark:text-zinc-200">{r.alias ?? r.rfc}</span>
                       </label>
                     </li>
                   ))}

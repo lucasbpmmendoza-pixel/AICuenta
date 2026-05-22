@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchPagosData, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers (match variablesEstaticas.js / variablesEspecificas.js) ────
 
@@ -132,8 +133,8 @@ export async function GET(req: NextRequest) {
         row.fechaEmision,                  // 1  Fecha Emision
         row.fechaPago,                     // 2  Fecha Pago
         row.uuid_pago,                     // 3  UUID Pago
-        row.RFC_emisor,                    // 4  RFC Emisor
-        row.RFC_receptor,                  // 5  RFC Receptor
+        rfcDisplay(row.RFC_emisor),         // 4  RFC Emisor
+        rfcDisplay(row.RFC_receptor),       // 5  RFC Receptor
         row.forma_pago,                    // 6  Forma Pago
         row.moneda_pago,                   // 7  Moneda Pago
         tc,                                // 8  Tipo Cambio
