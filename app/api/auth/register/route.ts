@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
+import sql from "mssql";
 import { registerSchema } from "@/lib/validations";
 import { getDb } from "@/lib/db";
 import { signVerificationToken } from "@/lib/auth";
@@ -86,11 +87,14 @@ export async function POST(req: NextRequest) {
   // ── 5. Hash de contrasena ──────────────────────────────
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-  // ── 6. Insertar usuario ────────────────────────────────
-  let userId: string;
+  // ── 6-7. Crear usuario + enviar verificacion en transaccion ─
+  // Evita cuentas creadas sin correo cuando en serverless el proceso termina rapido.
+  let tx: sql.Transaction | null = null;
   try {
-    const result = await db
-      .request()
+    tx = new sql.Transaction(db);
+    await tx.begin();
+
+    const result = await new sql.Request(tx)
       .input("name", name)
       .input("email", email)
       .input("password_hash", passwordHash)
@@ -100,20 +104,34 @@ export async function POST(req: NextRequest) {
          VALUES (@name, @email, @password_hash)`,
       );
 
-    userId = result.recordset[0].id;
+    const userId = result.recordset[0].id;
+    const verificationToken = await signVerificationToken(userId, email);
+    await sendVerificationEmail(email, name, verificationToken);
+
+    await tx.commit();
   } catch (err) {
-    console.error("[register] Insert error:", (err as Error).message);
+    if (tx) {
+      try {
+        await tx.rollback();
+      } catch (rollbackErr) {
+        console.error("[register] Rollback error:", (rollbackErr as Error).message);
+      }
+    }
+
+    const msg = (err as Error).message;
+    console.error("[register] Create/send error:", msg);
+    if (msg.includes("RESEND_API_KEY") || msg.includes("You can only send testing emails") || msg.includes("domain") || msg.includes("sender")) {
+      return NextResponse.json(
+        { error: "No se pudo enviar el correo de verificacion. Revisa la configuracion de correo en produccion." },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
       { error: "No se pudo crear la cuenta. Intenta mas tarde." },
       { status: 500 },
     );
   }
-
-  // ── 7. Generar token de verificación y enviar correo ──────
-  const verificationToken = await signVerificationToken(userId, email);
-  sendVerificationEmail(email, name, verificationToken).catch((err) =>
-    console.error("[register] Verification email error:", (err as Error).message),
-  );
 
   return NextResponse.json(
     { ok: true, message: "check_email" },
