@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { rfcAlias } from "@/lib/rfc-aliases";
 
 // GET /api/team/[id]/rfcs — Todos los RFCs del owner con flag de asignacion al miembro
 export async function GET(
@@ -39,7 +40,12 @@ export async function GET(
         ORDER  BY e.rfc
       `);
 
-    return NextResponse.json({ rfcs: result.recordset });
+    return NextResponse.json({
+      rfcs: result.recordset.map(r => ({
+        ...r,
+        alias: rfcAlias(r.rfc) ?? null,
+      })),
+    });
   } catch (err) {
     console.error("[team rfcs GET] DB error:", (err as Error).message);
     return NextResponse.json({ error: "Error al obtener RFCs" }, { status: 503 });

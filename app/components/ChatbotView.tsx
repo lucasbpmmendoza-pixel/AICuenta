@@ -162,9 +162,7 @@ export default function ChatbotView({ session, accountType }: Props) {
   }
 
   const selectedRfcObj = rfcs.find(r => r.rfc === selectedRfc)
-  const rfcDisplay = selectedRfcObj?.alias
-    ? `${selectedRfcObj.alias} (${selectedRfc})`
-    : selectedRfc
+  const rfcDisplay = selectedRfcObj?.alias ?? selectedRfc
 
   const canSend = !!selectedRfc && !!input.trim() && !sending
 
@@ -194,7 +192,7 @@ export default function ChatbotView({ session, accountType }: Props) {
                 >
                   {rfcs.map(r => (
                     <option key={r.rfc} value={r.rfc}>
-                      {r.alias ? `${r.alias} (${r.rfc})` : r.rfc}
+                      {r.alias ?? r.rfc}
                     </option>
                   ))}
                 </select>

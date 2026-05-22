@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchRawCFDIForExport, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
 
@@ -289,8 +290,8 @@ export async function GET(req: NextRequest) {
 
       buffers[mes][tipo].push([
         `${dd}/${mm}/${yyyy}`, row.UUID,
-        row.RFC_Emisor, row.RegimenFiscal,
-        row.RFC_Receptor, row.RegimenFiscalReceptor,
+        rfcDisplay(row.RFC_Emisor), row.RegimenFiscal,
+        rfcDisplay(row.RFC_Receptor), row.RegimenFiscalReceptor,
         subtotal, iva8, iva16, totalTras,
         retISR, retIVA, descuento, total,
         row.Moneda, row.Movimiento,
@@ -311,8 +312,8 @@ export async function GET(req: NextRequest) {
       if (totalRetencion !== 0) {
         t.retenidos += totalRetencion;
         retencionesRows.push([
-          row.RFC_Emisor, row.RegimenFiscal,
-          row.RFC_Receptor, row.RegimenFiscalReceptor,
+          rfcDisplay(row.RFC_Emisor), row.RegimenFiscal,
+          rfcDisplay(row.RFC_Receptor), row.RegimenFiscalReceptor,
           tipo,
           subtotal, iva8, iva16, totalTras,
           retISR, retIVA, totalRetencion,
