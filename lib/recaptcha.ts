@@ -1,7 +1,8 @@
 interface RecaptchaResponse {
   success: boolean;
-  score: number;
-  action: string;
+  score?: number;
+  action?: string;
+  hostname?: string;
   "error-codes"?: string[];
 }
 
@@ -11,7 +12,7 @@ interface RecaptchaResponse {
  */
 export async function verifyRecaptcha(token: string, expectedAction: string): Promise<void> {
   const secret = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secret) throw new Error("RECAPTCHA_SECRET_KEY not set");
+  if (!secret) throw new Error("RECAPTCHA_SERVER_MISCONFIG: RECAPTCHA_SECRET_KEY not set");
 
   const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
     method: "POST",
@@ -22,7 +23,13 @@ export async function verifyRecaptcha(token: string, expectedAction: string): Pr
   const data: RecaptchaResponse = await res.json();
 
   if (!data.success) {
-    throw new Error(`reCAPTCHA failed: ${(data["error-codes"] ?? []).join(", ")}`);
+    throw new Error(
+      `reCAPTCHA failed: codes=${(data["error-codes"] ?? []).join(",")} hostname=${data.hostname ?? "n/a"} action=${data.action ?? "n/a"}`,
+    );
+  }
+
+  if (!data.action) {
+    throw new Error("reCAPTCHA response missing action. Verify that the key is reCAPTCHA v3.");
   }
 
   if (data.action !== expectedAction) {
@@ -30,7 +37,12 @@ export async function verifyRecaptcha(token: string, expectedAction: string): Pr
   }
 
   // Score: 1.0 = humano, 0.0 = bot. Umbral conservador: 0.5
-  if (data.score < 0.5) {
-    throw new Error(`reCAPTCHA score too low: ${data.score}`);
+  if (typeof data.score !== "number") {
+    throw new Error("reCAPTCHA response missing score. Verify that the key is reCAPTCHA v3.");
+  }
+
+  const minScore = Number(process.env.RECAPTCHA_MIN_SCORE ?? 0.5);
+  if (data.score < minScore) {
+    throw new Error(`reCAPTCHA score too low: ${data.score} (min=${minScore})`);
   }
 }

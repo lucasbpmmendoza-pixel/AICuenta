@@ -110,6 +110,18 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    label: 'Asistente Docs',
+    href: '/dashboard/chat-docs',
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />
+        <path d="M14 2v6h6" />
+        <path d="M8 13h8" />
+        <path d="M8 17h6" />
+      </svg>
+    ),
+  },
+  {
     label: 'Soporte',
     href: '/dashboard/soporte',
     icon: (

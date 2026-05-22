@@ -28,7 +28,11 @@ export async function POST(req: NextRequest) {
   try {
     await verifyRecaptcha(recaptchaToken, "register");
   } catch (err) {
-    console.error("[register] reCAPTCHA error:", (err as Error).message);
+    const msg = (err as Error).message;
+    console.error("[register] reCAPTCHA error:", msg);
+    if (msg.startsWith("RECAPTCHA_SERVER_MISCONFIG")) {
+      return NextResponse.json({ error: "Servicio de seguridad no configurado correctamente." }, { status: 500 });
+    }
     return NextResponse.json({ error: "Verificacion de seguridad fallida. Intenta de nuevo." }, { status: 400 });
   }
 
