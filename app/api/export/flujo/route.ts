@@ -215,11 +215,22 @@ export async function GET(req: NextRequest) {
     writeSection("INGRESOS", ingresos);
     writeSection("EGRESOS", egresos);
 
-    const grandSubtotal = normalizedRows.reduce((s, r) => s + r.subtotalMx, 0);
-    const grandIva = normalizedRows.reduce((s, r) => s + r.ivaMx, 0);
-    const grandRetISR = normalizedRows.reduce((s, r) => s + r.retIsrMx, 0);
-    const grandRetIVA = normalizedRows.reduce((s, r) => s + r.retIvaMx, 0);
-    const grandTotal = normalizedRows.reduce((s, r) => s + r.totalMx, 0);
+    const sumSection = (rowsToSum: typeof normalizedRows) => ({
+      subtotal: rowsToSum.reduce((s, r) => s + r.subtotalMx, 0),
+      iva: rowsToSum.reduce((s, r) => s + r.ivaMx, 0),
+      retISR: rowsToSum.reduce((s, r) => s + r.retIsrMx, 0),
+      retIVA: rowsToSum.reduce((s, r) => s + r.retIvaMx, 0),
+      total: rowsToSum.reduce((s, r) => s + r.totalMx, 0),
+    });
+
+    const sumIngresos = sumSection(ingresos);
+    const sumEgresos = sumSection(egresos);
+
+    const grandSubtotal = sumIngresos.subtotal - sumEgresos.subtotal;
+    const grandIva = sumIngresos.iva - sumEgresos.iva;
+    const grandRetISR = sumIngresos.retISR - sumEgresos.retISR;
+    const grandRetIVA = sumIngresos.retIVA - sumEgresos.retIVA;
+    const grandTotal = sumIngresos.total - sumEgresos.total;
 
     const grandRow = ws.addRow([
       "TOTAL GENERAL", null, null, null, null, null, null, null, null, null, null, null,

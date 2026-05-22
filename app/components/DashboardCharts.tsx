@@ -1,10 +1,17 @@
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell,
 } from 'recharts'
 import { useTheme } from '@/app/hooks/useTheme'
+
+type IsrRegimenOption = {
+  code: string
+  name: string
+  rateHint: string
+}
 
 // ── Tipos públicos ──────────────────────────────────────────────
 export interface DashboardData {
@@ -12,6 +19,7 @@ export interface DashboardData {
     total: number; count: number;
     vigentes: number; cancelados: number;
     ivaTotal: number; ivaRetenido: number;
+    isrRetenido: number;
     isrEstimado: number;
     regimenFiscal: string;
     regimenLabel: string;
@@ -21,6 +29,7 @@ export interface DashboardData {
   topProveedores:       Array<{ nombre: string; monto: number }>
   topConceptosIngresos: Array<{ concepto: string; monto: number }>
   topConceptosEgresos:  Array<{ concepto: string; monto: number }>
+  isrRegimenes: IsrRegimenOption[]
 }
 
 interface Props {
@@ -35,6 +44,46 @@ const MXN = (n: number) =>
   new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 }).format(n)
 
 const DONUT_COLORS = ['#3b82f6', '#f43f5e']
+
+function calcularIsrPorRegimen(regimen: string, ingresos: number, egresos: number, isrRetenido: number): number {
+  const utilidad = Math.max(ingresos - egresos, 0)
+  switch (regimen) {
+    case '625':
+      if (ingresos <= 25000) return ingresos * 0.01
+      if (ingresos <= 50000) return ingresos * 0.011
+      if (ingresos <= 83333) return ingresos * 0.015
+      if (ingresos <= 208333) return ingresos * 0.02
+      return ingresos * 0.025
+    case '626':
+      return ingresos * 0.01
+    case '601':
+      return ingresos * 0.30
+    case '612':
+      return Math.max(ingresos * 0.30, isrRetenido) || 0
+    case '606':
+      return ingresos * 0.20
+    case '621':
+      return ingresos * 0.10
+    case '603':
+    case '605':
+    case '616':
+      return 0
+    case '611':
+    case '614':
+    case '615':
+      return ingresos * 0.10
+    case '622':
+      return ingresos * 0.21
+    case '623':
+    case '624':
+    case '608':
+    case '610':
+    case '620':
+      return ingresos * 0.30
+    default:
+      return (isrRetenido > 0 ? Math.max(ingresos * 0.10, isrRetenido) : utilidad * 0.30) || 0
+  }
+}
 
 // ── Tooltip personalizado ──────────────────────────────────────
 function ChartTooltip({ active, payload, label }: {
@@ -163,8 +212,31 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
 
   const periodo = `${mes} ${anio}`
 
-  const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
+  const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
   const egresos   = data?.egresos   ?? { total: 0, count: 0 }
+  const regimenes = data?.isrRegimenes ?? []
+
+  const [regimenSeleccionado, setRegimenSeleccionado] = useState('')
+
+  useEffect(() => {
+    if (!data) return
+    const detected = data.ingresos.regimenFiscal
+    const existe = detected && regimenes.some((r) => r.code === detected)
+    const next = existe ? detected : (regimenes[0]?.code ?? '')
+    setRegimenSeleccionado(next)
+  }, [data, regimenes])
+
+  const regimenLabelSeleccionado = useMemo(() => {
+    if (!regimenSeleccionado) return ingresos.regimenLabel || 'Provisional mensual'
+    const opt = regimenes.find((r) => r.code === regimenSeleccionado)
+    return opt ? `${opt.name} · ${opt.rateHint}` : (ingresos.regimenLabel || 'Provisional mensual')
+  }, [ingresos.regimenLabel, regimenSeleccionado, regimenes])
+
+  const isrEstimado = useMemo(() => {
+    if (!regimenSeleccionado) return ingresos.isrEstimado ?? 0
+    return calcularIsrPorRegimen(regimenSeleccionado, ingresos.total, egresos.total, ingresos.isrRetenido)
+  }, [regimenSeleccionado, ingresos.isrEstimado, ingresos.total, ingresos.isrRetenido, egresos.total])
+
   const utilidad  = ingresos.total - egresos.total
   const cfdiData  = [
     { name: 'Vigentes',   value: ingresos.vigentes  },
@@ -184,7 +256,40 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
 
       {/* ── Fila 2: KPIs fiscales + estado CFDIs ─────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <KpiCard label="ISR estimado"   skeleton={loading} value={MXN(ingresos.isrEstimado ?? 0)} sub={ingresos.regimenLabel || 'Provisional mensual'} color="amber"  icon={<IconISR />} />
+        <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm px-5 py-4">
+          <div className="flex items-start gap-4">
+            <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-800">
+              <IconISR />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">ISR estimado</p>
+              {loading ? (
+                <div className="h-6 w-28 rounded-lg bg-slate-100 dark:bg-zinc-800 animate-pulse mt-1" />
+              ) : (
+                <>
+                  <p className="text-xl font-black tracking-tight leading-none text-amber-500 dark:text-amber-400">{MXN(isrEstimado)}</p>
+                  <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1 leading-tight">{regimenLabelSeleccionado}</p>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-1">
+              Regimen fiscal para ISR
+            </label>
+            <select
+              value={regimenSeleccionado}
+              onChange={(e) => setRegimenSeleccionado(e.target.value)}
+              disabled={loading || regimenes.length === 0}
+              className="w-full rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-deep-light-500 disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {regimenes.map((r) => (
+                <option key={r.code} value={r.code}>{r.code} - {r.name} ({r.rateHint})</option>
+              ))}
+            </select>
+          </div>
+        </div>
         <KpiCard label="IVA trasladado" skeleton={loading} value={MXN(ingresos.ivaTotal)}          sub="IVA cargado a tus clientes"                     color="violet" icon={<IconIVA />} />
 
         {/* Mini donut CFDIs */}

@@ -3,6 +3,33 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 
+type IsrRegimenOption = {
+  code: string;
+  name: string;
+  rateHint: string;
+};
+
+const ISR_REGIMENES: IsrRegimenOption[] = [
+  { code: "601", name: "General de Ley Personas Morales", rateHint: "30%" },
+  { code: "603", name: "Personas Morales con Fines no Lucrativos", rateHint: "0%" },
+  { code: "605", name: "Sueldos y Salarios e Ingresos Asimilados", rateHint: "0%" },
+  { code: "606", name: "Arrendamiento", rateHint: "20%" },
+  { code: "608", name: "Demas ingresos", rateHint: "30%" },
+  { code: "610", name: "Residentes en el Extranjero", rateHint: "30%" },
+  { code: "611", name: "Ingresos por Dividendos", rateHint: "10%" },
+  { code: "612", name: "Personas Fisicas con Actividades Empresariales y Profesionales", rateHint: "30%" },
+  { code: "614", name: "Ingresos por intereses", rateHint: "10%" },
+  { code: "615", name: "Regimen de los ingresos por obtencion de premios", rateHint: "10%" },
+  { code: "616", name: "Sin obligaciones fiscales", rateHint: "0%" },
+  { code: "620", name: "Sociedades Cooperativas de Produccion", rateHint: "30%" },
+  { code: "621", name: "Incorporacion Fiscal", rateHint: "10%" },
+  { code: "622", name: "Actividades Agricolas, Ganaderas, Silvicolas y Pesqueras", rateHint: "21%" },
+  { code: "623", name: "Opcional para Grupos de Sociedades", rateHint: "30%" },
+  { code: "624", name: "Coordinados", rateHint: "30%" },
+  { code: "625", name: "RESICO Personas Fisicas", rateHint: "1% a 2.5%" },
+  { code: "626", name: "RESICO Personas Morales", rateHint: "1%" },
+ ];
+
 async function validateRfc(effectiveUserId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
   const r = await db
@@ -212,17 +239,9 @@ export async function GET(req: NextRequest) {
     }
 
     function labelRegimen(reg: string): string {
-      const MAP: Record<string, string> = {
-        '601': 'General PM · 30% ingresos (estimado)',
-        '606': 'Arrendamiento · 20% ingresos',
-        '608': 'Demás ingresos',
-        '610': 'Resid. extranjero',
-        '612': 'PF Empresarial/Honorarios · 30% ingresos',
-        '621': 'RIF · 10% ingresos',
-        '625': 'RESICO PF · 1–2.5% ingresos',
-        '626': 'RESICO PM · 1% ingresos',
-      };
-      return MAP[reg] ?? (reg ? `Régimen ${reg}` : 'Régimen no identificado');
+      const match = ISR_REGIMENES.find((r) => r.code === reg);
+      if (match) return `${match.name} · ${match.rateHint}`;
+      return reg ? `Regimen ${reg}` : "Regimen no identificado";
     }
 
     return NextResponse.json({
@@ -233,6 +252,7 @@ export async function GET(req: NextRequest) {
         cancelados:   Number(ingRow.cancelados) || 0,
         ivaTotal:     Number(ingRow.ivaTotal)  || 0,
         ivaRetenido:  Number(ingRow.ivaRetenido) || 0,
+        isrRetenido:  isrRetenido,
         isrEstimado:  estimarISR(regimen, ingresosMXN, utilidad, isrRetenido),
         regimenFiscal: regimen,
         regimenLabel:  labelRegimen(regimen),
@@ -245,6 +265,7 @@ export async function GET(req: NextRequest) {
       topProveedores:       provs.map(r    => ({ nombre: r.nombre,     monto: Number(r.monto) })),
       topConceptosIngresos: concIng.map(r  => ({ concepto: r.concepto, monto: Number(r.monto) })),
       topConceptosEgresos:  concEgr.map(r  => ({ concepto: r.concepto, monto: Number(r.monto) })),
+      isrRegimenes: ISR_REGIMENES,
     });
   } catch (err) {
     console.error("[dashboard/data] Error:", (err as Error).message);

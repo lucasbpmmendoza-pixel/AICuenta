@@ -404,14 +404,23 @@ export async function GET(req: NextRequest) {
       const tIn = totales[mes]["INGRESOS"];
       const tGa = totales[mes]["GASTOS"];
       const tNo = totales[mes]["GASTOS - NOMINA"];
+      const tOut = {
+        subtotal:  tGa.subtotal  + tNo.subtotal,
+        iva8:      tGa.iva8      + tNo.iva8,
+        iva16:     tGa.iva16     + tNo.iva16,
+        retISR:    tGa.retISR    + tNo.retISR,
+        retIVA:    tGa.retIVA    + tNo.retIVA,
+        descuento: tGa.descuento + tNo.descuento,
+        total:     tGa.total     + tNo.total,
+      };
       const tgm = {
-        subtotal:  tIn.subtotal  + tGa.subtotal  + tNo.subtotal,
-        iva8:      tIn.iva8      + tGa.iva8      + tNo.iva8,
-        iva16:     tIn.iva16     + tGa.iva16     + tNo.iva16,
-        retISR:    tIn.retISR    + tGa.retISR    + tNo.retISR,
-        retIVA:    tIn.retIVA    + tGa.retIVA    + tNo.retIVA,
-        descuento: tIn.descuento + tGa.descuento + tNo.descuento,
-        total:     tIn.total     + tGa.total     + tNo.total,
+        subtotal:  tIn.subtotal  - tOut.subtotal,
+        iva8:      tIn.iva8      - tOut.iva8,
+        iva16:     tIn.iva16     - tOut.iva16,
+        retISR:    tIn.retISR    - tOut.retISR,
+        retIVA:    tIn.retIVA    - tOut.retIVA,
+        descuento: tIn.descuento - tOut.descuento,
+        total:     tIn.total     - tOut.total,
       };
       ws.addRow([]);
       const tgRow = ws.addRow([
