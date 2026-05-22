@@ -104,6 +104,44 @@ export async function docsGetDetail(id: number, maxChars = 8000): Promise<DocDet
   return row;
 }
 
+export interface CatProdResult {
+  clave: string;
+  descripcion: string;
+}
+
+/**
+ * Busca claves de producto/servicio SAT en tb_catprodserv.
+ * Si `query` es un número/código busca por prefijo de clave; si no, busca por descripción LIKE.
+ * Limita siempre a TOP N para no saturar el contexto.
+ */
+export async function catprodSearch(query: string, limit = 20): Promise<CatProdResult[]> {
+  const db = await getDb();
+  const req = db.request();
+
+  const safeLimit = Math.min(Math.max(1, limit), 50);
+  const clean = query.trim().replace(/[%_[\]]/g, "\\$&");
+
+  req.input("lim", safeLimit);
+  req.input("exactClave", clean.toUpperCase());
+  req.input("likeClave", `${clean.toUpperCase()}%`);
+  req.input("likeDesc", `%${clean}%`);
+
+  // Prioridad: coincidencia exacta de clave > prefijo de clave > descripción
+  const result = await req.query<CatProdResult>(`
+    SELECT TOP (@lim) clave, descripcion
+    FROM tb_catprodserv WITH (NOLOCK)
+    WHERE clave = @exactClave
+       OR clave LIKE @likeClave ESCAPE '\\'
+       OR descripcion LIKE @likeDesc ESCAPE '\\'
+    ORDER BY
+      CASE WHEN clave = @exactClave THEN 0
+           WHEN clave LIKE @likeClave ESCAPE '\\' THEN 1
+           ELSE 2 END,
+      clave
+  `);
+  return result.recordset;
+}
+
 /**
  * Lista todas las categorías disponibles con conteo de documentos.
  */

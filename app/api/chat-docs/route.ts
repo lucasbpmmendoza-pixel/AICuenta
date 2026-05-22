@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { getSession } from "@/lib/session";
-import { docsSearch, docsGetDetail, docsListCategorias } from "@/lib/docs-query";
+import { docsSearch, docsGetDetail, docsListCategorias, catprodSearch } from "@/lib/docs-query";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -18,6 +18,7 @@ Reglas obligatorias:
 - Antes de responder cualquier pregunta, usa docs_search para encontrar documentos relevantes.
 - Si el resultado de docs_search no tiene suficiente detalle, usa docs_get_detail para obtener el contenido completo del documento.
 - Si necesitas saber qué categorías existen, usa docs_list_categorias.
+- Cuando el usuario pregunte sobre claves de producto o servicio SAT, conceptos CFDI, descripciones de productos o servicios, o necesite identificar la clave SAT correcta para un artículo, usa catprod_search para buscar en el catálogo oficial del SAT.
 - Nunca inventes información; si no encuentras datos relevantes en los documentos, dilo explícitamente.
 - Cita el título del documento fuente cuando respondas.
 - Responde siempre en español claro y profesional.
@@ -80,6 +81,30 @@ const CHAT_TOOLS = [
       parameters: {
         type: "object",
         properties: {},
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "catprod_search",
+      description:
+        "Busca claves de producto o servicio SAT (ClaveProdServ) en el catálogo oficial del SAT. Usa esta herramienta cuando el usuario pregunte por claves SAT de productos/servicios, conceptos de facturas, descripciones de artículos o servicios para facturación, o quiera saber qué clave usar en su CFDI.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Clave numérica (ej: 84111506) o palabras de la descripción del producto/servicio (ej: 'software contabilidad', 'consultoría', 'alimentos')",
+          },
+          limit: {
+            type: "number",
+            description: "Número máximo de resultados (1-30, por defecto 20)",
+            default: 20,
+          },
+        },
+        required: ["query"],
         additionalProperties: false,
       },
     },
@@ -153,6 +178,16 @@ async function executeTool(
 
   if (name === "docs_list_categorias") {
     return docsListCategorias();
+  }
+
+  if (name === "catprod_search") {
+    const query = typeof args.query === "string" ? args.query.trim() : "";
+    if (!query) return { error: "query requerido" };
+    const rawLimit = typeof args.limit === "number" ? args.limit : 20;
+    const safeLimit = Math.min(Math.max(1, rawLimit), 30);
+    const results = await catprodSearch(query, safeLimit);
+    if (!results.length) return { message: "No se encontraron claves SAT para esa búsqueda. Intenta con términos más generales." };
+    return results;
   }
 
   return { error: `Tool no soportada: ${name}` };
