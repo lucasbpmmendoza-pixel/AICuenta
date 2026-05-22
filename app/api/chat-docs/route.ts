@@ -6,6 +6,11 @@ import { docsSearch, docsGetDetail, docsListCategorias } from "@/lib/docs-query"
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
+const MAX_HISTORY_MESSAGES = 8;
+const MAX_MESSAGE_CHARS = 1500;
+const MAX_DOC_CHARS = 8000;
+const MAX_TOOL_RESULT_CHARS = 12000;
+
 const SYSTEM_PROMPT = `Eres un asistente experto en consulta de documentos internos.
 Tu trabajo es responder preguntas usando únicamente la información de los documentos disponibles en la base de datos.
 
@@ -52,7 +57,7 @@ const CHAT_TOOLS = [
     function: {
       name: "docs_get_detail",
       description:
-        "Obtiene el contenido completo de un documento por su ID. Usa esta herramienta cuando docs_search encuentre un documento relevante pero necesites leer su contenido completo para responder la pregunta.",
+        "Obtiene un extracto del contenido de un documento por su ID. Usa esta herramienta cuando docs_search encuentre un documento relevante y necesites más detalle sin cargar todo el documento.",
       parameters: {
         type: "object",
         properties: {
@@ -94,8 +99,22 @@ function parseToolArgs(raw: string): Record<string, unknown> {
 function sanitizeChatMessages(messages: unknown[]): ChatCompletionMessageParam[] {
   return (messages as { role?: unknown; content?: unknown }[])
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    .slice(-20)
-    .map((m) => ({ role: m.role as "user" | "assistant", content: m.content as string }));
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: String(m.content).slice(0, MAX_MESSAGE_CHARS),
+    }));
+}
+
+function compactToolResult(result: unknown): string {
+  const raw = JSON.stringify(result);
+  if (raw.length <= MAX_TOOL_RESULT_CHARS) return raw;
+
+  return JSON.stringify({
+    truncated: true,
+    message: "Resultado recortado para evitar exceder contexto.",
+    preview: raw.slice(0, MAX_TOOL_RESULT_CHARS),
+  });
 }
 
 async function executeTool(
@@ -105,19 +124,31 @@ async function executeTool(
   if (name === "docs_search") {
     const query = typeof args.query === "string" ? args.query.trim() : "";
     if (!query) return { error: "query requerido" };
+    const rawLimit = typeof args.limit === "number" ? args.limit : 5;
+    const safeLimit = Math.min(Math.max(1, rawLimit), 5);
     return docsSearch(
       query,
       typeof args.categoria === "string" ? args.categoria : undefined,
-      typeof args.limit === "number" ? args.limit : 5,
+      safeLimit,
     );
   }
 
   if (name === "docs_get_detail") {
     const id = typeof args.id === "number" ? args.id : parseInt(String(args.id), 10);
     if (!id || isNaN(id)) return { error: "id requerido" };
-    const doc = await docsGetDetail(id);
+    const doc = await docsGetDetail(id, MAX_DOC_CHARS);
     if (!doc) return { error: `Documento con id=${id} no encontrado` };
-    return doc;
+    return {
+      id: doc.id,
+      titulo: doc.titulo,
+      categoria: doc.categoria,
+      tags: doc.tags,
+      resumen: doc.resumen,
+      contenido: doc.contenido,
+      contenido_len: doc.contenido_len,
+      contenido_truncado: doc.contenido_truncado,
+      created_at: doc.created_at,
+    };
   }
 
   if (name === "docs_list_categorias") {
@@ -220,7 +251,7 @@ export async function POST(req: Request) {
         convo.push({
           role: "tool",
           tool_call_id: tc.id,
-          content: JSON.stringify(result),
+          content: compactToolResult(result),
         });
       }
     }

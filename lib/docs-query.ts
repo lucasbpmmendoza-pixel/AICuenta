@@ -11,6 +11,8 @@ export interface DocSearchResult {
 export interface DocDetail extends DocSearchResult {
   contenido: string;
   created_at: string;
+  contenido_len?: number;
+  contenido_truncado?: boolean;
 }
 
 /**
@@ -26,16 +28,41 @@ export async function docsSearch(
   const req = db.request();
 
   const safeLimit = Math.min(Math.max(1, limit), 50);
-  const likeVal = `%${query.replace(/[%_[\]]/g, "\\$&")}%`;
+  const cleanQuery = query.trim();
+  const likeVal = `%${cleanQuery.replace(/[%_[\]]/g, "\\$&")}%`;
+  const tokens = cleanQuery
+    .toLowerCase()
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2)
+    .slice(0, 8);
 
   req.input("q", likeVal);
   req.input("lim", safeLimit);
 
+  const baseFields = ["titulo", "tags", "resumen", "contenido"];
+
+  const likeByFields = (param: string) =>
+    baseFields.map((f) => `${f} LIKE ${param} ESCAPE '\\'`).join(" OR ");
+
   let where = `activo = 1 AND (
-    titulo   LIKE @q ESCAPE '\\' OR
-    tags     LIKE @q ESCAPE '\\' OR
-    resumen  LIKE @q ESCAPE '\\'
+    ${likeByFields("@q")}
   )`;
+
+  if (tokens.length > 0) {
+    const tokenClauses: string[] = [];
+    tokens.forEach((token, i) => {
+      const p = `@t${i}`;
+      req.input(`t${i}`, `%${token.replace(/[%_[\]]/g, "\\$&")}%`);
+      tokenClauses.push(`(${likeByFields(p)})`);
+    });
+
+    where = `activo = 1 AND ((
+      ${likeByFields("@q")}
+    ) OR (
+      ${tokenClauses.join(" OR ")}
+    ))`;
+  }
 
   if (categoria) {
     req.input("cat", categoria.trim());
@@ -53,22 +80,28 @@ export async function docsSearch(
 }
 
 /**
- * Devuelve el contenido completo de un documento por su ID.
+ * Devuelve un extracto del contenido de un documento por su ID para evitar
+ * sobrecargar el contexto del modelo.
  */
-export async function docsGetDetail(id: number): Promise<DocDetail | null> {
+export async function docsGetDetail(id: number, maxChars = 8000): Promise<DocDetail | null> {
   const db = await getDb();
   const req = db.request();
   req.input("id", id);
+  req.input("maxChars", Math.max(500, Math.min(20000, maxChars)));
 
   const result = await req.query(`
-    SELECT id, titulo, categoria, tags, resumen, contenido,
+    SELECT id, titulo, categoria, tags, resumen,
+           LEFT(contenido, @maxChars) AS contenido,
+           LEN(contenido) AS contenido_len,
            CONVERT(VARCHAR(23), created_at, 126) AS created_at
     FROM documents
     WHERE id = @id AND activo = 1
   `);
 
   if (!result.recordset.length) return null;
-  return result.recordset[0] as DocDetail;
+  const row = result.recordset[0] as DocDetail;
+  row.contenido_truncado = (row.contenido_len ?? 0) > row.contenido.length;
+  return row;
 }
 
 /**
