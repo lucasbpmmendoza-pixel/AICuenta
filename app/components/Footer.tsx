@@ -12,7 +12,8 @@ const links = [
     items: [
       { label: "Acerca de", href: "#" },
       { label: "Contacto", href: "#" },
-      { label: "Aviso de privacidad", href: "#" },
+      { label: "Aviso de privacidad", href: "/privacidad" },
+      { label: "Terminos y condiciones", href: "/terminos" },
     ],
   },
   {
