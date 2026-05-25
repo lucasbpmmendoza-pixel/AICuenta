@@ -9,6 +9,11 @@ type IsrRegimenOption = {
   rateHint: string;
 };
 
+type NominaDeduccionesParsed = {
+  retISR: number;
+  imss: number;
+};
+
 const ISR_REGIMENES: IsrRegimenOption[] = [
   { code: "601", name: "General de Ley Personas Morales", rateHint: "30%" },
   { code: "603", name: "Personas Morales con Fines no Lucrativos", rateHint: "0%" },
@@ -42,6 +47,63 @@ async function validateRfc(effectiveUserId: string, rfc: string): Promise<boolea
   return (r.recordset[0]?.cnt ?? 0) > 0;
 }
 
+function n(v: unknown): number {
+  const x = Number(v);
+  return Number.isFinite(x) ? x : 0;
+}
+
+function asObject(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+}
+
+function parseNominaDeducciones(raw: unknown): NominaDeduccionesParsed {
+  if (raw === null || raw === undefined || raw === "") return { retISR: 0, imss: 0 };
+
+  let data: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return { retISR: 0, imss: 0 };
+    }
+  }
+
+  const root = asObject(data);
+  if (!root) return { retISR: 0, imss: 0 };
+
+  const detalle = root.detalle;
+  let retISR = 0;
+  let imss = 0;
+
+  if (Array.isArray(detalle)) {
+    for (const item of detalle) {
+      const row = asObject(item);
+      if (!row) continue;
+      const tipo = String(row.tipoDeduccion ?? row.TipoDeduccion ?? "").trim();
+      const concepto = String(row.concepto ?? row.Concepto ?? "").toLowerCase();
+      const importe = n(row.importe ?? row.Importe);
+      if (importe <= 0) continue;
+
+      if (tipo === "002" || concepto.includes("isr")) {
+        retISR += importe;
+        continue;
+      }
+      if (tipo === "001" || concepto.includes("imss") || concepto.includes("seguridad social")) {
+        imss += importe;
+      }
+    }
+  }
+
+  const resumen = asObject(root.resumenPorTipo ?? root.ResumenPorTipo);
+  if (retISR === 0 && resumen) retISR = n(resumen["002"]);
+  if (imss === 0 && resumen) imss = n(resumen["001"]);
+
+  const totalRet = n(root.totalImpuestosRetenidos ?? root.TotalImpuestosRetenidos ?? root.totalRetenidos ?? root.TotalRetenidos);
+  if (retISR === 0 && totalRet > 0) retISR = totalRet;
+
+  return { retISR, imss };
+}
+
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
@@ -67,8 +129,19 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
 
+    const dedCols = await db.request().query<{ COLUMN_NAME: string }>(`
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'facturalo_cfdis'
+        AND COLUMN_NAME IN ('NominaDeducciones', 'nomina_deducciones', 'nominaDeducciones')
+    `);
+    const nominaDedCol = dedCols.recordset[0]?.COLUMN_NAME ?? null;
+    const nominaDedSelect = nominaDedCol
+      ? `TRY_CONVERT(nvarchar(max), [${nominaDedCol.replace(/\]/g, "]]" )}]) AS NominaDeducciones`
+      : `CAST(NULL AS nvarchar(max)) AS NominaDeducciones`;
+
     // Promise.allSettled — si una query es lenta/falla, las demás igual retornan
-    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes] = await Promise.allSettled([
+    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes, nominaRetRes] = await Promise.allSettled([
 
       // Q1: Resumen ingresos emitidos
       db.request()
@@ -167,12 +240,29 @@ export async function GET(req: NextRequest) {
           ORDER BY Fecha DESC
           OPTION (RECOMPILE, MAXDOP 1)
         `),
+
+      // Q7: Retenciones de nómina emitida (ISR + IMSS desde NominaDeducciones)
+      db.request()
+        .input("rfc",      sql.NVarChar, rfc)
+        .input("dateFrom", sql.DateTime,  dateFrom)
+        .input("dateTo",   sql.DateTime,  dateTo)
+        .query(`
+          SELECT
+            TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoISR,0))                    AS isrDB,
+            ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), tipoCambio),0), 1)               AS tipoCambio,
+            ${nominaDedSelect}
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Emisor=@rfc AND TipoComprobante='N' AND Status='Vigente'
+            AND Fecha>=@dateFrom AND Fecha<@dateTo
+          OPTION (RECOMPILE, MAXDOP 1)
+        `),
     ]);
 
     type IngRow  = { total:number; count:number; vigentes:number; cancelados:number; ivaTotal:number; isrRetenido:number; ivaRetenido:number };
     type EgrRow  = { total:number; count:number };
     type NomRow  = { nombre:string; monto:number };
     type ConcRow = { concepto:string; monto:number };
+    type NomRetRow = { isrDB: number; tipoCambio: number; NominaDeducciones: string | null };
 
     // Helper: extrae recordset de un PromiseSettledResult, o retorna default
     function settled<T>(res: PromiseSettledResult<sql.IResult<T>>, def: T[]): T[] {
@@ -196,12 +286,23 @@ export async function GET(req: NextRequest) {
     const concIng  = settled<ConcRow>(concIngRes, []);
     const concEgr  = provs.map(p => ({ concepto: p.nombre, monto: p.monto }));
     const regRes   = regimenRes.status === 'fulfilled' ? regimenRes.value.recordset[0] : undefined;
+    const nominaRows = settled<NomRetRow>(nominaRetRes, []);
     const regimen  = String((regRes as { regimenFiscal: string } | undefined)?.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
 
     const ingresosMXN = Number(ingRow.total)       || 0;
     const egresosMXN  = Number(egrRow.total)       || 0;
     const utilidad    = Math.max(ingresosMXN - egresosMXN, 0);
     const isrRetenido = Number(ingRow.isrRetenido) || 0;
+
+    let nominaIsr = 0;
+    let nominaImss = 0;
+    for (const r of nominaRows) {
+      const tc = n(r.tipoCambio) || 1;
+      const parsed = parseNominaDeducciones(r.NominaDeducciones);
+      const isr = parsed.retISR > 0 ? parsed.retISR : n(r.isrDB);
+      nominaIsr += isr * tc;
+      nominaImss += parsed.imss * tc;
+    }
 
     // Estima ISR provisional mensual según régimen fiscal
     function estimarISR(reg: string, ing: number, util: number, retenido: number): number {
@@ -265,6 +366,11 @@ export async function GET(req: NextRequest) {
       topProveedores:       provs.map(r    => ({ nombre: r.nombre,     monto: Number(r.monto) })),
       topConceptosIngresos: concIng.map(r  => ({ concepto: r.concepto, monto: Number(r.monto) })),
       topConceptosEgresos:  concEgr.map(r  => ({ concepto: r.concepto, monto: Number(r.monto) })),
+      nominaRetenciones: {
+        count: nominaRows.length,
+        isr: nominaIsr,
+        imss: nominaImss,
+      },
       isrRegimenes: ISR_REGIMENES,
     });
   } catch (err) {

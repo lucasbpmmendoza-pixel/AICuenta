@@ -29,6 +29,11 @@ export interface DashboardData {
   topProveedores:       Array<{ nombre: string; monto: number }>
   topConceptosIngresos: Array<{ concepto: string; monto: number }>
   topConceptosEgresos:  Array<{ concepto: string; monto: number }>
+  nominaRetenciones: {
+    count: number
+    isr: number
+    imss: number
+  }
   isrRegimenes: IsrRegimenOption[]
 }
 
@@ -214,6 +219,7 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
 
   const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
   const egresos   = data?.egresos   ?? { total: 0, count: 0 }
+  const nominaRet = data?.nominaRetenciones ?? { count: 0, isr: 0, imss: 0 }
   const regimenes = data?.isrRegimenes ?? []
 
   const [regimenSeleccionado, setRegimenSeleccionado] = useState('')
@@ -238,6 +244,7 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
   }, [regimenSeleccionado, ingresos.isrEstimado, ingresos.total, ingresos.isrRetenido, egresos.total])
 
   const utilidad  = ingresos.total - egresos.total
+  const mostrarTagNomina = !loading && nominaRet.count > 0
   const cfdiData  = [
     { name: 'Vigentes',   value: ingresos.vigentes  },
     { name: 'Cancelados', value: ingresos.cancelados },
@@ -328,6 +335,25 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
           </div>
         </div>
       </div>
+
+      {mostrarTagNomina && (
+        <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider">
+              Nomina emitida
+            </span>
+            <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+              Retenciones del periodo:
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/90 dark:bg-zinc-900 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-zinc-200 border border-emerald-200 dark:border-emerald-900/70">
+              ISR {MXN(nominaRet.isr)}
+            </span>
+            <span className="inline-flex items-center rounded-full bg-white/90 dark:bg-zinc-900 px-2.5 py-1 text-xs font-bold text-slate-700 dark:text-zinc-200 border border-emerald-200 dark:border-emerald-900/70">
+              IMSS {MXN(nominaRet.imss)}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ── Fila 3: Ingresos y Egresos por contraparte ────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
