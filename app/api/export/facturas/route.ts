@@ -36,11 +36,21 @@ const MXN = '"$"#,##0.00';
 
 interface Totales {
   subtotal: number; iva8: number; iva16: number;
-  retISR: number; retIVA: number; descuento: number;
+  retISR: number; retSegundo: number; retSecundaria: number; descuento: number;
   total: number; retenidos: number;
 }
 function resetTotales(): Totales {
-  return { subtotal: 0, iva8: 0, iva16: 0, retISR: 0, retIVA: 0, descuento: 0, total: 0, retenidos: 0 };
+  return {
+    subtotal: 0,
+    iva8: 0,
+    iva16: 0,
+    retISR: 0,
+    retSegundo: 0,
+    retSecundaria: 0,
+    descuento: 0,
+    total: 0,
+    retenidos: 0,
+  };
 }
 
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0; }
@@ -61,20 +71,28 @@ function firstObject(v: unknown): Record<string, unknown> | null {
   return asObject(v);
 }
 
-function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; ajusteNeto: number; totalDeducciones: number } {
-  if (raw === null || raw === undefined || raw === "") return { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
+function parseNominaDeducciones(raw: unknown): {
+  retISR: number;
+  imss: number;
+  retSecundaria: number;
+  ajusteNeto: number;
+  totalDeducciones: number;
+} {
+  if (raw === null || raw === undefined || raw === "") {
+    return { retISR: 0, imss: 0, retSecundaria: 0, ajusteNeto: 0, totalDeducciones: 0 };
+  }
 
   let data: unknown = raw;
   if (typeof raw === "string") {
     try {
       data = JSON.parse(raw);
     } catch {
-      return { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
+      return { retISR: 0, imss: 0, retSecundaria: 0, ajusteNeto: 0, totalDeducciones: 0 };
     }
   }
 
   const root = firstObject(data);
-  if (!root) return { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
+  if (!root) return { retISR: 0, imss: 0, retSecundaria: 0, ajusteNeto: 0, totalDeducciones: 0 };
 
   const collectDeductionRows = (): Record<string, unknown>[] => {
     const candidates: unknown[] = [
@@ -116,6 +134,7 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; a
   const rows = collectDeductionRows();
   let retISR = 0;
   let imss = 0;
+  let retSecundaria = 0;
   let ajusteNeto = 0;
 
   const register = (row: Record<string, unknown>) => {
@@ -141,7 +160,11 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; a
     // Frecuente en nómina: "Ajuste al neto" (normalmente tipo 004)
     if (tipo === "004" || (concepto.includes("ajuste") && concepto.includes("neto"))) {
       ajusteNeto += importe;
+      return;
     }
+
+    // Cualquier otra deducción de nómina se reporta como secundaria.
+    retSecundaria += importe;
   };
 
   rows.forEach(register);
@@ -166,7 +189,7 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; a
 
   if (retISR === 0 && totalImpuestosRet > 0) retISR = totalImpuestosRet;
 
-  return { retISR, imss, ajusteNeto, totalDeducciones };
+  return { retISR, imss, retSecundaria, ajusteNeto, totalDeducciones };
 }
 
 // ─── SAT code translators ──────────────────────────────────────────────────────
@@ -205,19 +228,19 @@ function mesLabelLong(key: string): string {
 // Headers match writeTableHeaders() in variablesEspecificas.js
 const TABLE_HEADERS = [
   "Fecha", "Folio", "Emisor", "Régimen Emisor", "Receptor", "Régimen Receptor",
-  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion Secundaria", "Descuento", "Total",
+  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion IVA/IMSS", "Retencion Secundaria", "Descuento", "Total",
   "Moneda", "Clasificación", "Comprobante", "Forma pago", "Método Pago", "Uso CFDI",
 ];
 const COL_MAIN = TABLE_HEADERS.length;
-const COL_WIDTHS_MAIN = [13, 38, 18, 17, 16, 13, 13, 13, 13, 18, 13, 13, 13, 13, 10, 13, 13, 22, 13, 10];
+const COL_WIDTHS_MAIN = [13, 38, 18, 17, 16, 13, 13, 13, 13, 18, 13, 14, 14, 13, 13, 10, 13, 13, 22, 13, 10];
 
-const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret Secundaria", "Total Retenciones", "Total"];
+const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret IVA/IMSS", "Ret Secundaria", "Total Retenciones", "Total"];
 const COL_TOT = TOT_HEADERS.length;
-const COL_WIDTHS_TOT = [22, 22, 14, 13, 13, 13, 13, 13, 13, 18, 14];
+const COL_WIDTHS_TOT = [22, 22, 14, 13, 13, 13, 13, 13, 14, 14, 18, 14];
 
-const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret Secundaria", "Ret Total", "Descuento", "Total", "Mes"];
+const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret IVA/IMSS", "Ret Secundaria", "Ret Total", "Descuento", "Total", "Mes"];
 const COL_RET = RET_HEADERS.length;
-const COL_WIDTHS_RET = [16, 20, 16, 20, 22, 14, 13, 13, 16, 13, 13, 16, 13, 14, 16];
+const COL_WIDTHS_RET = [16, 20, 16, 20, 22, 14, 13, 13, 16, 13, 14, 14, 16, 13, 14, 16];
 
 // ─── Excel style helpers ───────────────────────────────────────────────────────
 
@@ -267,15 +290,15 @@ function tableHeaderRow(ws: ExcelJS.Worksheet) {
   plainHeaderRow(ws, TABLE_HEADERS);
 }
 
-type RowTuple = [string, string, string, string, string, string, number, number, number, number, number, number, number, number, string, string, string, string, string, string];
+type RowTuple = [string, string, string, string, string, string, number, number, number, number, number, number, number, number, number, string, string, string, string, string, string];
 
 function addDataRow(ws: ExcelJS.Worksheet, r: RowTuple) {
-  const fp = r[17] as string;
+  const fp = r[18] as string;
   const esEfectivo = fp === "Efectivo";
   const row = ws.addRow(r);
   row.eachCell({ includeEmpty: true }, (cell, ci) => {
     addBorder(cell);
-    if (ci >= 7 && ci <= 14) cell.numFmt = MXN;
+    if (ci >= 7 && ci <= 15) cell.numFmt = MXN;
     if (esEfectivo) setFill(cell, C.AMARILLO);
   });
 }
@@ -288,13 +311,13 @@ function sectionTotalsRow(ws: ExcelJS.Worksheet, tipo: Tipo, t: Totales) {
   const row = ws.addRow([
     "", "", "", "", "", "TOTALES",
     t.subtotal, t.iva8, t.iva16, t.iva8 + t.iva16,
-    t.retISR, t.retIVA, t.descuento, t.total,
+    t.retISR, t.retSegundo, t.retSecundaria, t.descuento, t.total,
   ]);
   row.font = { bold: true };
   row.eachCell({ includeEmpty: true }, (cell, ci) => {
     addBorder(cell);
     cell.alignment = { vertical: "middle", horizontal: "right" };
-    if (ci >= 7 && ci <= 14) cell.numFmt = MXN;
+    if (ci >= 7 && ci <= 15) cell.numFmt = MXN;
     if (ci >= 7) {
       setFill(cell, bg);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -306,7 +329,7 @@ function totalesMesRow(wsTot: ExcelJS.Worksheet, label: string, tipo: Tipo, t: T
   const row = wsTot.addRow([
     label, tipo,
     t.subtotal, t.iva8, t.iva16, t.iva8 + t.iva16,
-    t.descuento, t.retISR, t.retIVA, t.retenidos, t.total,
+    t.descuento, t.retISR, t.retSegundo, t.retSecundaria, t.retenidos, t.total,
   ]);
   row.eachCell({ includeEmpty: true }, (cell, ci) => {
     addBorder(cell);
@@ -377,7 +400,7 @@ export async function GET(req: NextRequest) {
     // ── Buffer rows by month and tipo ────────────────────────────────────────
     const totales: Record<string, Record<Tipo, Totales>> = {};
     const buffers: Record<string, Record<Tipo, RowTuple[]>> = {};
-    type RetTuple = [string, string, string, string, string, number, number, number, number, number, number, number, number, number, string];
+    type RetTuple = [string, string, string, string, string, number, number, number, number, number, number, number, number, number, number, string];
     const retencionesRows: RetTuple[] = [];
 
     for (const row of rawRows) {
@@ -408,11 +431,12 @@ export async function GET(req: NextRequest) {
       const totalTras = n(row.TotalTrasladado) * tc;
       const parsedNomina = row.TipoComprobante === "N"
         ? parseNominaDeducciones((row as { NominaDeducciones?: string | null }).NominaDeducciones)
-        : { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
+        : { retISR: 0, imss: 0, retSecundaria: 0, ajusteNeto: 0, totalDeducciones: 0 };
       const retISR    = (parsedNomina.retISR > 0 ? parsedNomina.retISR : n(row.RetISR)) * tc;
-      const retIVA    = (row.TipoComprobante === "N"
+      const retSegundo = (row.TipoComprobante === "N"
         ? (parsedNomina.imss > 0 ? parsedNomina.imss : 0)
         : n(row.RetIVA)) * tc;
+      const retSecundaria = (row.TipoComprobante === "N" ? parsedNomina.retSecundaria : 0) * tc;
       const descuentoBase = n(row.Descuento);
       const descuentoNomina = row.TipoComprobante === "N" && descuentoBase === 0 && parsedNomina.totalDeducciones > 0
         ? parsedNomina.totalDeducciones
@@ -426,7 +450,7 @@ export async function GET(req: NextRequest) {
         rfcDisplay(row.RFC_Emisor), row.RegimenFiscal,
         rfcDisplay(row.RFC_Receptor), row.RegimenFiscalReceptor,
         subtotal, iva8, iva16, totalTras,
-        retISR, retIVA, descuento, total,
+        retISR, retSegundo, retSecundaria, descuento, total,
         row.Moneda, row.Movimiento,
         tipoCFDI(row.TipoComprobante), fp,
         row.MetodoPago, row.UsoCFDI,
@@ -437,11 +461,12 @@ export async function GET(req: NextRequest) {
       t.iva8      += iva8;
       t.iva16     += iva16;
       t.retISR    += retISR;
-      t.retIVA    += retIVA;
+      t.retSegundo += retSegundo;
+      t.retSecundaria += retSecundaria;
       t.descuento += descuento;
       t.total     += total;
 
-      const totalRetencion = retISR + retIVA;
+      const totalRetencion = retISR + retSegundo + retSecundaria;
       if (totalRetencion !== 0) {
         t.retenidos += totalRetencion;
         retencionesRows.push([
@@ -449,7 +474,7 @@ export async function GET(req: NextRequest) {
           rfcDisplay(row.RFC_Receptor), row.RegimenFiscalReceptor,
           tipo,
           subtotal, iva8, iva16, totalTras,
-          retISR, retIVA, totalRetencion,
+          retISR, retSegundo, retSecundaria, totalRetencion,
           descuento, total,
           mesLabelLong(mes),
         ]);
@@ -505,9 +530,10 @@ export async function GET(req: NextRequest) {
             gt.iva8      += n(r[7]);
             gt.iva16     += n(r[8]);
             gt.retISR    += n(r[10]);
-            gt.retIVA    += n(r[11]);
-            gt.descuento += n(r[12]);
-            gt.total     += n(r[13]);
+            gt.retSegundo += n(r[11]);
+            gt.retSecundaria += n(r[12]);
+            gt.descuento += n(r[13]);
+            gt.total     += n(r[14]);
           }
           for (const [rfcEm, grupo] of Object.entries(byRFC)) {
             grupo.rows.forEach(r => addDataRow(ws, r));
@@ -515,7 +541,7 @@ export async function GET(req: NextRequest) {
             const tRow = ws.addRow([
               `TOTAL: ${rfcEm}`, "", "", "", "", "",
               grupo.tot.subtotal, grupo.tot.iva8, grupo.tot.iva16, grupo.tot.iva8 + grupo.tot.iva16,
-              grupo.tot.retISR, grupo.tot.retIVA, grupo.tot.descuento, grupo.tot.total,
+              grupo.tot.retISR, grupo.tot.retSegundo, grupo.tot.retSecundaria, grupo.tot.descuento, grupo.tot.total,
               "", "", "", "", "", "",
             ]);
             ws.mergeCells(tRow.number, 1, tRow.number, 5); // merge 1-5, matches formato.js
@@ -524,7 +550,7 @@ export async function GET(req: NextRequest) {
               setFill(cell, C.GRISCLARO);
               addBorder(cell);
               cell.alignment = { vertical: "middle", horizontal: "right" };
-              if (ci >= 7 && ci <= 14) cell.numFmt = MXN;
+              if (ci >= 7 && ci <= 15) cell.numFmt = MXN;
             });
           }
         } else {
@@ -543,7 +569,8 @@ export async function GET(req: NextRequest) {
         iva8:      tGa.iva8      + tNo.iva8,
         iva16:     tGa.iva16     + tNo.iva16,
         retISR:    tGa.retISR    + tNo.retISR,
-        retIVA:    tGa.retIVA    + tNo.retIVA,
+        retSegundo: tGa.retSegundo + tNo.retSegundo,
+        retSecundaria: tGa.retSecundaria + tNo.retSecundaria,
         descuento: tGa.descuento + tNo.descuento,
         total:     tGa.total     + tNo.total,
       };
@@ -552,7 +579,8 @@ export async function GET(req: NextRequest) {
         iva8:      tIn.iva8      - tOut.iva8,
         iva16:     tIn.iva16     - tOut.iva16,
         retISR:    tIn.retISR    - tOut.retISR,
-        retIVA:    tIn.retIVA    - tOut.retIVA,
+        retSegundo: tIn.retSegundo - tOut.retSegundo,
+        retSecundaria: tIn.retSecundaria - tOut.retSecundaria,
         descuento: tIn.descuento - tOut.descuento,
         total:     tIn.total     - tOut.total,
       };
@@ -560,7 +588,7 @@ export async function GET(req: NextRequest) {
       const tgRow = ws.addRow([
         "TOTAL GENERAL MES", "", "", "", "", "",
         tgm.subtotal, tgm.iva8, tgm.iva16, tgm.iva8 + tgm.iva16,
-        tgm.retISR, tgm.retIVA, tgm.descuento, tgm.total,
+        tgm.retISR, tgm.retSegundo, tgm.retSecundaria, tgm.descuento, tgm.total,
         "", "", "", "", "", "",
       ]);
       ws.mergeCells(tgRow.number, 1, tgRow.number, 6);
@@ -569,7 +597,7 @@ export async function GET(req: NextRequest) {
         setFill(cell, C.GRIS);
         addBorder(cell);
         cell.alignment = { vertical: "middle", horizontal: ci === 1 ? "left" : "right" };
-        if (ci >= 7 && ci <= 14) cell.numFmt = MXN;
+        if (ci >= 7 && ci <= 15) cell.numFmt = MXN;
       });
 
       // Write this month to TOTALES sheet
@@ -580,7 +608,7 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      const keys = ["subtotal","iva8","iva16","retISR","retIVA","descuento","total","retenidos"] as const;
+      const keys = ["subtotal","iva8","iva16","retISR","retSegundo","retSecundaria","descuento","total","retenidos"] as const;
       keys.forEach(k => {
         sumaIngresos[k] += tIn[k];
         sumaGastos[k]   += tGa[k] + tNo[k];
@@ -592,7 +620,7 @@ export async function GET(req: NextRequest) {
     const siRow = wsTot.addRow([
       "", "TOTAL INGRESOS",
       sumaIngresos.subtotal, sumaIngresos.iva8, sumaIngresos.iva16, sumaIngresos.iva8 + sumaIngresos.iva16,
-      sumaIngresos.descuento, sumaIngresos.retISR, sumaIngresos.retIVA, sumaIngresos.retenidos, sumaIngresos.total,
+      sumaIngresos.descuento, sumaIngresos.retISR, sumaIngresos.retSegundo, sumaIngresos.retSecundaria, sumaIngresos.retenidos, sumaIngresos.total,
     ]);
     siRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
     siRow.eachCell({ includeEmpty: true }, (cell, ci) => {
@@ -605,7 +633,7 @@ export async function GET(req: NextRequest) {
     const sgRow = wsTot.addRow([
       "", "TOTAL GASTOS Y NOMINA",
       sumaGastos.subtotal, sumaGastos.iva8, sumaGastos.iva16, sumaGastos.iva8 + sumaGastos.iva16,
-      sumaGastos.descuento, sumaGastos.retISR, sumaGastos.retIVA, sumaGastos.retenidos, sumaGastos.total,
+      sumaGastos.descuento, sumaGastos.retISR, sumaGastos.retSegundo, sumaGastos.retSecundaria, sumaGastos.retenidos, sumaGastos.total,
     ]);
     sgRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
     sgRow.eachCell({ includeEmpty: true }, (cell, ci) => {
