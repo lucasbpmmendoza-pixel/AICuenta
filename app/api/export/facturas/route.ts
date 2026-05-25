@@ -78,6 +78,7 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; a
 
   const collectDeductionRows = (): Record<string, unknown>[] => {
     const candidates: unknown[] = [
+      root,
       root.NominaDeducciones,
       root.nominaDeducciones,
       root.Deducciones,
@@ -145,11 +146,25 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; a
 
   rows.forEach(register);
 
-  const totalDeducciones = n(root.TotalDeducciones ?? root.totalDeducciones ?? root.Descuento ?? root.descuento);
-  const totalRet = n(root.TotalImpuestosRetenidos ?? root.totalImpuestosRetenidos ?? root.TotalRetenidos ?? root.totalRetenidos);
-  if (retISR === 0 && totalRet > 0) {
-    retISR = totalRet;
+  const totalImpuestosRet = n(root.TotalImpuestosRetenidos ?? root.totalImpuestosRetenidos ?? root.TotalRetenidos ?? root.totalRetenidos);
+  const totalOtrasDed = n(root.TotalOtrasDeducciones ?? root.totalOtrasDeducciones);
+  const totalDeducciones = n(
+    root.TotalDeducciones
+    ?? root.totalDeducciones
+    ?? root.Descuento
+    ?? root.descuento
+    ?? (totalImpuestosRet + totalOtrasDed)
+  );
+
+  const resumenPorTipo = asObject(root.resumenPorTipo ?? root.ResumenPorTipo);
+  if (retISR === 0 && resumenPorTipo) {
+    retISR = n(resumenPorTipo["002"]);
   }
+  if (imss === 0 && resumenPorTipo) {
+    imss = n(resumenPorTipo["001"]);
+  }
+
+  if (retISR === 0 && totalImpuestosRet > 0) retISR = totalImpuestosRet;
 
   return { retISR, imss, ajusteNeto, totalDeducciones };
 }
@@ -190,17 +205,17 @@ function mesLabelLong(key: string): string {
 // Headers match writeTableHeaders() in variablesEspecificas.js
 const TABLE_HEADERS = [
   "Fecha", "Folio", "Emisor", "Régimen Emisor", "Receptor", "Régimen Receptor",
-  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion IMSS/IVA", "Descuento", "Total",
+  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion Secundaria", "Descuento", "Total",
   "Moneda", "Clasificación", "Comprobante", "Forma pago", "Método Pago", "Uso CFDI",
 ];
 const COL_MAIN = TABLE_HEADERS.length;
 const COL_WIDTHS_MAIN = [13, 38, 18, 17, 16, 13, 13, 13, 13, 18, 13, 13, 13, 13, 10, 13, 13, 22, 13, 10];
 
-const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret IMSS/IVA", "Total Retenciones", "Total"];
+const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret Secundaria", "Total Retenciones", "Total"];
 const COL_TOT = TOT_HEADERS.length;
 const COL_WIDTHS_TOT = [22, 22, 14, 13, 13, 13, 13, 13, 13, 18, 14];
 
-const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret IMSS/IVA", "Ret Total", "Descuento", "Total", "Mes"];
+const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret Secundaria", "Ret Total", "Descuento", "Total", "Mes"];
 const COL_RET = RET_HEADERS.length;
 const COL_WIDTHS_RET = [16, 20, 16, 20, 22, 14, 13, 13, 16, 13, 13, 16, 13, 14, 16];
 
