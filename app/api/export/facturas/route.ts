@@ -61,20 +61,20 @@ function firstObject(v: unknown): Record<string, unknown> | null {
   return asObject(v);
 }
 
-function parseNominaDeducciones(raw: unknown): { retISR: number; retIVA: number } {
-  if (raw === null || raw === undefined || raw === "") return { retISR: 0, retIVA: 0 };
+function parseNominaDeducciones(raw: unknown): { retISR: number; imss: number; ajusteNeto: number; totalDeducciones: number } {
+  if (raw === null || raw === undefined || raw === "") return { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
 
   let data: unknown = raw;
   if (typeof raw === "string") {
     try {
       data = JSON.parse(raw);
     } catch {
-      return { retISR: 0, retIVA: 0 };
+      return { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
     }
   }
 
   const root = firstObject(data);
-  if (!root) return { retISR: 0, retIVA: 0 };
+  if (!root) return { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
 
   const collectDeductionRows = (): Record<string, unknown>[] => {
     const candidates: unknown[] = [
@@ -114,7 +114,8 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; retIVA: number 
 
   const rows = collectDeductionRows();
   let retISR = 0;
-  let retIVA = 0;
+  let imss = 0;
+  let ajusteNeto = 0;
 
   const register = (row: Record<string, unknown>) => {
     const tipo = String(row.TipoDeduccion ?? row.tipoDeduccion ?? row.Clave ?? row.clave ?? "").trim();
@@ -124,24 +125,33 @@ function parseNominaDeducciones(raw: unknown): { retISR: number; retIVA: number 
 
     if (importe <= 0) return;
 
+    // Nómina SAT: 002 = ISR retenido
     if (tipo === "002" || concepto.includes("isr") || impuesto.includes("isr")) {
       retISR += importe;
       return;
     }
 
-    if (concepto.includes("iva") || impuesto.includes("iva")) {
-      retIVA += importe;
+    // Nómina SAT: 001 = Seguridad social (IMSS)
+    if (tipo === "001" || concepto.includes("imss") || concepto.includes("seguridad social")) {
+      imss += importe;
+      return;
+    }
+
+    // Frecuente en nómina: "Ajuste al neto" (normalmente tipo 004)
+    if (tipo === "004" || (concepto.includes("ajuste") && concepto.includes("neto"))) {
+      ajusteNeto += importe;
     }
   };
 
   rows.forEach(register);
 
+  const totalDeducciones = n(root.TotalDeducciones ?? root.totalDeducciones ?? root.Descuento ?? root.descuento);
   const totalRet = n(root.TotalImpuestosRetenidos ?? root.totalImpuestosRetenidos ?? root.TotalRetenidos ?? root.totalRetenidos);
-  if (retISR === 0 && retIVA === 0 && totalRet > 0) {
+  if (retISR === 0 && totalRet > 0) {
     retISR = totalRet;
   }
 
-  return { retISR, retIVA };
+  return { retISR, imss, ajusteNeto, totalDeducciones };
 }
 
 // ─── SAT code translators ──────────────────────────────────────────────────────
@@ -180,17 +190,17 @@ function mesLabelLong(key: string): string {
 // Headers match writeTableHeaders() in variablesEspecificas.js
 const TABLE_HEADERS = [
   "Fecha", "Folio", "Emisor", "Régimen Emisor", "Receptor", "Régimen Receptor",
-  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion IVA", "Descuento", "Total",
+  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion IMSS/IVA", "Descuento", "Total",
   "Moneda", "Clasificación", "Comprobante", "Forma pago", "Método Pago", "Uso CFDI",
 ];
 const COL_MAIN = TABLE_HEADERS.length;
 const COL_WIDTHS_MAIN = [13, 38, 18, 17, 16, 13, 13, 13, 13, 18, 13, 13, 13, 13, 10, 13, 13, 22, 13, 10];
 
-const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret IVA", "Total Retenciones", "Total"];
+const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret IMSS/IVA", "Total Retenciones", "Total"];
 const COL_TOT = TOT_HEADERS.length;
 const COL_WIDTHS_TOT = [22, 22, 14, 13, 13, 13, 13, 13, 13, 18, 14];
 
-const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret IVA", "Ret Total", "Descuento", "Total", "Mes"];
+const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret IMSS/IVA", "Ret Total", "Descuento", "Total", "Mes"];
 const COL_RET = RET_HEADERS.length;
 const COL_WIDTHS_RET = [16, 20, 16, 20, 22, 14, 13, 13, 16, 13, 13, 16, 13, 14, 16];
 
@@ -383,10 +393,16 @@ export async function GET(req: NextRequest) {
       const totalTras = n(row.TotalTrasladado) * tc;
       const parsedNomina = row.TipoComprobante === "N"
         ? parseNominaDeducciones((row as { NominaDeducciones?: string | null }).NominaDeducciones)
-        : { retISR: 0, retIVA: 0 };
+        : { retISR: 0, imss: 0, ajusteNeto: 0, totalDeducciones: 0 };
       const retISR    = (parsedNomina.retISR > 0 ? parsedNomina.retISR : n(row.RetISR)) * tc;
-      const retIVA    = (parsedNomina.retIVA > 0 ? parsedNomina.retIVA : n(row.RetIVA)) * tc;
-      const descuento = n(row.Descuento) * tc;
+      const retIVA    = (row.TipoComprobante === "N"
+        ? (parsedNomina.imss > 0 ? parsedNomina.imss : 0)
+        : n(row.RetIVA)) * tc;
+      const descuentoBase = n(row.Descuento);
+      const descuentoNomina = row.TipoComprobante === "N" && descuentoBase === 0 && parsedNomina.totalDeducciones > 0
+        ? parsedNomina.totalDeducciones
+        : descuentoBase;
+      const descuento = descuentoNomina * tc;
       const total     = n(row.Total) * tc;
       const fp        = formaDePago(row.TipoPago);
 
