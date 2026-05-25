@@ -45,6 +45,105 @@ function resetTotales(): Totales {
 
 function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0; }
 
+function asObject(v: unknown): Record<string, unknown> | null {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
+}
+
+function firstObject(v: unknown): Record<string, unknown> | null {
+  if (!v) return null;
+  if (Array.isArray(v)) {
+    for (const item of v) {
+      const obj = asObject(item);
+      if (obj) return obj;
+    }
+    return null;
+  }
+  return asObject(v);
+}
+
+function parseNominaDeducciones(raw: unknown): { retISR: number; retIVA: number } {
+  if (raw === null || raw === undefined || raw === "") return { retISR: 0, retIVA: 0 };
+
+  let data: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return { retISR: 0, retIVA: 0 };
+    }
+  }
+
+  const root = firstObject(data);
+  if (!root) return { retISR: 0, retIVA: 0 };
+
+  const collectDeductionRows = (): Record<string, unknown>[] => {
+    const candidates: unknown[] = [
+      root.NominaDeducciones,
+      root.nominaDeducciones,
+      root.Deducciones,
+      root.Deduccion,
+      root.DeduccionesNomina,
+      root.Deductions,
+    ];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate.map(asObject).filter(Boolean) as Record<string, unknown>[];
+      }
+      const obj = asObject(candidate);
+      if (!obj) continue;
+
+      const rows = [
+        obj.Deduccion,
+        obj.Deducciones,
+        obj.items,
+        obj.detalle,
+        obj.detalles,
+      ];
+      for (const rowsCandidate of rows) {
+        if (Array.isArray(rowsCandidate)) {
+          return rowsCandidate.map(asObject).filter(Boolean) as Record<string, unknown>[];
+        }
+        const rowObj = asObject(rowsCandidate);
+        if (rowObj) return [rowObj];
+      }
+    }
+
+    return [];
+  };
+
+  const rows = collectDeductionRows();
+  let retISR = 0;
+  let retIVA = 0;
+
+  const register = (row: Record<string, unknown>) => {
+    const tipo = String(row.TipoDeduccion ?? row.tipoDeduccion ?? row.Clave ?? row.clave ?? "").trim();
+    const concepto = String(row.Concepto ?? row.concepto ?? row.Descripcion ?? row.descripcion ?? "").toLowerCase();
+    const importe = n(row.Importe ?? row.importe ?? row.Monto ?? row.monto ?? row.Valor ?? row.valor);
+    const impuesto = String(row.Impuesto ?? row.impuesto ?? "").toLowerCase();
+
+    if (importe <= 0) return;
+
+    if (tipo === "002" || concepto.includes("isr") || impuesto.includes("isr")) {
+      retISR += importe;
+      return;
+    }
+
+    if (concepto.includes("iva") || impuesto.includes("iva")) {
+      retIVA += importe;
+    }
+  };
+
+  rows.forEach(register);
+
+  const totalRet = n(root.TotalImpuestosRetenidos ?? root.totalImpuestosRetenidos ?? root.TotalRetenidos ?? root.totalRetenidos);
+  if (retISR === 0 && retIVA === 0 && totalRet > 0) {
+    retISR = totalRet;
+  }
+
+  return { retISR, retIVA };
+}
+
 // ─── SAT code translators ──────────────────────────────────────────────────────
 
 function tipoCFDI(t: string): string {
@@ -282,8 +381,11 @@ export async function GET(req: NextRequest) {
       const iva8      = n(row.IVA8) * tc;
       const iva16     = n(row.IVA16) * tc;
       const totalTras = n(row.TotalTrasladado) * tc;
-      const retISR    = n(row.RetISR) * tc;
-      const retIVA    = n(row.RetIVA) * tc;
+      const parsedNomina = row.TipoComprobante === "N"
+        ? parseNominaDeducciones((row as { NominaDeducciones?: string | null }).NominaDeducciones)
+        : { retISR: 0, retIVA: 0 };
+      const retISR    = (parsedNomina.retISR > 0 ? parsedNomina.retISR : n(row.RetISR)) * tc;
+      const retIVA    = (parsedNomina.retIVA > 0 ? parsedNomina.retIVA : n(row.RetIVA)) * tc;
       const descuento = n(row.Descuento) * tc;
       const total     = n(row.Total) * tc;
       const fp        = formaDePago(row.TipoPago);

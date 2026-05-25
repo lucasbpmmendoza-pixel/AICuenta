@@ -326,6 +326,7 @@ export interface RawCFDIExport {
   TipoPago: string;
   MetodoPago: string;
   UsoCFDI: string;
+  NominaDeducciones?: string | null;
 }
 
 export async function fetchRawCFDIForExport(
@@ -334,6 +335,18 @@ export async function fetchRawCFDIForExport(
   dateTo: Date
 ): Promise<RawCFDIExport[]> {
   const db = await getDb();
+
+  const columns = await db.request().query<{ COLUMN_NAME: string }>(`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'facturalo_cfdis'
+      AND COLUMN_NAME IN ('NominaDeducciones', 'nomina_deducciones', 'nominaDeducciones')
+  `);
+  const nominaCol = columns.recordset[0]?.COLUMN_NAME ?? null;
+  const nominaSelect = nominaCol
+    ? `TRY_CONVERT(nvarchar(max), [${nominaCol.replace(/\]/g, "]]" )}]) AS NominaDeducciones`
+    : `CAST(NULL AS nvarchar(max)) AS NominaDeducciones`;
+
   const result = await db
     .request()
     .input("rfc",      sql.NVarChar, rfc)
@@ -368,7 +381,8 @@ export async function fetchRawCFDIForExport(
         ISNULL(TipoComprobante,'')                                          AS TipoComprobante,
         ISNULL(TipoPago,'')                                                 AS TipoPago,
         ISNULL(MetodoPago,'')                                               AS MetodoPago,
-        ISNULL(UsoCFDI,'')                                                  AS UsoCFDI
+        ISNULL(UsoCFDI,'')                                                  AS UsoCFDI,
+        ${nominaSelect}
       FROM facturalo_cfdis WITH (NOLOCK)
       WHERE (
               (RFC_Emisor   = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'INGRESO')
