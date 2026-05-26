@@ -626,15 +626,15 @@ function LimitNote({ count, cols }: { count: number; cols: number }) {
 
 function TablaIngresos({ rows }: { rows: IngresoCFDI[] }) {
   return (
-    <table className="w-full min-w-[900px]">
+    <table className="w-full min-w-[840px]">
       <thead>
         <tr>
           <TH>UUID</TH><TH>Fecha</TH><TH>RFC Receptor</TH><TH>Razón Social</TH>
-          <TH>Folio</TH><TH>Status</TH><TH>Moneda</TH><TH>Total</TH><TH>Total MXN</TH><TH>IVA Trasl.</TH><TH>ISR Ret.</TH>
+          <TH>Folio</TH><TH>Status</TH><TH>Moneda</TH><TH>Total</TH><TH>Total MXN</TH><TH>IVA Trasl.</TH>
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={11} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
+        {rows.length === 0 ? <EmptyRow cols={10} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
           <tr key={`${r.UUID}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs text-slate-400 dark:text-zinc-500">{uuid4(r.UUID)}</span></TD>
             <TD>{fmt(r.Fecha)}</TD>
@@ -646,26 +646,25 @@ function TablaIngresos({ rows }: { rows: IngresoCFDI[] }) {
             <TD right>{MXN(Number(r.Total) || 0)}</TD>
             <TD right><span className="font-semibold">{MXN(Number(r.Total_MXN) || 0)}</span></TD>
             <TD right>{MXN(Number(r.TotalTrasladado) || 0)}</TD>
-            <TD right>{MXN(Number(r.TotalRetenidoISR) || 0)}</TD>
           </tr>
         ))}
       </tbody>
-      <LimitNote count={rows.length} cols={11} />
+      <LimitNote count={rows.length} cols={10} />
     </table>
   )
 }
 
 function TablaEgresos({ rows }: { rows: EgresoCFDI[] }) {
   return (
-    <table className="w-full min-w-[700px]">
+    <table className="w-full min-w-[660px]">
       <thead>
         <tr>
           <TH>RFC Emisor</TH><TH>Razón Social</TH><TH>Facturas</TH>
-          <TH>Vigentes</TH><TH>Canceladas</TH><TH>Total MXN</TH><TH>IVA Acred.</TH><TH>ISR Ret.</TH><TH>IVA Ret.</TH>
+          <TH>Vigentes</TH><TH>Canceladas</TH><TH>Total MXN</TH><TH>IVA Acred.</TH><TH>IVA Ret.</TH>
         </tr>
       </thead>
       <tbody>
-        {rows.length === 0 ? <EmptyRow cols={9} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
+        {rows.length === 0 ? <EmptyRow cols={8} /> : rows.slice(0, PREVIEW_LIMIT).map((r, i) => (
           <tr key={`${r.RFC_Emisor}_${i}`} className="hover:bg-slate-50 dark:hover:bg-zinc-800/40 transition">
             <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Emisor)}</span></TD>
             <TD><span className="max-w-[220px] truncate block">{r.RazonSocialEmisor}</span></TD>
@@ -674,12 +673,11 @@ function TablaEgresos({ rows }: { rows: EgresoCFDI[] }) {
             <TD right><span className="text-red-600 dark:text-red-400">{r.Canceladas}</span></TD>
             <TD right><span className="font-semibold">{MXN(Number(r.Total_MXN) || 0)}</span></TD>
             <TD right>{MXN(Number(r.IVA_MXN) || 0)}</TD>
-            <TD right>{MXN(Number(r.ISR_Retenido_MXN) || 0)}</TD>
             <TD right>{MXN(Number(r.IVA_Retenido_MXN) || 0)}</TD>
           </tr>
         ))}
       </tbody>
-      <LimitNote count={rows.length} cols={9} />
+      <LimitNote count={rows.length} cols={8} />
     </table>
   )
 }
@@ -690,7 +688,7 @@ function TablaNomina({ rows }: { rows: NominaCFDI[] }) {
       <thead>
         <tr>
           <TH>UUID</TH><TH>Tipo</TH><TH>Fecha</TH><TH>RFC Emisor</TH><TH>Razón Social Emisor</TH>
-          <TH>RFC Receptor</TH><TH>Status</TH><TH>Total MXN</TH><TH>ISR Ret.</TH>
+          <TH>RFC Receptor</TH><TH>Status</TH><TH>Total MXN</TH><TH>ISR Retenido</TH>
         </tr>
       </thead>
       <tbody>
@@ -708,7 +706,7 @@ function TablaNomina({ rows }: { rows: NominaCFDI[] }) {
             <TD><span className="font-mono text-xs">{rfcDisplay(r.RFC_Receptor)}</span></TD>
             <TD><span className={badge(r.Status)}>{r.Status}</span></TD>
             <TD right><span className="font-semibold">{MXN(Number(r.Total_MXN) || 0)}</span></TD>
-            <TD right>{MXN(Number(r.TotalRetenidoISR) || 0)}</TD>
+            <TD right><span className="font-semibold text-emerald-700 dark:text-emerald-300">{MXN(Number(r.TotalRetenidoISR) || Number(r.Descuento) || 0)}</span></TD>
           </tr>
         ))}
       </tbody>
