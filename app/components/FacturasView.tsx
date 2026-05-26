@@ -74,6 +74,7 @@ export default function FacturasView({ session, accountType }: Props) {
   const [flujoData, setflujoData]   = useState<flujoRow[] | null>(null)
   const [loadingEfectivamente, setLoadingEfectivamente]         = useState(false)
   const [exportingEfectivamente, setExportingEfectivamente]     = useState(false)
+  const [exportingDiot, setExportingDiot]                       = useState(false)
 
   useEffect(() => {
     fetch('/api/rfcs').then(r => r.json()).then(d => {
@@ -264,6 +265,27 @@ export default function FacturasView({ session, accountType }: Props) {
     finally { setExporting(false) }
   }
 
+  async function handleExportDiot() {
+    if (!selectedRfc || exportingDiot) return
+    setExportingDiot(true)
+    logAction('btn_descargar_diot_facturas')
+    try {
+      const url = `/api/export/diot?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
+      const res = await fetch(url)
+      if (!res.ok) { alert('Error al generar DIOT'); return }
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `diot_${rfcDisplay(selectedRfc)}_${periodLabel()}.txt`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch {
+      alert('Error al descargar DIOT')
+    } finally {
+      setExportingDiot(false)
+    }
+  }
+
   const counts = {
     ingresos:    data?.ingresos.length    ?? 0,
     egresos:     data?.egresos.length     ?? 0,
@@ -405,18 +427,33 @@ export default function FacturasView({ session, accountType }: Props) {
 
               {/* Descargar Excel CFDIs */}
               {selectedRfc && (
-                <button
-                  onClick={handleExport}
-                  disabled={exporting || loading || !data}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
-                >
-                  {exporting ? (
-                    <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
-                  ) : (
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>
-                  )}
-                  {exporting ? 'Generando…' : 'Descargar Excel'}
-                </button>
+                <>
+                  <button
+                    onClick={handleExportDiot}
+                    disabled={exportingDiot || loading || !data}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                  >
+                    {exportingDiot ? (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                    ) : (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>
+                    )}
+                    {exportingDiot ? 'Generando…' : 'Descargar DIOT'}
+                  </button>
+
+                  <button
+                    onClick={handleExport}
+                    disabled={exporting || loading || !data}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                  >
+                    {exporting ? (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                    ) : (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>
+                    )}
+                    {exporting ? 'Generando…' : 'Descargar Excel'}
+                  </button>
+                </>
               )}
               <NotificationBell />
             </div>
