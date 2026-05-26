@@ -6,6 +6,7 @@ import type { JWTPayload } from "@/lib/auth";
 import Sidebar from "./Sidebar";
 import DashboardFooter from "./DashboardFooter";
 import DashboardCharts, { type DashboardData } from "./DashboardCharts";
+import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -34,10 +35,19 @@ export default function DashboardView({ session, accountType }: Props) {
       .then(d => {
         const list: RfcOption[] = d.rfcs ?? []
         setRfcs(list)
-        if (list.length > 0) setSelectedRfc(list[0].rfc)
+        if (list.length === 0) return
+        const storedRfc = readSelectedRfc()
+        const existsInList = storedRfc && list.some(r => r.rfc === storedRfc)
+        const nextRfc = existsInList ? storedRfc : list[0].rfc
+        setSelectedRfc(nextRfc)
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!selectedRfc) return
+    saveSelectedRfc(selectedRfc)
+  }, [selectedRfc])
 
   // Fetch datos del dashboard
   const fetchData = useCallback(async (rfc: string, y: number, m: number) => {

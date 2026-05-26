@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/app/hooks/useTheme'
+import { logAction } from '@/lib/logs'
 
 export type AccountType = 'single' | 'multi'
 
@@ -162,6 +163,26 @@ export default function Sidebar({ userName, accountType, role, ownerId }: Props)
     return true
   })
 
+  function getTabNameFromHref(href: string): string | null {
+    const tabMap: Record<string, string> = {
+      '/dashboard': 'tab_dashboard',
+      '/dashboard/rfcs': 'tab_rfc',
+      '/dashboard/usuarios': 'tab_usuarios',
+      '/dashboard/chat': 'tab_asistente_ia',
+      '/dashboard/chat-docs': 'tab_asistente_docs',
+      '/dashboard/unete': 'tab_aichikenelo',
+    }
+    return tabMap[href] ?? null
+  }
+
+  function handleNavClick(href: string) {
+    const tabName = getTabNameFromHref(href)
+    if (tabName) {
+      logAction(tabName)
+    }
+    setMobileOpen(false)
+  }
+
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
     router.push('/login')
@@ -198,7 +219,11 @@ export default function Sidebar({ userName, accountType, role, ownerId }: Props)
             <a
               key={item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={(e) => {
+                e.preventDefault()
+                handleNavClick(item.href)
+                router.push(item.href)
+              }}
               className={[
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
                 isActive

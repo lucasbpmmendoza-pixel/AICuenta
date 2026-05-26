@@ -7,6 +7,8 @@ import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, flujoRow } from '@/lib/facturas-query'
 import { rfcDisplay } from '@/lib/rfc-aliases'
+import { logAction } from '@/lib/logs'
+import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -77,9 +79,18 @@ export default function FacturasView({ session, accountType }: Props) {
     fetch('/api/rfcs').then(r => r.json()).then(d => {
       const list: RfcOption[] = d.rfcs ?? []
       setRfcs(list)
-      if (list.length > 0) setSelectedRfc(list[0].rfc)
+      if (list.length === 0) return
+      const storedRfc = readSelectedRfc()
+      const existsInList = storedRfc && list.some(r => r.rfc === storedRfc)
+      const nextRfc = existsInList ? storedRfc : list[0].rfc
+      setSelectedRfc(nextRfc)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!selectedRfc) return
+    saveSelectedRfc(selectedRfc)
+  }, [selectedRfc])
 
   const fetchData = useCallback(async (rfc: string, params: string) => {
     if (!rfc) return
@@ -184,6 +195,7 @@ export default function FacturasView({ session, accountType }: Props) {
   async function handleExportNotas() {
     if (!selectedRfc || exportingNotas) return
     setExportingNotas(true)
+    logAction('btn_descargar_notas_facturas')
     try {
       const url = `/api/export/notas-credito?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
@@ -201,6 +213,7 @@ export default function FacturasView({ session, accountType }: Props) {
   async function handleExportEfectivamente() {
     if (!selectedRfc || exportingEfectivamente) return
     setExportingEfectivamente(true)
+    logAction('btn_descargar_flujo_facturas')
     try {
       const url = `/api/export/flujo?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
@@ -218,6 +231,7 @@ export default function FacturasView({ session, accountType }: Props) {
   async function handleExportPagos() {
     if (!selectedRfc || exportingPagos) return
     setExportingPagos(true)
+    logAction('btn_descargar_pagos_facturas')
     try {
       const url = `/api/export/pagos?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)
@@ -235,6 +249,7 @@ export default function FacturasView({ session, accountType }: Props) {
   async function handleExport() {
     if (!selectedRfc || exporting) return
     setExporting(true)
+    logAction('btn_descargar_excel_facturas')
     try {
       const url = `/api/export/facturas?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
       const res = await fetch(url)

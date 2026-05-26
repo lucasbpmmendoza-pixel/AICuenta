@@ -7,6 +7,8 @@ import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import type { ConceptoRow } from '@/lib/facturas-query'
 import { rfcDisplay } from '@/lib/rfc-aliases'
+import { logAction } from '@/lib/logs'
+import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -59,7 +61,7 @@ function TablaConceptos({
     )
   }
 
-  const maxImporte = Math.max(...rows.map(r => Number(r.importe)), 1)
+  const totalImporte = rows.reduce((acc, r) => acc + Number(r.importe), 0)
 
   return (
     <div className="overflow-x-auto">
@@ -80,7 +82,7 @@ function TablaConceptos({
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-zinc-800">
           {rows.map((row, i) => {
-            const pct = maxImporte > 0 ? (Number(row.importe) / maxImporte) * 100 : 0
+            const pct = totalImporte > 0 ? (Number(row.importe) / totalImporte) * 100 : 0
             return (
               <tr key={i} className="hover:bg-slate-50 dark:hover:bg-zinc-800/50 transition-colors">
                 <td className="px-4 py-3">
@@ -152,9 +154,18 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
     fetch('/api/rfcs').then(r => r.json()).then(d => {
       const list: RfcOption[] = d.rfcs ?? []
       setRfcs(list)
-      if (list.length > 0) setSelectedRfc(list[0].rfc)
+      if (list.length === 0) return
+      const storedRfc = readSelectedRfc()
+      const existsInList = storedRfc && list.some(r => r.rfc === storedRfc)
+      const nextRfc = existsInList ? storedRfc : list[0].rfc
+      setSelectedRfc(nextRfc)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!selectedRfc) return
+    saveSelectedRfc(selectedRfc)
+  }, [selectedRfc])
 
   // Cargar datos al cambiar RFC / periodo
   const fetchData = useCallback(async (rfc: string, y: number, m: number) => {
@@ -195,6 +206,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   async function handleExport() {
     if (!selectedRfc || exporting) return
     setExporting(true)
+    logAction('btn_descargar_estados_financieros')
     try {
       const url = `/api/export/estados-financieros?rfc=${encodeURIComponent(selectedRfc)}&year=${year}&month=${month}`
       const res = await fetch(url)

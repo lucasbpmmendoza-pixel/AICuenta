@@ -5,6 +5,7 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
+import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 interface RfcOption { id: string; rfc: string; alias: string | null }
 
@@ -93,9 +94,18 @@ export default function ChatbotView({ session, accountType }: Props) {
     fetch('/api/rfcs').then(r => r.json()).then(d => {
       const list: RfcOption[] = d.rfcs ?? []
       setRfcs(list)
-      if (list.length > 0) setSelectedRfc(list[0].rfc)
+      if (list.length === 0) return
+      const storedRfc = readSelectedRfc()
+      const existsInList = storedRfc && list.some(r => r.rfc === storedRfc)
+      const nextRfc = existsInList ? storedRfc : list[0].rfc
+      setSelectedRfc(nextRfc)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (!selectedRfc) return
+    saveSelectedRfc(selectedRfc)
+  }, [selectedRfc])
 
   // Auto-scroll al fondo
   useEffect(() => {
