@@ -408,7 +408,10 @@ export async function GET(req: NextRequest) {
       const mov = (row.Movimiento ?? "").trim().toUpperCase();
 
       let tipo: Tipo;
-      if (row.TipoComprobante === "N")   tipo = "GASTOS - NOMINA";
+      if (row.TipoComprobante === "N") {
+        // Nomina: emisor => egreso, receptor => ingreso.
+        tipo = mov === "INGRESO" ? "INGRESOS" : "GASTOS - NOMINA";
+      }
       else if (mov === "INGRESO")        tipo = "INGRESOS";
       else if (mov === "EGRESO")         tipo = "GASTOS";
       else                               continue;

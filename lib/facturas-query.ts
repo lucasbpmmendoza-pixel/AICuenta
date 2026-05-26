@@ -371,7 +371,8 @@ export async function fetchRawCFDIForExport(
         ISNULL(Moneda,'MXN')                                                AS Moneda,
         ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)          AS tipoCambio,
         CASE
-          WHEN TipoComprobante = 'N' THEN 'Nomina'
+          WHEN RFC_Emisor = @rfc AND TipoComprobante = 'N' THEN 'Egreso'
+          WHEN RFC_Receptor = @rfc AND TipoComprobante = 'N' THEN 'Ingreso'
           WHEN RFC_Emisor = @rfc AND TipoComprobante = 'I' THEN 'Ingreso'
           WHEN RFC_Receptor = @rfc AND TipoComprobante = 'I' THEN 'Egreso'
           WHEN RFC_Emisor = @rfc AND TipoComprobante = 'E' THEN 'Egreso'
@@ -387,6 +388,7 @@ export async function fetchRawCFDIForExport(
       WHERE (
               (RFC_Emisor   = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'INGRESO')
            OR (RFC_Emisor   = @rfc AND TipoComprobante = 'N')
+           OR (RFC_Receptor = @rfc AND TipoComprobante = 'N')
            OR (RFC_Emisor   = @rfc AND TipoComprobante = 'E' AND UPPER(Movimiento) = 'EGRESO')
            OR (RFC_Receptor = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'EGRESO')
            OR (RFC_Receptor = @rfc AND TipoComprobante = 'E' AND UPPER(Movimiento) = 'INGRESO')
