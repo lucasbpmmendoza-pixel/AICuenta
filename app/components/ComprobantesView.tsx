@@ -139,6 +139,8 @@ export default function ComprobantesView() {
     es.onerror = () => {
       es.close()
       esRef.current = null
+      setConnecting(false)
+      if (!qrDataUrl) setStatus('disconnected')
     }
   }
 

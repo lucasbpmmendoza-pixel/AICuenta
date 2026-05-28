@@ -12,6 +12,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys'
 import path from 'path'
 import fs from 'fs'
+import os from 'os'
 import QRCode from 'qrcode'
 import { OpenAI } from 'openai'
 import { getDb } from './db'
@@ -63,8 +64,14 @@ function getOrCreate(ownerId: string): WASession {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function getAuthBaseDir(): string {
+  // In serverless environments (e.g. Vercel), only the OS temp dir is writable.
+  const base = process.env.VERCEL ? os.tmpdir() : process.cwd()
+  return path.join(base, 'tmp', 'whatsapp_auth')
+}
+
 function getAuthDir(ownerId: string): string {
-  const dir = path.join(process.cwd(), 'tmp', 'whatsapp_auth', ownerId)
+  const dir = path.join(getAuthBaseDir(), ownerId)
   fs.mkdirSync(dir, { recursive: true })
   return dir
 }
@@ -236,64 +243,72 @@ export async function startSession(ownerId: string): Promise<void> {
   session.status = 'connecting'
   emit(session, { type: 'status', status: 'connecting' })
 
-  const authDir = getAuthDir(ownerId)
-  const { state, saveCreds } = await useMultiFileAuthState(authDir)
-  const { version } = await fetchLatestBaileysVersion()
+  try {
+    const authDir = getAuthDir(ownerId)
+    const { state, saveCreds } = await useMultiFileAuthState(authDir)
+    const { version } = await fetchLatestBaileysVersion()
 
-  const sock = makeWASocket({
-    auth: state,
-    version,
-    printQRInTerminal: false,
-    markOnlineOnConnect: false,
-    browser: ['AICuenta Bot', 'Chrome', '1.0.0'],
-  })
+    const sock = makeWASocket({
+      auth: state,
+      version,
+      printQRInTerminal: false,
+      markOnlineOnConnect: false,
+      browser: ['AICuenta Bot', 'Chrome', '1.0.0'],
+    })
 
-  session.sock = sock
-  sock.ev.on('creds.update', saveCreds)
+    session.sock = sock
+    sock.ev.on('creds.update', saveCreds)
 
-  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr) {
-      const dataUrl = await QRCode.toDataURL(qr)
-      session.qrDataUrl = dataUrl
-      session.status = 'qr'
-      emit(session, { type: 'qr', dataUrl })
-      emit(session, { type: 'status', status: 'qr' })
-    }
-
-    if (connection === 'open') {
-      session.status = 'connected'
-      session.qrDataUrl = null
-      emit(session, { type: 'status', status: 'connected' })
-    }
-
-    if (connection === 'close') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
-      const loggedOut = statusCode === DisconnectReason.loggedOut
-      session.status = 'disconnected'
-      session.sock = null
-      emit(session, { type: 'status', status: 'disconnected' })
-
-      if (!loggedOut) {
-        // Auto-reconnect after brief delay
-        setTimeout(() => startSession(ownerId).catch(console.error), 4000)
-      } else {
-        // Clear saved credentials on explicit logout
-        fs.rmSync(getAuthDir(ownerId), { recursive: true, force: true })
+    sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
+      if (qr) {
+        const dataUrl = await QRCode.toDataURL(qr)
+        session.qrDataUrl = dataUrl
+        session.status = 'qr'
+        emit(session, { type: 'qr', dataUrl })
+        emit(session, { type: 'status', status: 'qr' })
       }
-    }
-  })
 
-  sock.ev.on('messages.upsert', async ({ messages, type }) => {
-    if (type !== 'notify') return
-    for (const message of messages) {
-      try {
-        await procesarMensaje(session, message)
-      } catch (err) {
-        console.error('[WA] Error procesando mensaje:', err)
+      if (connection === 'open') {
+        session.status = 'connected'
+        session.qrDataUrl = null
+        emit(session, { type: 'status', status: 'connected' })
       }
-    }
-  })
+
+      if (connection === 'close') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const statusCode = (lastDisconnect?.error as any)?.output?.statusCode
+        const loggedOut = statusCode === DisconnectReason.loggedOut
+        session.status = 'disconnected'
+        session.sock = null
+        emit(session, { type: 'status', status: 'disconnected' })
+
+        if (!loggedOut) {
+          // Auto-reconnect after brief delay
+          setTimeout(() => startSession(ownerId).catch(console.error), 4000)
+        } else {
+          // Clear saved credentials on explicit logout
+          fs.rmSync(getAuthDir(ownerId), { recursive: true, force: true })
+        }
+      }
+    })
+
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      if (type !== 'notify') return
+      for (const message of messages) {
+        try {
+          await procesarMensaje(session, message)
+        } catch (err) {
+          console.error('[WA] Error procesando mensaje:', err)
+        }
+      }
+    })
+  } catch (err) {
+    console.error('[WA] Error iniciando sesion:', err)
+    session.status = 'disconnected'
+    session.qrDataUrl = null
+    session.sock = null
+    emit(session, { type: 'status', status: 'disconnected' })
+  }
 }
 
 export function subscribe(ownerId: string, listener: (event: WAEvent) => void): () => void {
@@ -321,6 +336,6 @@ export async function disconnectSession(ownerId: string): Promise<void> {
   session.qrDataUrl = null
   emit(session, { type: 'status', status: 'disconnected' })
 
-  const authDir = path.join(process.cwd(), 'tmp', 'whatsapp_auth', ownerId)
+  const authDir = path.join(getAuthBaseDir(), ownerId)
   fs.rmSync(authDir, { recursive: true, force: true })
 }
