@@ -3,6 +3,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { loadOwnerPlanLimits } from "@/lib/account-plan";
 
 const memberSchema = z.object({
   name:     z.string().trim().min(2, "El nombre es muy corto").max(120),
@@ -55,6 +56,21 @@ export async function POST(req: NextRequest) {
 
   const db = await getDb();
 
+  const limits = await loadOwnerPlanLimits(db, session.sub);
+  if (limits.accountType !== "multi") {
+    return NextResponse.json(
+      { error: "Solo las cuentas empresariales pueden agregar miembros." },
+      { status: 422 },
+    );
+  }
+
+  if (limits.maxMembers <= 0) {
+    return NextResponse.json(
+      { error: "Tu plan actual no incluye miembros de equipo. Actualiza a un plan empresarial superior." },
+      { status: 422 },
+    );
+  }
+
   // Verificar que el correo no esté en uso
   const existing = await db
     .request()
@@ -64,13 +80,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ese correo ya esta registrado" }, { status: 409 });
   }
 
-  // Limitar a 10 miembros por cuenta
+  // Limite de miembros segun plan
   const count = await db
     .request()
     .input("ownerId", session.sub)
     .query<{ cnt: number }>("SELECT COUNT(1) AS cnt FROM users WHERE owner_id = @ownerId");
-  if ((count.recordset[0]?.cnt ?? 0) >= 10) {
-    return NextResponse.json({ error: "Limite de 10 usuarios por cuenta alcanzado" }, { status: 422 });
+  if ((count.recordset[0]?.cnt ?? 0) >= limits.maxMembers) {
+    return NextResponse.json(
+      { error: `Limite de ${limits.maxMembers} usuarios por cuenta alcanzado para tu plan ${limits.planType}.` },
+      { status: 422 },
+    );
   }
 
   const hash = await bcrypt.hash(password, 12);
@@ -83,8 +102,8 @@ export async function POST(req: NextRequest) {
       .input("hash",     hash)
       .input("ownerId",  session.sub)
       .query(`
-        INSERT INTO users (name, email, password_hash, is_active, email_verified, role, owner_id, account_type)
-        VALUES (@name, @email, @hash, 1, 1, 'member', @ownerId, NULL)
+        INSERT INTO users (name, email, password_hash, is_active, email_verified, role, owner_id, account_type, plan_type)
+        VALUES (@name, @email, @hash, 1, 1, 'member', @ownerId, NULL, 'basic')
       `);
 
     return NextResponse.json({ ok: true });

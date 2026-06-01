@@ -1,15 +1,33 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import { headers } from "next/headers";
 import { getSession } from "@/lib/session";
 import { docsSearch, docsGetDetail, docsListCategorias, catprodSearch } from "@/lib/docs-query";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const MAX_HISTORY_MESSAGES = 8;
-const MAX_MESSAGE_CHARS = 1500;
+const PREMIUM_MODEL = process.env.CHAT_DOCS_MODEL_PREMIUM ?? "gpt-4o-mini";
+const PUBLIC_MODEL = process.env.CHAT_DOCS_MODEL_PUBLIC ?? "gpt-4o-mini";
+
+const PREMIUM_MAX_HISTORY_MESSAGES = 8;
+const PUBLIC_MAX_HISTORY_MESSAGES = 4;
+const PREMIUM_MAX_MESSAGE_CHARS = 1500;
+const PUBLIC_MAX_MESSAGE_CHARS = 700;
+
+const PUBLIC_MAX_MESSAGES_PER_DAY = Math.min(
+  100,
+  Math.max(1, parseInt(process.env.PUBLIC_CHAT_DOCS_DAILY_LIMIT ?? "8", 10) || 8),
+);
 const MAX_DOC_CHARS = 8000;
 const MAX_TOOL_RESULT_CHARS = 12000;
+
+type PublicUsageBucket = {
+  count: number;
+  resetAt: number;
+};
+
+const publicUsage = new Map<string, PublicUsageBucket>();
 
 const SYSTEM_PROMPT = `Eres un asistente experto en consulta de documentos internos.
 Tu trabajo es responder preguntas usando únicamente la información de los documentos disponibles en la base de datos.
@@ -121,14 +139,56 @@ function parseToolArgs(raw: string): Record<string, unknown> {
   }
 }
 
-function sanitizeChatMessages(messages: unknown[]): ChatCompletionMessageParam[] {
+function sanitizeChatMessages(
+  messages: unknown[],
+  options: { maxHistory: number; maxChars: number },
+): ChatCompletionMessageParam[] {
   return (messages as { role?: unknown; content?: unknown }[])
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
-    .slice(-MAX_HISTORY_MESSAGES)
+    .slice(-options.maxHistory)
     .map((m) => ({
       role: m.role as "user" | "assistant",
-      content: String(m.content).slice(0, MAX_MESSAGE_CHARS),
+      content: String(m.content).slice(0, options.maxChars),
     }));
+}
+
+function getResetAt(now: number): number {
+  return now + 24 * 60 * 60 * 1000;
+}
+
+async function getPublicClientId(): Promise<string> {
+  const requestHeaders = await headers();
+  const forwardedFor = requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = requestHeaders.get("x-real-ip")?.trim();
+  const fallback = requestHeaders.get("host")?.trim() ?? "unknown-host";
+  const id = forwardedFor || realIp || fallback;
+  return `public:${id}`;
+}
+
+async function consumePublicQuota() {
+  const now = Date.now();
+  const clientId = await getPublicClientId();
+  const existing = publicUsage.get(clientId);
+  const bucket = !existing || existing.resetAt <= now
+    ? { count: 0, resetAt: getResetAt(now) }
+    : existing;
+
+  if (bucket.count >= PUBLIC_MAX_MESSAGES_PER_DAY) {
+    return {
+      allowed: false as const,
+      limit: PUBLIC_MAX_MESSAGES_PER_DAY,
+      resetAt: bucket.resetAt,
+    };
+  }
+
+  bucket.count += 1;
+  publicUsage.set(clientId, bucket);
+  return {
+    allowed: true as const,
+    remaining: Math.max(0, PUBLIC_MAX_MESSAGES_PER_DAY - bucket.count),
+    limit: PUBLIC_MAX_MESSAGES_PER_DAY,
+    resetAt: bucket.resetAt,
+  };
 }
 
 function compactToolResult(result: unknown): string {
@@ -196,7 +256,7 @@ async function executeTool(
 // ─── POST /api/chat-docs ──────────────────────────────────────────────────────
 export async function POST(req: Request) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const isPublicRequest = !session;
 
   let body: { messages?: unknown[] };
   try {
@@ -212,8 +272,26 @@ export async function POST(req: Request) {
   if (!process.env.OPENAI_API_KEY)
     return NextResponse.json({ error: "OPENAI_API_KEY no configurada" }, { status: 500 });
 
+  if (isPublicRequest) {
+    const quotaResult = await consumePublicQuota();
+    if (!quotaResult.allowed) {
+      return NextResponse.json(
+        {
+          error: "Has alcanzado el limite diario del modo publico. Inicia sesion para continuar en modo premium.",
+          code: "PUBLIC_LIMIT_REACHED",
+          limit: quotaResult.limit,
+          resetAt: quotaResult.resetAt,
+        },
+        { status: 429 },
+      );
+    }
+  }
+
   const reqId = `chatdocs_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const validMessages = sanitizeChatMessages(messages);
+  const validMessages = sanitizeChatMessages(messages, {
+    maxHistory: isPublicRequest ? PUBLIC_MAX_HISTORY_MESSAGES : PREMIUM_MAX_HISTORY_MESSAGES,
+    maxChars: isPublicRequest ? PUBLIC_MAX_MESSAGE_CHARS : PREMIUM_MAX_MESSAGE_CHARS,
+  });
   const lastUser = [...validMessages].reverse().find((m) => m.role === "user");
 
   console.log(`[chat-docs][${reqId}] start msgs=${validMessages.length}`);
@@ -231,7 +309,7 @@ export async function POST(req: Request) {
     for (let step = 0; step < 5; step++) {
       const t0 = Date.now();
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: isPublicRequest ? PUBLIC_MODEL : PREMIUM_MODEL,
         temperature: 0.2,
         messages: convo,
         tools: CHAT_TOOLS as any,

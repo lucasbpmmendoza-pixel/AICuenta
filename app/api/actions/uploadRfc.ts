@@ -4,6 +4,7 @@ import { put } from '@vercel/blob'
 import path from 'path'
 import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
+import { loadOwnerPlanLimits } from '@/lib/account-plan'
 
 const RFC_SAFE = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i
 
@@ -31,6 +32,37 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
   const keyExt = path.extname(keyFile.name).toLowerCase()
   if (cerExt !== '.cer') return { success: false, message: 'El archivo CER debe tener extension .cer' }
   if (keyExt !== '.key') return { success: false, message: 'El archivo KEY debe tener extension .key' }
+
+  // Validar limites por plan antes de subir archivos
+  try {
+    const db = await getDb()
+    const limits = await loadOwnerPlanLimits(db, effectiveUserId)
+
+    const countResult = await db
+      .request()
+      .input('user_id', effectiveUserId)
+      .input('rfc', rfc)
+      .query<{ total: number; exists_rfc: number }>(`
+        SELECT
+          COUNT(1) AS total,
+          SUM(CASE WHEN rfc = @rfc THEN 1 ELSE 0 END) AS exists_rfc
+        FROM EFIELES
+        WHERE user_id = @user_id
+      `)
+
+    const total = countResult.recordset[0]?.total ?? 0
+    const existsRfc = (countResult.recordset[0]?.exists_rfc ?? 0) > 0
+
+    if (!existsRfc && total >= limits.maxRfcs) {
+      return {
+        success: false,
+        message: `Tu plan ${limits.planType} permite hasta ${limits.maxRfcs} RFC(s). Actualiza tu plan para registrar mas RFCs.`,
+      }
+    }
+  } catch (err) {
+    console.error('[uploadRfc] limit check error:', (err as Error).message)
+    return { success: false, message: 'No se pudo validar el limite de RFCs. Intenta de nuevo.' }
+  }
 
   // Subir a Vercel Blob bajo RFC/ (mismo formato que usa el worker)
   const prefix = rfc

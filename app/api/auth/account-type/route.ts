@@ -20,15 +20,30 @@ export async function GET() {
     return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
   }
 
-  const result = await db
-    .request()
-    .input("id", session.sub)
-    .query<{ account_type: string | null }>(
-      "SELECT account_type FROM users WHERE id = @id"
-    );
+  let accountType: string | null = null;
+  let planType: string | null = "basic";
 
-  const accountType = result.recordset[0]?.account_type ?? null;
-  return NextResponse.json({ account_type: accountType });
+  try {
+    const result = await db
+      .request()
+      .input("id", session.sub)
+      .query<{ account_type: string | null; plan_type?: string | null }>(
+        "SELECT account_type, plan_type FROM users WHERE id = @id"
+      );
+    accountType = result.recordset[0]?.account_type ?? null;
+    planType = result.recordset[0]?.plan_type ?? "basic";
+  } catch {
+    const fallback = await db
+      .request()
+      .input("id", session.sub)
+      .query<{ account_type: string | null }>(
+        "SELECT account_type FROM users WHERE id = @id"
+      );
+    accountType = fallback.recordset[0]?.account_type ?? null;
+    planType = "basic";
+  }
+
+  return NextResponse.json({ account_type: accountType, plan_type: planType });
 }
 
 export async function POST(req: NextRequest) {
@@ -59,11 +74,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
   }
 
-  await db
-    .request()
-    .input("id", session.sub)
-    .input("account_type", parsed.data.account_type)
-    .query("UPDATE users SET account_type = @account_type WHERE id = @id");
+  try {
+    await db
+      .request()
+      .input("id", session.sub)
+      .input("account_type", parsed.data.account_type)
+      .query(
+        "UPDATE users SET account_type = @account_type, plan_type = COALESCE(plan_type, 'basic') WHERE id = @id",
+      );
+  } catch {
+    await db
+      .request()
+      .input("id", session.sub)
+      .input("account_type", parsed.data.account_type)
+      .query("UPDATE users SET account_type = @account_type WHERE id = @id");
+  }
 
   return NextResponse.json({ ok: true });
 }

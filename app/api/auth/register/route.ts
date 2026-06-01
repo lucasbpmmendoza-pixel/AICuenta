@@ -99,9 +99,9 @@ export async function POST(req: NextRequest) {
       .input("email", email)
       .input("password_hash", passwordHash)
       .query<{ id: string }>(
-        `INSERT INTO users (name, email, password_hash)
+        `INSERT INTO users (name, email, password_hash, plan_type)
          OUTPUT INSERTED.id
-         VALUES (@name, @email, @password_hash)`,
+         VALUES (@name, @email, @password_hash, 'basic')`,
       );
 
     const userId = result.recordset[0].id;
