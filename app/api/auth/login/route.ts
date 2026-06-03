@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { signToken, setAuthCookie } from "@/lib/auth";
 import { getPostLoginRedirect } from "@/lib/redirect";
 import { verifyRecaptcha } from "@/lib/recaptcha";
+import { DEMO_COOKIE_NAME } from "@/lib/demo-mode";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Correo invalido"),
@@ -117,5 +118,7 @@ export async function POST(req: NextRequest) {
   const redirectTo = (role === 'member' || role === 'chikenelo')
     ? '/dashboard'
     : await getPostLoginRedirect(user.id);
-  return NextResponse.json({ ok: true, redirectTo });
+  const res = NextResponse.json({ ok: true, redirectTo });
+  res.cookies.delete(DEMO_COOKIE_NAME);
+  return res;
 }

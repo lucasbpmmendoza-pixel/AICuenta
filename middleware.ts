@@ -26,7 +26,7 @@ export async function middleware(req: NextRequest) {
     const res = NextResponse.next();
     if (demoRequested && !demoEnabled) {
       res.cookies.set(DEMO_COOKIE_NAME, "1", {
-        httpOnly: true,
+        httpOnly: false,
         secure: process.env.NODE_ENV === "production",
         sameSite: "lax",
         path: "/",

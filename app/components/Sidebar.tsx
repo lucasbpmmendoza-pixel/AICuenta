@@ -150,11 +150,25 @@ const NAV_ITEMS: NavItem[] = [
     label: 'AIChikenelo',
     href: '/dashboard/unete',
     icon: (
-      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-        >
-        <circle cx="12" cy="8" r="4" />
-        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-        <path d="M15 8h.01M9 8h.01" />
+      <svg className="h-6 w-6" viewBox="0 2 24 24" xmlns="http://www.w3.org/2000/svg" >
+        <g transform="translate(0.5 0.2)">
+          {/* cresta */}
+          <circle cx="3.5" cy="7" r="2" fill="currentColor" />
+          <circle cx="4" cy="5" r="2" fill="currentColor" />
+          <circle cx="5" cy="3.5" r="2" fill="currentColor" />
+          <circle cx="6" cy="5" r="2" fill="currentColor" />
+          <circle cx="7" cy="3.6" r="2" fill="currentColor" />
+          <circle cx="8.5" cy="4.5" r="2" fill="currentColor" />
+
+          {/* cabeza/cuello/cuerpo */}
+          <path d="M4.7 8.5c.9-1.5 2.5-2.3 4.2-2.3 2.7 0 5 2.1 5.2 4.8A2.7 2.7 0 0 0 14 12v6.3c0 2.7-2.2 4.9-4.9 4.9H8.9C6.2 23.2 4 21 4 18.3V11c0-1.5.8-2.9 2.1-3.9Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* cola */}
+          <path d="M16 10.3h2a1.1 1.4 0 0 1 1.1 2.2l-1.5 1.9 1.5 1.8a1.4 1.4 0 0 1-1.1 2.1h-2a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+
+          {/* ojo */}
+          <circle cx="10" cy="10" r="2" fill="currentColor" />
+</g>
       </svg>
     ),
   },
@@ -232,6 +246,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
         {visibleItems.map((item) => {
           const isActive = pathname === item.href
           const isDisabled = demoEnabled && disabledDemoItems.has(item.href)
+          const isDemoFreeItem = demoEnabled && item.href === '/dashboard/chat-docs'
           return (
             <a
               key={item.href}
@@ -250,6 +265,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
                   : isActive
                   ? 'bg-[#7B6FE8] text-white shadow-sm shadow-[#7B6FE8]/40 dark:shadow-[#91EB78]/40 dark:bg-[#91EB78] dark:text-zinc-900'
                   : 'text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957]  dark:hover:text-[#6BDA4D]',
+                isDemoFreeItem ? 'ring-2 ring-inset ring-[#D4A531] dark:ring-[#F2C45A]' : '',
               ].join(' ')}
             >
               {item.icon}
@@ -292,22 +308,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
           </div>
           <span className="truncate text-sm font-medium text-slate-700 dark:text-zinc-300">{userName}</span>
         </div>
-        {demoEnabled ? (
-          <button
-            onClick={() => {
-              router.push('/register')
-            }}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-[#450c7d] dark:hover:text-[#6BDA4D]"
-          >
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="8.5" cy="7" r="4" />
-              <line x1="20" y1="8" x2="20" y2="14" />
-              <line x1="17" y1="11" x2="23" y2="11" />
-            </svg>
-            Registrarme para la app
-          </button>
-        ) : (
+        {!demoEnabled && (
           <button
             onClick={() => {
               void handleLogout()

@@ -5,6 +5,11 @@ import { getStripe } from "@/lib/stripe";
 
 export const runtime = "nodejs";
 
+type StripeSubscriptionWithPeriods = Stripe.Subscription & {
+  current_period_start?: number | null;
+  current_period_end?: number | null;
+};
+
 function toSqlDate(unixSeconds?: number | null): Date {
   return new Date((unixSeconds ?? 0) * 1000);
 }
@@ -25,7 +30,7 @@ function mapSubscriptionStatus(status: Stripe.Subscription.Status): string {
   }
 }
 
-async function upsertMembershipFromSubscription(subscription: Stripe.Subscription): Promise<void> {
+async function upsertMembershipFromSubscription(subscription: StripeSubscriptionWithPeriods): Promise<void> {
   const userId = subscription.metadata?.userId;
   const planIdRaw = subscription.metadata?.planId;
 
@@ -121,7 +126,7 @@ async function upsertMembershipFromSubscription(subscription: Stripe.Subscriptio
     `);
 }
 
-async function markCanceledSubscription(subscription: Stripe.Subscription): Promise<void> {
+async function markCanceledSubscription(subscription: StripeSubscriptionWithPeriods): Promise<void> {
   const db = await getDb();
   await db
     .request()
@@ -184,19 +189,19 @@ export async function POST(req: NextRequest) {
         const session = event.data.object as Stripe.Checkout.Session;
         if (session.subscription && typeof session.subscription === "string") {
           const stripe = getStripe();
-          const subscription = await stripe.subscriptions.retrieve(session.subscription);
+          const subscription = await stripe.subscriptions.retrieve(session.subscription) as StripeSubscriptionWithPeriods;
           await upsertMembershipFromSubscription(subscription);
         }
         break;
       }
       case "customer.subscription.created":
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as StripeSubscriptionWithPeriods;
         await upsertMembershipFromSubscription(subscription);
         break;
       }
       case "customer.subscription.deleted": {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as StripeSubscriptionWithPeriods;
         await markCanceledSubscription(subscription);
         break;
       }

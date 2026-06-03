@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { JWTPayload } from "@/lib/auth";
 import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 import DashboardFooter from "./DashboardFooter";
 import DashboardCharts, { type DashboardData } from "./DashboardCharts";
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
@@ -56,7 +57,7 @@ export default function DashboardView({ session, accountType }: Props) {
     setData(null)
     setError(null)
     try {
-      const res = await fetch(`/api/dashboard/data?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`)
+      const res = await fetch(`/api/dashboard?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`)
       const d = await res.json()
       if (res.ok) {
         setData(d)

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
+import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import type { IngresoCFDI, EgresoCFDI, NominaCFDI, RetencionCFDI, PagoRow, NotaCreditoRow, flujoRow } from '@/lib/facturas-query'
@@ -98,7 +99,7 @@ export default function FacturasView({ session, accountType }: Props) {
     setLoading(true)
     setData(null)
     try {
-      const res = await fetch(`/api/facturas/data?rfc=${encodeURIComponent(rfc)}&${params}`)
+      const res = await fetch(`/api/facturas?rfc=${encodeURIComponent(rfc)}&${params}`)
       const d = await res.json()
       if (res.ok) setData(d)
     } catch {}
@@ -117,7 +118,7 @@ export default function FacturasView({ session, accountType }: Props) {
     if (periodType === 'custom' && (!customFrom || !customTo)) return
     setPagosData(null)
     setLoadingPagos(true)
-    fetch(`/api/pagos/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
+    fetch(`/api/pagos?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.pagos)) setPagosData(d.pagos) })
       .catch(() => {})
@@ -130,7 +131,7 @@ export default function FacturasView({ session, accountType }: Props) {
     if (periodType === 'custom' && (!customFrom || !customTo)) return
     setNotasData(null)
     setLoadingNotas(true)
-    fetch(`/api/notas-credito/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
+    fetch(`/api/notas-credito?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.notas)) setNotasData(d.notas) })
       .catch(() => {})
@@ -143,7 +144,7 @@ export default function FacturasView({ session, accountType }: Props) {
     if (periodType === 'custom' && (!customFrom || !customTo)) return
     setflujoData(null)
     setLoadingEfectivamente(true)
-    fetch(`/api/efectivamente-pagado/data?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
+    fetch(`/api/efectivamente-pagado?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`)
       .then(r => r.json())
       .then(d => { if (Array.isArray(d.rows)) setflujoData(d.rows) })
       .catch(() => {})

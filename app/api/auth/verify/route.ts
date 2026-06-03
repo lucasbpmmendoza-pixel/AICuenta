@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyVerificationToken, signToken, setAuthCookie } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getPostLoginRedirect } from "@/lib/redirect";
+import { DEMO_COOKIE_NAME } from "@/lib/demo-mode";
 
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token");
@@ -57,5 +58,7 @@ export async function GET(req: NextRequest) {
   await setAuthCookie(authToken);
 
   const redirectTo = await getPostLoginRedirect(user.id);
-  return NextResponse.redirect(new URL(redirectTo, req.url));
+  const res = NextResponse.redirect(new URL(redirectTo, req.url));
+  res.cookies.delete(DEMO_COOKIE_NAME);
+  return res;
 }

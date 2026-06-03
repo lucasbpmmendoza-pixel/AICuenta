@@ -318,7 +318,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
             {loading ? (
               <div className="h-full w-full rounded-full bg-slate-100 dark:bg-zinc-800 animate-pulse" />
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                 <PieChart>
                   <Pie data={cfdiData} innerRadius={22} outerRadius={32} paddingAngle={3} dataKey="value" startAngle={90} endAngle={-270} strokeWidth={0}>
                     {cfdiData.map((_, i) => <Cell key={i} fill={DONUT_COLORS[i]} />)}
@@ -379,7 +379,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
             <EmptyChart label="Sin datos para este periodo" />
           ) : (
             <div className="h-[210px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                 <BarChart layout="vertical" data={data.topClientes} margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid horizontal={false} stroke={gridColor} strokeDasharray="3 3" />
                   <XAxis type="number" tick={{ fontSize: 11, fill: axisColor }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
@@ -401,7 +401,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
             <EmptyChart label="Sin datos para este periodo" />
           ) : (
             <div className="h-[210px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                 <BarChart layout="vertical" data={data.topProveedores} margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid horizontal={false} stroke={gridColor} strokeDasharray="3 3" />
                   <XAxis type="number" tick={{ fontSize: 11, fill: axisColor }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
@@ -426,7 +426,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
             <EmptyChart label="Sin datos para este periodo" />
           ) : (
             <div className="h-[190px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                 <BarChart layout="vertical" data={data.topConceptosIngresos} margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid horizontal={false} stroke={gridColor} strokeDasharray="3 3" />
                   <XAxis type="number" tick={{ fontSize: 11, fill: axisColor }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
@@ -448,7 +448,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
             <EmptyChart label="Sin datos para este periodo" />
           ) : (
             <div className="h-[190px]">
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={1}>
                 <BarChart layout="vertical" data={data.topConceptosEgresos} margin={{ top: 0, right: 12, left: 0, bottom: 0 }}>
                   <CartesianGrid horizontal={false} stroke={gridColor} strokeDasharray="3 3" />
                   <XAxis type="number" tick={{ fontSize: 11, fill: axisColor }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />

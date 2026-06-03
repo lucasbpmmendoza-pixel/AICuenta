@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
+import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
