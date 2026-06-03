@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { DEMO_COOKIE_NAME, isDemoCookieEnabled } from "@/lib/demo-mode";
 
 const COOKIE_NAME = "auth_token";
 const PROTECTED = ["/dashboard", "/upload-fiel"];
@@ -18,6 +19,22 @@ export async function middleware(req: NextRequest) {
   if (!isProtected) return NextResponse.next();
 
   const token = req.cookies.get(COOKIE_NAME)?.value;
+  const demoRequested = req.nextUrl.searchParams.get("demo") === "1";
+  const demoEnabled = isDemoCookieEnabled(req.cookies.get(DEMO_COOKIE_NAME)?.value);
+
+  if (!token && (demoRequested || demoEnabled)) {
+    const res = NextResponse.next();
+    if (demoRequested && !demoEnabled) {
+      res.cookies.set(DEMO_COOKIE_NAME, "1", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24,
+      });
+    }
+    return res;
+  }
 
   if (!token) {
     return NextResponse.redirect(new URL("/login", req.url));
@@ -25,7 +42,9 @@ export async function middleware(req: NextRequest) {
 
   try {
     await jwtVerify(token, getSecret(), { algorithms: ["HS256"] });
-    return NextResponse.next();
+    const res = NextResponse.next();
+    if (demoEnabled) res.cookies.delete(DEMO_COOKIE_NAME);
+    return res;
   } catch {
     // Token expirado o inválido
     const res = NextResponse.redirect(new URL("/login", req.url));

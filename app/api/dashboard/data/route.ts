@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { buildDemoDashboardData } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 
 type IsrRegimenOption = {
   code: string;
@@ -108,6 +110,8 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  const demoMode = isDemoSession(session);
+
   const { searchParams } = new URL(req.url);
   const rfc   = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
   const year  = parseInt(searchParams.get("year")  ?? String(new Date().getFullYear()), 10);
@@ -118,13 +122,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "year/month inválidos" }, { status: 400 });
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-
-  const owns = await validateRfc(effectiveUserId, rfc);
-  if (!owns) return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
-
   const dateFrom = new Date(Date.UTC(year, month - 1, 1))
   const dateTo   = new Date(Date.UTC(year, month, 1))
+
+  if (demoMode) {
+    return NextResponse.json(buildDemoDashboardData(rfc, dateFrom, dateTo));
+  }
+
+  const effectiveUserId = session.ownerId ?? session.sub;
+  const owns = await validateRfc(effectiveUserId, rfc);
+  if (!owns) return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
 
   try {
     const db = await getDb();

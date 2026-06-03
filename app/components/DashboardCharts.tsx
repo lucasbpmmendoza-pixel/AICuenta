@@ -6,6 +6,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import { useTheme } from '@/app/hooks/useTheme'
+import { readRegimenForRfc, saveRegimenForRfc } from '@/lib/rfc-regimen-preference'
 
 type IsrRegimenOption = {
   code: string
@@ -42,6 +43,7 @@ interface Props {
   loading: boolean
   mes: string
   anio: number
+  selectedRfc: string
 }
 
 // ── Formato moneda ─────────────────────────────────────────────
@@ -207,7 +209,7 @@ const IconIVA = () => (
 )
 
 // ── Componente principal ───────────────────────────────────────
-export default function DashboardCharts({ data, loading, mes, anio }: Props) {
+export default function DashboardCharts({ data, loading, mes, anio, selectedRfc }: Props) {
   const { dark } = useTheme()
 
   const gridColor  = dark ? '#3f3f46' : '#e2e8f0'
@@ -226,11 +228,22 @@ export default function DashboardCharts({ data, loading, mes, anio }: Props) {
 
   useEffect(() => {
     if (!data) return
+    const preferred = readRegimenForRfc(selectedRfc)
+    const preferredExists = preferred && regimenes.some((r) => r.code === preferred)
+    if (preferredExists) {
+      setRegimenSeleccionado(preferred)
+      return
+    }
     const detected = data.ingresos.regimenFiscal
     const existe = detected && regimenes.some((r) => r.code === detected)
     const next = existe ? detected : (regimenes[0]?.code ?? '')
     setRegimenSeleccionado(next)
-  }, [data, regimenes])
+  }, [data, regimenes, selectedRfc])
+
+  useEffect(() => {
+    if (!selectedRfc || !regimenSeleccionado) return
+    saveRegimenForRfc(selectedRfc, regimenSeleccionado)
+  }, [selectedRfc, regimenSeleccionado])
 
   const regimenLabelSeleccionado = useMemo(() => {
     if (!regimenSeleccionado) return ingresos.regimenLabel || 'Provisional mensual'

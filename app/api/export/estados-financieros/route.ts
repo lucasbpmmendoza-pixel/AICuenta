@@ -4,6 +4,8 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { buildDemoConceptos, getDemoNombreEmpresa } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -185,9 +187,13 @@ export async function GET(req: NextRequest) {
   if (!rfc || isNaN(year) || isNaN(month) || month < 1 || month > 12)
     return new Response("Parámetros inválidos", { status: 400 });
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc)))
-    return new Response("RFC no encontrado", { status: 403 });
+  const demoMode = isDemoSession(session);
+  if (!demoMode) {
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return new Response("RFC no encontrado", { status: 403 });
+    }
+  }
 
   const dateFrom = new Date(Date.UTC(year, month - 1, 1));
   const dateTo   = new Date(Date.UTC(year, month, 1));
@@ -196,10 +202,23 @@ export async function GET(req: NextRequest) {
   const periodoLabel = `${MESES[month - 1]} ${year}`;
 
   try {
-    const [data, nombreEmpresa] = await Promise.all([
-      fetchEstadosFinancieros(rfc, dateFrom, dateTo),
-      fetchNombreEmpresa(rfc),
-    ]);
+    const [data, nombreEmpresa] = demoMode
+      ? [
+          (() => {
+            const conceptos = buildDemoConceptos(rfc, dateFrom, dateTo);
+            return {
+              ingresos: conceptos.ingresos,
+              egresos: conceptos.egresos,
+              totalFacturasIngresos: conceptos.ingresos.reduce((acc, row) => acc + row.numFacturas, 0),
+              totalFacturasEgresos: conceptos.egresos.reduce((acc, row) => acc + row.numFacturas, 0),
+            };
+          })(),
+          getDemoNombreEmpresa(rfc),
+        ]
+      : await Promise.all([
+          fetchEstadosFinancieros(rfc, dateFrom, dateTo),
+          fetchNombreEmpresa(rfc),
+        ]);
 
     const wb = new ExcelJS.Workbook();
     wb.creator = "AIcuenta";
@@ -210,7 +229,7 @@ export async function GET(req: NextRequest) {
     buildSheet(wb, "Ingresos por Concepto", ING_BG, "PRINCIPALES INGRESOS POR PRODUCTO / SERVICIO", subtitle, data.ingresos);
     buildSheet(wb, "Egresos por Concepto",  EGR_BG, "PRINCIPALES EGRESOS POR PRODUCTO / SERVICIO",  subtitle, data.egresos);
 
-    const auditRows = await fetchAuditoriaConceptos(rfc, dateFrom, dateTo);
+    const auditRows = demoMode ? [] : await fetchAuditoriaConceptos(rfc, dateFrom, dateTo);
     const auditWs = wb.addWorksheet("Auditoria Conceptos");
     auditWs.columns = [
       { width: 38 },

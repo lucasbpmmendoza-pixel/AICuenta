@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchPagosData } from "@/lib/facturas-query";
+import { buildDemoPagos } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -18,6 +20,7 @@ async function validateRfc(userId: string, rfc: string): Promise<boolean> {
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const demoMode = isDemoSession(session);
 
   const { searchParams } = new URL(req.url);
   const rfc       = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
@@ -57,12 +60,16 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc))) {
-    return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
-  }
-
   try {
+    if (demoMode) {
+      return NextResponse.json({ pagos: buildDemoPagos(rfc, dateFrom, dateTo) });
+    }
+
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
+    }
+
     const pagos = await fetchPagosData(rfc, dateFrom, dateTo, 10);
     return NextResponse.json({ pagos });
   } catch (err) {

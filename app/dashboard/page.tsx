@@ -10,16 +10,18 @@ export default async function DashboardPage() {
   // Para miembros, usar el ID del dueño para obtener account_type
   const effectiveId = session.ownerId ?? session.sub;
 
-  let accountType: string | null = null;
-  try {
-    const db = await getDb();
-    const result = await db
-      .request()
-      .input("id", effectiveId)
-      .query<{ account_type: string | null }>("SELECT account_type FROM users WHERE id = @id");
-    accountType = result.recordset[0]?.account_type ?? null;
-  } catch (err) {
-    console.error("[dashboard] Error al leer account_type:", (err as Error).message);
+  let accountType: string | null = session.isDemo ? "multi" : null;
+  if (!session.isDemo) {
+    try {
+      const db = await getDb();
+      const result = await db
+        .request()
+        .input("id", effectiveId)
+        .query<{ account_type: string | null }>("SELECT account_type FROM users WHERE id = @id");
+      accountType = result.recordset[0]?.account_type ?? null;
+    } catch (err) {
+      console.error("[dashboard] Error al leer account_type:", (err as Error).message);
+    }
   }
   if (!accountType) redirect("/upload-fiel");
 

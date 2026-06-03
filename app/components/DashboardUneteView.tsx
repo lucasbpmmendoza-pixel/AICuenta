@@ -12,9 +12,10 @@ interface Props {
   rfcFromDb: string
   ownerRfc: string | null
   allRfcs: string[]
+  readOnly?: boolean
 }
 
-export default function DashboardUneteView({ session, accountType, rfcFromDb, ownerRfc, allRfcs }: Props) {
+export default function DashboardUneteView({ session, accountType, rfcFromDb, ownerRfc, allRfcs, readOnly = false }: Props) {
   const [nombre, setNombre] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -24,6 +25,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
   const selectedRfc = allRfcs.find(r => checkedRfcs.has(r)) ?? ''
 
   function toggleRfc(rfc: string) {
+    if (readOnly) return
     setCheckedRfcs(prev => {
       const next = new Set(prev)
       if (next.has(rfc)) next.delete(rfc)
@@ -33,6 +35,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
   }
 
   async function handleAceptar() {
+    if (readOnly) return
     setSending(true)
     setError('')
     try {
@@ -55,7 +58,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
+      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
 
     <main className="flex-1 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
@@ -76,6 +79,12 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
             </div>
 
             <div className="flex flex-col gap-6 px-8 py-8">
+              {readOnly && (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                  Vista demo: puedes ver la interfaz pero no interactuar.
+                </p>
+              )}
+
               <p className="text-zinc-700 dark:text-zinc-300 text-sm leading-relaxed">
                 Para ser una empresa de vanguardia usamos IA. Si quieres unirte a nuestro equipo,
                 escribenos por WhatsApp con el boton de abajo y nos ponemos en contacto contigo.
@@ -90,6 +99,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
                   type="text"
                   value={nombre}
                   onChange={(e) => setNombre(e.target.value)}
+                  disabled={readOnly}
                   placeholder="Ingresa tu nombre completo"
                   className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-sm"
                 />
@@ -111,6 +121,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
                           type="checkbox"
                           checked={checkedRfcs.has(rfc)}
                           onChange={() => toggleRfc(rfc)}
+                          disabled={readOnly}
                           className="w-4 h-4 accent-green-500 cursor-pointer shrink-0"
                         />
                         <span className="font-mono text-sm font-semibold text-zinc-700 dark:text-zinc-300">
@@ -131,7 +142,7 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
               <button
                 type="button"
                 onClick={handleAceptar}
-                disabled={sending || nombre.trim() === '' || checkedRfcs.size === 0}
+                disabled={readOnly || sending || nombre.trim() === '' || checkedRfcs.size === 0}
                 className="rounded-xl bg-brand-green hover:bg-[#25D366] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 transition-colors text-sm"
               >
                 {sending ? 'Registrando...' : 'Aceptar - Ir a WhatsApp'}

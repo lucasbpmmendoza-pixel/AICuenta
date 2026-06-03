@@ -3,6 +3,8 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchNotasCreditoData, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { buildDemoNotasCredito, getDemoNombreEmpresa } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers (match variablesEstaticas.js / variablesEspecificas.js) ────
@@ -86,16 +88,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc))) {
-    return new Response("RFC no encontrado", { status: 403 });
+  const demoMode = isDemoSession(session);
+  if (!demoMode) {
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return new Response("RFC no encontrado", { status: 403 });
+    }
   }
 
   try {
-    const [rows, nombreEmpresa] = await Promise.all([
-      fetchNotasCreditoData(rfc, dateFrom, dateTo),
-      fetchNombreEmpresa(rfc),
-    ]);
+    const [rows, nombreEmpresa] = demoMode
+      ? [buildDemoNotasCredito(rfc, dateFrom, dateTo), getDemoNombreEmpresa(rfc)]
+      : await Promise.all([
+          fetchNotasCreditoData(rfc, dateFrom, dateTo),
+          fetchNombreEmpresa(rfc),
+        ]);
 
     // ─── Build workbook ────────────────────────────────────────────────────────
 

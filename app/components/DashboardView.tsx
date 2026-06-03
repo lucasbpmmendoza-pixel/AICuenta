@@ -92,7 +92,7 @@ export default function DashboardView({ session, accountType }: Props) {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
+      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
 
     <main className="flex-1 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
@@ -151,7 +151,7 @@ export default function DashboardView({ session, accountType }: Props) {
               <button onClick={() => fetchData(selectedRfc, year, month)} className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2">Reintentar</button>
             </div>
           ) : (
-            <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} />
+            <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} selectedRfc={selectedRfc} />
           )}
         </div>
         <DashboardFooter />

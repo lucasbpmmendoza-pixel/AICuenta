@@ -12,6 +12,7 @@ interface Props {
   accountType: AccountType
   role?: 'owner' | 'member' | 'chikenelo'
   ownerId?: string
+  isDemo?: boolean
 }
 
 interface NavItem {
@@ -101,6 +102,17 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    label: 'Suscripcion',
+    href: '/dashboard/suscripcion',
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 10h18" />
+        <path d="M8 15h4" />
+      </svg>
+    ),
+  },
+  {
     label: 'Asistente IA',
     href: '/dashboard/chat',
     icon: (
@@ -148,11 +160,13 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
-export default function Sidebar({ userName, accountType, role, ownerId }: Props) {
+export default function Sidebar({ userName, accountType, role, ownerId, isDemo = false }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { dark, toggle } = useTheme()
+
+  const demoEnabled = isDemo
 
   // isOwner: true solo si role es 'owner' Y no tiene ownerId (subordinados siempre tienen ownerId)
   const isOwner = role === 'owner' && !ownerId
@@ -162,6 +176,8 @@ export default function Sidebar({ userName, accountType, role, ownerId }: Props)
     if (item.ownerOnly && !isOwner) return false
     return true
   })
+
+  const disabledDemoItems = new Set<string>()
 
   function getTabNameFromHref(href: string): string | null {
     const tabMap: Record<string, string> = {
@@ -215,18 +231,23 @@ export default function Sidebar({ userName, accountType, role, ownerId }: Props)
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         {visibleItems.map((item) => {
           const isActive = pathname === item.href
+          const isDisabled = demoEnabled && disabledDemoItems.has(item.href)
           return (
             <a
               key={item.href}
               href={item.href}
               onClick={(e) => {
                 e.preventDefault()
+                if (isDisabled) return
                 handleNavClick(item.href)
                 router.push(item.href)
               }}
+              aria-disabled={isDisabled}
               className={[
                 'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
-                isActive
+                isDisabled
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500'
+                  : isActive
                   ? 'bg-[#7B6FE8] text-white shadow-sm shadow-[#7B6FE8]/40 dark:shadow-[#91EB78]/40 dark:bg-[#91EB78] dark:text-zinc-900'
                   : 'text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957]  dark:hover:text-[#6BDA4D]',
               ].join(' ')}
@@ -271,17 +292,36 @@ export default function Sidebar({ userName, accountType, role, ownerId }: Props)
           </div>
           <span className="truncate text-sm font-medium text-slate-700 dark:text-zinc-300">{userName}</span>
         </div>
-        <button
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-red-500 dark:hover:text-red-400"
-        >                                                                                                                              
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          Cerrar sesion
-        </button>
+        {demoEnabled ? (
+          <button
+            onClick={() => {
+              router.push('/register')
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-[#450c7d] dark:hover:text-[#6BDA4D]"
+          >
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="8.5" cy="7" r="4" />
+              <line x1="20" y1="8" x2="20" y2="14" />
+              <line x1="17" y1="11" x2="23" y2="11" />
+            </svg>
+            Registrarme para la app
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              void handleLogout()
+            }}
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-red-500 dark:hover:text-red-400"
+          >                                                                                                                              
+            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Cerrar sesion
+          </button>
+        )}
       </div>
     </div>
   )

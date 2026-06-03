@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import DropZone from './DropZone'
 import { uploadRfc } from '@/app/api/actions/uploadRfc'
 import { rfcAlias } from '@/lib/rfc-aliases'
+import { saveRegimenForRfc } from '@/lib/rfc-regimen-preference'
 
 interface Rfc {
   id: string
@@ -18,6 +19,27 @@ interface Rfc {
 interface Props {
   readOnly?: boolean
 }
+
+const ISR_REGIMENES = [
+  { code: '601', name: 'General de Ley Personas Morales', rateHint: '30%' },
+  { code: '603', name: 'Personas Morales con Fines no Lucrativos', rateHint: '0%' },
+  { code: '605', name: 'Sueldos y Salarios e Ingresos Asimilados', rateHint: '0%' },
+  { code: '606', name: 'Arrendamiento', rateHint: '20%' },
+  { code: '608', name: 'Demas ingresos', rateHint: '30%' },
+  { code: '610', name: 'Residentes en el Extranjero', rateHint: '30%' },
+  { code: '611', name: 'Ingresos por Dividendos', rateHint: '10%' },
+  { code: '612', name: 'Personas Fisicas con Actividades Empresariales y Profesionales', rateHint: '30%' },
+  { code: '614', name: 'Ingresos por intereses', rateHint: '10%' },
+  { code: '615', name: 'Regimen de los ingresos por obtencion de premios', rateHint: '10%' },
+  { code: '616', name: 'Sin obligaciones fiscales', rateHint: '0%' },
+  { code: '620', name: 'Sociedades Cooperativas de Produccion', rateHint: '30%' },
+  { code: '621', name: 'Incorporacion Fiscal', rateHint: '10%' },
+  { code: '622', name: 'Actividades Agricolas, Ganaderas, Silvicolas y Pesqueras', rateHint: '21%' },
+  { code: '623', name: 'Opcional para Grupos de Sociedades', rateHint: '30%' },
+  { code: '624', name: 'Coordinados', rateHint: '30%' },
+  { code: '625', name: 'RESICO Personas Fisicas', rateHint: '1% a 2.5%' },
+  { code: '626', name: 'RESICO Personas Morales', rateHint: '1%' },
+] as const
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -37,6 +59,7 @@ function RfcForm({
   const [efiel,   setEfiel]   = useState('')
   const [cerFile, setCerFile] = useState<File | null>(null)
   const [keyFile, setKeyFile] = useState<File | null>(null)
+  const [regimenFiscal, setRegimenFiscal] = useState<string>('')
   const [showEfiel, setShowEfiel] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error,   setError]     = useState<string | null>(null)
@@ -58,6 +81,7 @@ function RfcForm({
     if (!result.success) {
       setError(result.message)
     } else {
+      saveRegimenForRfc(rfc, regimenFiscal)
       onSuccess(result.message)
     }
   }
@@ -98,6 +122,23 @@ function RfcForm({
             Ingresa la nueva contrasena. La actual no se muestra por seguridad.
           </p>
         )}
+      </div>
+
+      {/* Regimen fiscal (igual que Dashboard) */}
+      <div className="flex flex-col gap-1">
+        <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
+          Regimen fiscal para ISR
+        </label>
+        <select
+          value={regimenFiscal}
+          onChange={(e) => setRegimenFiscal(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        >
+          <option value="">Seleccionar (opcional)</option>
+          {ISR_REGIMENES.map((item) => (
+            <option key={item.code} value={item.code}>{item.code} - {item.name} ({item.rateHint})</option>
+          ))}
+        </select>
       </div>
 
       {/* File uploads */}

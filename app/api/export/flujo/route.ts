@@ -3,6 +3,8 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { buildDemoFlujo, getDemoNombreEmpresa } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 import { rfcDisplay, rfcAlias } from "@/lib/rfc-aliases";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -87,16 +89,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc))) {
-    return new Response("RFC no encontrado", { status: 403 });
+  const demoMode = isDemoSession(session);
+  if (!demoMode) {
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return new Response("RFC no encontrado", { status: 403 });
+    }
   }
 
   try {
-    const [rows, nombreEmpresa] = await Promise.all([
-      fetchflujo(rfc, dateFrom, dateTo),
-      fetchNombreEmpresa(rfc),
-    ]);
+    const [rows, nombreEmpresa] = demoMode
+      ? [buildDemoFlujo(rfc, dateFrom, dateTo), getDemoNombreEmpresa(rfc)]
+      : await Promise.all([
+          fetchflujo(rfc, dateFrom, dateTo),
+          fetchNombreEmpresa(rfc),
+        ]);
 
     const normalizedRows = rows.map((row: typeof rows[number]) => {
       const tc = Number(row.tipoCambio) || 1;

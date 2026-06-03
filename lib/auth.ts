@@ -19,6 +19,7 @@ export interface JWTPayload {
   name: string;
   role: 'owner' | 'member' | 'chikenelo';
   ownerId?: string;  // solo para members y chikenelo: ID del dueño de la cuenta
+  isDemo?: boolean;
 }
 
 export async function signToken(payload: JWTPayload): Promise<string> {
