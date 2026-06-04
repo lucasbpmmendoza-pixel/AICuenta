@@ -12,6 +12,21 @@ interface Props {
   dailyLimit: number
 }
 
+function extractExcelDownloadUrl(text: string): string | null {
+  const match = text.match(/(?:sandbox:)?(\/api\/chat-docs\/export\/[a-zA-Z0-9-]+)/)
+  return match ? match[0] : null
+}
+
+function stripExcelUrlFromMessage(text: string): string {
+  return text
+    .replace(/\(\s*sandbox:\/api\/chat-docs\/export\/[a-zA-Z0-9-]+\s*\)/g, '')
+    .replace(/\(\s*\/api\/chat-docs\/export\/[a-zA-Z0-9-]+\s*\)/g, '')
+    .replace(/sandbox:\/api\/chat-docs\/export\/[a-zA-Z0-9-]+/g, '')
+    .replace(/\/api\/chat-docs\/export\/[a-zA-Z0-9-]+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -23,6 +38,8 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
+  const excelUrl = !isUser ? extractExcelDownloadUrl(msg.content) : null
+  const visibleContent = !isUser ? stripExcelUrlFromMessage(msg.content) : msg.content
 
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -31,13 +48,23 @@ function MessageBubble({ msg }: { msg: Message }) {
           DOC
         </div>
       )}
-      <div
-        className={[
-          'max-w-[88%] whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed',
-          isUser ? 'rounded-br-sm bg-[#1f2937] text-white' : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800 shadow-sm',
-        ].join(' ')}
-      >
-        {msg.content}
+      <div className="max-w-[88%]">
+        <div
+          className={[
+            'whitespace-pre-wrap rounded-2xl px-4 py-3 text-sm leading-relaxed',
+            isUser ? 'rounded-br-sm bg-[#1f2937] text-white' : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800 shadow-sm',
+          ].join(' ')}
+        >
+          {visibleContent}
+        </div>
+        {excelUrl && (
+          <a
+            href={excelUrl}
+            className="mt-2 inline-flex h-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+          >
+            Descargar Excel
+          </a>
+        )}
       </div>
       {isUser && (
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-600">
@@ -52,6 +79,8 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [showLimitModal, setShowLimitModal] = useState(false)
+  const [limitModalVisible, setLimitModalVisible] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -59,6 +88,21 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  useEffect(() => {
+    if (showLimitModal) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setLimitModalVisible(true))
+      })
+    } else {
+      setLimitModalVisible(false)
+    }
+  }, [showLimitModal])
+
+  function closeLimitModal() {
+    setLimitModalVisible(false)
+    setTimeout(() => setShowLimitModal(false), 220)
+  }
 
   async function sendMessage() {
     const text = input.trim()
@@ -80,6 +124,14 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
 
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: 'Error desconocido' }))
+        const limitReached = res.status === 429 || err?.code === 'PUBLIC_LIMIT_REACHED'
+
+        if (limitReached) {
+          setMessages((prev) => prev.slice(0, -1))
+          setShowLimitModal(true)
+          return
+        }
+
         const message =
           typeof err?.error === 'string'
             ? err.error
@@ -124,37 +176,78 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
-      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-4 pt-4 sm:px-6">
-        <header className="mb-3 rounded-2xl border border-slate-200 bg-white p-3 sm:p-3.5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">AIcuenta</p>
-              <h1 className="mt-0.5 text-base font-bold tracking-tight text-slate-900 sm:text-lg">Asistente Docs Publico</h1>
-              <p className="mt-0.5 text-xs text-slate-600">
-                Consulta abierta con limite de {dailyLimit} mensajes por dia.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/login"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Iniciar sesion
-              </Link>
+      {showLimitModal && (
+        <div
+          className={[
+            'fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 px-4 backdrop-blur-[1px]',
+            'transition-opacity duration-200',
+            limitModalVisible ? 'opacity-100' : 'opacity-0',
+          ].join(' ')}
+          onClick={closeLimitModal}
+        >
+          <div
+            className={[
+              'w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl',
+              'transition-all duration-200',
+              limitModalVisible ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.98] opacity-0',
+            ].join(' ')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Limite alcanzado</p>
+            <h2 className="mt-2 text-xl font-bold text-slate-900">Necesitas una cuenta y un plan de pago</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Ya usaste las {dailyLimit} consultas incluidas en modo publico. Crea tu cuenta para continuar y activar un plan premium.
+            </p>
+
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
               <Link
                 href="/register"
-                className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
+                className="inline-flex h-10 flex-1 items-center justify-center rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
                 Crear cuenta
               </Link>
+              <Link
+                href="/login"
+                className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Iniciar sesion
+              </Link>
             </div>
-          </div>
-        </header>
 
+            <button
+              type="button"
+              onClick={closeLimitModal}
+              className="mt-3 inline-flex h-9 w-full items-center justify-center rounded-lg text-sm font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 pb-4 pt-4 sm:px-6">
         <section className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white">
           <div className="border-b border-slate-200 px-5 py-3.5">
-            <p className="text-sm font-semibold text-slate-800">Asistente Documental IA</p>
-            <p className="mt-0.5 text-xs text-slate-500">Inicia sesion para acceder al modo premium.</p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Asistente Documental IA</p>
+                <p className="mt-0.5 text-xs text-slate-500">Inicia sesion para acceder al modo premium.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/login"
+                  className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Iniciar sesion
+                </Link>
+                <Link
+                  href="/register"
+                  className="inline-flex h-9 items-center justify-center rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Crear cuenta
+                </Link>
+              </div>
+            </div>
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
@@ -171,10 +264,10 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
                 </div>
                 <div className="mt-1 flex flex-wrap justify-center gap-2">
                   {[
-                    'Que categorias de documentos hay disponibles?',
-                    'Resumen de politicas contables',
-                    'Que clave SAT usar para consultoria?',
-                    'Que dice el manual sobre conciliacion bancaria?',
+                    'Que categorias de documentos tienes disponibles y cuántos hay por categoria?',
+                    'Que dice la Ley del IVA sobre actos o actividades gravadas?',
+                    'Que establece la Ley del ISR sobre ingresos acumulables?',
+                    'Que clave SAT recomiendas para servicios de consultoria administrativa?',
                   ].map((suggestion) => (
                     <button
                       key={suggestion}

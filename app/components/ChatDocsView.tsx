@@ -17,6 +17,21 @@ interface Props {
   accountType: 'single' | 'multi'
 }
 
+function extractExcelDownloadUrl(text: string): string | null {
+  const match = text.match(/(?:sandbox:)?(\/api\/chat-docs\/export\/[a-zA-Z0-9-]+)/)
+  return match ? match[0] : null
+}
+
+function stripExcelUrlFromMessage(text: string): string {
+  return text
+    .replace(/\(\s*sandbox:\/api\/chat-docs\/export\/[a-zA-Z0-9-]+\s*\)/g, '')
+    .replace(/\(\s*\/api\/chat-docs\/export\/[a-zA-Z0-9-]+\s*\)/g, '')
+    .replace(/sandbox:\/api\/chat-docs\/export\/[a-zA-Z0-9-]+/g, '')
+    .replace(/\/api\/chat-docs\/export\/[a-zA-Z0-9-]+/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
   return (
     <svg className={`${className} animate-spin`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -28,6 +43,8 @@ function Spinner({ className = 'h-4 w-4' }: { className?: string }) {
 
 function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
+  const excelUrl = !isUser ? extractExcelDownloadUrl(msg.content) : null
+  const visibleContent = !isUser ? stripExcelUrlFromMessage(msg.content) : msg.content
 
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -36,22 +53,27 @@ function MessageBubble({ msg }: { msg: Message }) {
           DOC
         </div>
       )}
-      <div
-        className={[
-          'max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap',
-          isUser
-            ? 'bg-[#7b6fe8] dark:bg-[#91EB78] text-white dark:text-zinc-900 rounded-br-sm'
-            : 'bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-100 rounded-bl-sm shadow-sm',
-        ].join(' ')}
-      >
-        {msg.content}
-      </div>
-      {isUser && (
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 dark:bg-zinc-700 text-slate-600 dark:text-zinc-300 text-xs font-bold">
-          Tu
+      <div className="max-w-[85%]">
+        <div
+          className={[
+            'rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap',
+            isUser
+              ? 'bg-[#7b6fe8] dark:bg-[#91EB78] text-white dark:text-zinc-900 rounded-br-sm'
+              : 'bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 text-slate-800 dark:text-zinc-100 rounded-bl-sm shadow-sm',
+          ].join(' ')}
+        >
+          {visibleContent}
         </div>
-      )}
+        {excelUrl && (
+          <a
+            href={excelUrl}
+            className="mt-2 inline-flex h-9 items-center justify-center rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-100"
+          >
+            Descargar Excel
+          </a>
+        )}
     </div>
+  </div>
   )
 }
 
