@@ -5,6 +5,11 @@
  */
 import { getSession } from '@/lib/session'
 import { startSession, subscribe, getStatus } from '@/lib/whatsapp-manager'
+import {
+  getWhatsappWorkerStreamHeaders,
+  getWhatsappWorkerUrl,
+  isWhatsappWorkerEnabled,
+} from '@/lib/whatsapp-worker'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -17,6 +22,30 @@ export async function GET() {
 
   // Owner key: owners use their own ID, members use their owner's ID
   const ownerId = session.ownerId ?? session.sub
+
+  if (isWhatsappWorkerEnabled()) {
+    const upstream = await fetch(getWhatsappWorkerUrl('/connect', ownerId), {
+      method: 'GET',
+      headers: getWhatsappWorkerStreamHeaders(),
+      cache: 'no-store',
+    })
+
+    if (!upstream.ok || !upstream.body) {
+      const body = await upstream.text().catch(() => 'Worker request failed')
+      return new Response(body || 'Worker request failed', {
+        status: upstream.status || 502,
+      })
+    }
+
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+      },
+    })
+  }
 
   // Kick off the session (no-op if already running)
   startSession(ownerId).catch(console.error)
