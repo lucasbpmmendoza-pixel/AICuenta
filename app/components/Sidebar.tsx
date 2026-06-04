@@ -160,6 +160,13 @@ const NAV_ITEMS: NavItem[] = [
           <circle cx="7" cy="3.6" r="2" fill="currentColor" />
           <circle cx="8.5" cy="4.5" r="2" fill="currentColor" />
 
+           <circle cx="3.5" cy="7" r="1.2" fill="white" />
+          <circle cx="4" cy="5" r="1.2" fill="white" />
+          <circle cx="5" cy="3.5" r="1.2" fill="white" />
+          <circle cx="5.7" cy="5" r="1.5" fill="white" />
+          <circle cx="7" cy="3.6" r="1.2" fill="white" />
+          <circle cx="8.5" cy="4.5" r="1.2" fill="white" />
+
           {/* cabeza/cuello/cuerpo */}
           <path d="M4.7 8.5c.9-1.5 2.5-2.3 4.2-2.3 2.7 0 5 2.1 5.2 4.8A2.7 2.7 0 0 0 14 12v6.3c0 2.7-2.2 4.9-4.9 4.9H8.9C6.2 23.2 4 21 4 18.3V11c0-1.5.8-2.9 2.1-3.9Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
 
