@@ -112,7 +112,7 @@ export async function GET(req: NextRequest) {
     // Column widths (ajustarAnchoColumnasNotasCredito)
     COL_WIDTHS.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
-    // Company header (escribirEncabezadoRfc — GRIS bg, height 20, white bold, centered, bordered)
+    // Company header (escribirEncabezadoRfc — GRIS bg, height 20,  bold, centered, bordered)
     const hRow = ws.addRow([nombreEmpresa]);
     hRow.height = 20;
     const hCell = hRow.getCell(1);
