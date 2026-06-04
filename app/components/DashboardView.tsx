@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import type { JWTPayload } from "@/lib/auth";
 import Sidebar from "./Sidebar";
+import TopBar from "./TopBar";
 import DashboardFooter from "./DashboardFooter";
 import DashboardCharts, { type DashboardData } from "./DashboardCharts";
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
@@ -56,7 +57,7 @@ export default function DashboardView({ session, accountType }: Props) {
     setData(null)
     setError(null)
     try {
-      const res = await fetch(`/api/dashboard/data?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`)
+      const res = await fetch(`/api/dashboard?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`)
       const d = await res.json()
       if (res.ok) {
         setData(d)
@@ -92,7 +93,7 @@ export default function DashboardView({ session, accountType }: Props) {
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
+      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
 
     <main className="flex-1 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
@@ -151,7 +152,7 @@ export default function DashboardView({ session, accountType }: Props) {
               <button onClick={() => fetchData(selectedRfc, year, month)} className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2">Reintentar</button>
             </div>
           ) : (
-            <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} />
+            <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} selectedRfc={selectedRfc} />
           )}
         </div>
         <DashboardFooter />

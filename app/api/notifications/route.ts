@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { isDemoSession } from "@/lib/demo-mode";
 
 export interface NotificationItem {
   id:         string;
@@ -13,13 +14,25 @@ export interface NotificationItem {
   created_at: string;
 }
 
+function isGuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 // ── GET /api/notifications ─────────────────────────────────────────────────
 // Devuelve las 30 notificaciones más recientes del usuario + conteo de no leídas
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
+  if (isDemoSession(session)) {
+    return NextResponse.json({ items: [], unreadCount: 0 });
+  }
+
   const userId = session.sub;
+  if (!isGuid(userId)) {
+    return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+  }
+
   const db = await getDb();
 
   const [itemsRes, countRes] = await Promise.all([
@@ -58,6 +71,14 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  if (isDemoSession(session)) {
+    return NextResponse.json({ ok: true });
+  }
+
+  if (!isGuid(session.sub)) {
+    return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+  }
 
   const body = await req.json().catch(() => ({}));
   if (body?.action !== "read-all")

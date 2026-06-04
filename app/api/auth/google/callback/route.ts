@@ -4,6 +4,7 @@ import sql from "mssql";
 import { getDb } from "@/lib/db";
 import { signToken, setAuthCookie } from "@/lib/auth";
 import { getPostLoginRedirect } from "@/lib/redirect";
+import { DEMO_COOKIE_NAME } from "@/lib/demo-mode";
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -165,5 +166,7 @@ export async function GET(req: NextRequest) {
   await setAuthCookie(token);
 
   const redirectTo = role === 'member' ? '/dashboard' : await getPostLoginRedirect(user.id);
-  return NextResponse.redirect(new URL(redirectTo, req.url));
+  const res = NextResponse.redirect(new URL(redirectTo, req.url));
+  res.cookies.delete(DEMO_COOKIE_NAME);
+  return res;
 }

@@ -2,10 +2,16 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { rfcAlias } from "@/lib/rfc-aliases";
+import { getDemoRfcs } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+  if (isDemoSession(session)) {
+    return NextResponse.json({ rfcs: getDemoRfcs() });
+  }
 
   const effectiveUserId = session.ownerId ?? session.sub;
 

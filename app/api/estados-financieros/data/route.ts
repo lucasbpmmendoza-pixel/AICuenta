@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchEstadosFinancieros } from "@/lib/facturas-query";
+import { buildDemoConceptos } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -18,6 +20,7 @@ async function validateRfc(userId: string, rfc: string): Promise<boolean> {
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  const demoMode = isDemoSession(session);
 
   const { searchParams } = new URL(req.url);
   const rfc   = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
@@ -28,14 +31,25 @@ export async function GET(req: NextRequest) {
   if (isNaN(year) || isNaN(month) || month < 1 || month > 12)
     return NextResponse.json({ error: "year/month inválidos" }, { status: 400 });
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc)))
-    return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
-
   const dateFrom = new Date(Date.UTC(year, month - 1, 1));
   const dateTo   = new Date(Date.UTC(year, month, 1));
 
   try {
+    if (demoMode) {
+      const conceptos = buildDemoConceptos(rfc, dateFrom, dateTo);
+      return NextResponse.json({
+        ingresos: conceptos.ingresos,
+        egresos: conceptos.egresos,
+        totalFacturasIngresos: conceptos.ingresos.reduce((acc, row) => acc + row.numFacturas, 0),
+        totalFacturasEgresos: conceptos.egresos.reduce((acc, row) => acc + row.numFacturas, 0),
+      });
+    }
+
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
+    }
+
     const data = await fetchEstadosFinancieros(rfc, dateFrom, dateTo, 20);
     return NextResponse.json(data);
   } catch (err) {

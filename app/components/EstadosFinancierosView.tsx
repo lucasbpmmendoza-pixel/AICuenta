@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
+
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
 import type { ConceptoRow } from '@/lib/facturas-query'
@@ -175,7 +176,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
     setEgresos([])
     try {
       const res = await fetch(
-        `/api/estados-financieros/data?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`
+        `/api/estados-financieros?rfc=${encodeURIComponent(rfc)}&year=${y}&month=${m}`
       )
       if (res.ok) {
         const d = await res.json()
@@ -226,7 +227,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
-      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} />
+      <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
     <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
 

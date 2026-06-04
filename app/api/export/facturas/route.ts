@@ -3,6 +3,9 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchRawCFDIForExport, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { buildDemoRawCFDIForExport, getDemoNombreEmpresa } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
+import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
@@ -387,15 +390,39 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc)))
-    return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
+  const demoMode = isDemoSession(session);
+  if (!demoMode) {
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
+    }
+  }
+
+  let demoDownloadLimit: ReturnType<typeof consumeDemoDownloadSlot> | null = null;
+
+  if (demoMode) {
+    demoDownloadLimit = consumeDemoDownloadSlot(req);
+    if (!demoDownloadLimit.allowed) {
+      return NextResponse.json(
+        { error: `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.` },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(demoDownloadLimit.retryAfterSeconds),
+            "Set-Cookie": demoDownloadLimit.setCookie,
+          },
+        }
+      );
+    }
+  }
 
   try {
-    const [rawRows, nombreEmpresa] = await Promise.all([
-      fetchRawCFDIForExport(rfc, dateFrom, dateTo),
-      fetchNombreEmpresa(rfc),
-    ]);
+    const [rawRows, nombreEmpresa] = demoMode
+      ? [buildDemoRawCFDIForExport(rfc, dateFrom, dateTo), getDemoNombreEmpresa(rfc)]
+      : await Promise.all([
+          fetchRawCFDIForExport(rfc, dateFrom, dateTo),
+          fetchNombreEmpresa(rfc),
+        ]);
 
     // ── Buffer rows by month and tipo ────────────────────────────────────────
     const totales: Record<string, Record<Tipo, Totales>> = {};
@@ -497,8 +524,8 @@ export async function GET(req: NextRequest) {
 
     // ── Monthly sheets ─────────────────────────────────────────────────────────
     const mesesArray = Object.keys(buffers).sort();
-    let sumaIngresos = resetTotales();
-    let sumaGastos   = resetTotales();
+    const sumaIngresos = resetTotales();
+    const sumaGastos   = resetTotales();
 
     for (const mes of mesesArray) {
       const hasData = TIPOS.some(tp => buffers[mes][tp].length > 0);
@@ -670,6 +697,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="facturas_${rfc}_${periodLabel}.xlsx"`,
         "Cache-Control": "no-store",
+        ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
       },
     });
   } catch (err) {

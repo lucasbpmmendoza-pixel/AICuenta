@@ -2,6 +2,8 @@ import { NextRequest } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { isDemoSession } from "@/lib/demo-mode";
+import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 
 type DiotRow = {
   rfcEmisor: string;
@@ -153,6 +155,7 @@ async function fetchDiotRows(rfc: string, dateFrom: Date, dateTo: Date): Promise
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return new Response("No autorizado", { status: 401 });
+  const demoMode = isDemoSession(session);
 
   const { searchParams } = new URL(req.url);
   const rfc = searchParams.get("rfc")?.trim().toUpperCase() ?? "";
@@ -167,13 +170,38 @@ export async function GET(req: NextRequest) {
     return new Response((err as Error).message, { status: 400 });
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc))) {
-    return new Response("RFC no encontrado", { status: 403 });
+  if (!demoMode) {
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return new Response("RFC no encontrado", { status: 403 });
+    }
+  }
+
+  let demoDownloadLimit: ReturnType<typeof consumeDemoDownloadSlot> | null = null;
+  if (demoMode) {
+    demoDownloadLimit = consumeDemoDownloadSlot(req);
+    if (!demoDownloadLimit.allowed) {
+      return new Response(
+        `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(demoDownloadLimit.retryAfterSeconds),
+            "Set-Cookie": demoDownloadLimit.setCookie,
+          },
+        }
+      );
+    }
   }
 
   try {
-    const rows = await fetchDiotRows(rfc, period.dateFrom, period.dateTo);
+    const rows = demoMode
+      ? [
+          { rfcEmisor: "AAA010101AAA", baseIva8: 12000, iva8: 960, baseIva16: 48000, iva16: 7680, baseIva0: 2500, baseIvaExento: 1000 },
+          { rfcEmisor: "BBB010101BBB", baseIva8: 8600, iva8: 688, baseIva16: 22000, iva16: 3520, baseIva0: 1800, baseIvaExento: 700 },
+          { rfcEmisor: "CCC010101CCC", baseIva8: 1400, iva8: 112, baseIva16: 9400, iva16: 1504, baseIva0: 300, baseIvaExento: 0 },
+        ]
+      : await fetchDiotRows(rfc, period.dateFrom, period.dateTo);
 
     const lines: string[] = [];
     const details = rows.map((row) => {
@@ -212,14 +240,21 @@ export async function GET(req: NextRequest) {
     const txt = lines.join("\n") + (lines.length > 0 ? "\n" : "");
 
     if (format === "json") {
-      return Response.json({
-        rfc,
-        period: period.label,
-        rows: details,
-        totalFilas: details.length,
-        totalLineasTxt: lines.length,
-        previewTxt: txt.slice(0, 4000),
-      });
+      return Response.json(
+        {
+          rfc,
+          period: period.label,
+          rows: details,
+          totalFilas: details.length,
+          totalLineasTxt: lines.length,
+          previewTxt: txt.slice(0, 4000),
+        },
+        {
+          headers: {
+            ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
+          },
+        }
+      );
     }
 
     const filename = `diot_${rfc}_${period.label}.txt`;
@@ -229,6 +264,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "text/plain; charset=utf-8",
         "Content-Disposition": `attachment; filename=\"${filename}\"`,
         "Cache-Control": "no-store",
+        ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
       },
     });
   } catch (err) {

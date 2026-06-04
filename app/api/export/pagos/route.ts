@@ -3,6 +3,9 @@ import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { fetchPagosData, fetchNombreEmpresa } from "@/lib/facturas-query";
+import { buildDemoPagos, getDemoNombreEmpresa } from "@/lib/demo-data";
+import { isDemoSession } from "@/lib/demo-mode";
+import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers (match variablesEstaticas.js / variablesEspecificas.js) ────
@@ -86,16 +89,39 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc))) {
-    return new Response("RFC no encontrado", { status: 403 });
+  const demoMode = isDemoSession(session);
+  if (!demoMode) {
+    const effectiveUserId = session.ownerId ?? session.sub;
+    if (!(await validateRfc(effectiveUserId, rfc))) {
+      return new Response("RFC no encontrado", { status: 403 });
+    }
+  }
+
+  let demoDownloadLimit: ReturnType<typeof consumeDemoDownloadSlot> | null = null;
+
+  if (demoMode) {
+    demoDownloadLimit = consumeDemoDownloadSlot(req);
+    if (!demoDownloadLimit.allowed) {
+      return new Response(
+        `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(demoDownloadLimit.retryAfterSeconds),
+            "Set-Cookie": demoDownloadLimit.setCookie,
+          },
+        }
+      );
+    }
   }
 
   try {
-    const [rows, nombreEmpresa] = await Promise.all([
-      fetchPagosData(rfc, dateFrom, dateTo),
-      fetchNombreEmpresa(rfc),
-    ]);
+    const [rows, nombreEmpresa] = demoMode
+      ? [buildDemoPagos(rfc, dateFrom, dateTo), getDemoNombreEmpresa(rfc)]
+      : await Promise.all([
+          fetchPagosData(rfc, dateFrom, dateTo),
+          fetchNombreEmpresa(rfc),
+        ]);
 
     // ─── Build workbook ────────────────────────────────────────────────────────
 
@@ -215,6 +241,7 @@ export async function GET(req: NextRequest) {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="${fileName}"`,
+        ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
       },
     });
   } catch (err) {
