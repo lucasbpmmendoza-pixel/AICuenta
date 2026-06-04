@@ -6,6 +6,7 @@ import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoConceptos, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Style helpers ─────────────────────────────────────────────────────────────
@@ -195,6 +196,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  let demoDownloadLimit: ReturnType<typeof consumeDemoDownloadSlot> | null = null;
+
+  if (demoMode) {
+    demoDownloadLimit = consumeDemoDownloadSlot(req);
+    if (!demoDownloadLimit.allowed) {
+      return new Response(
+        `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(demoDownloadLimit.retryAfterSeconds),
+            "Set-Cookie": demoDownloadLimit.setCookie,
+          },
+        }
+      );
+    }
+  }
+
   const dateFrom = new Date(Date.UTC(year, month - 1, 1));
   const dateTo   = new Date(Date.UTC(year, month, 1));
 
@@ -311,6 +330,7 @@ export async function GET(req: NextRequest) {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="estados-financieros_${rfc}_${String(month).padStart(2,"0")}-${year}.xlsx"`,
+        ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
       },
     });
   } catch (err) {

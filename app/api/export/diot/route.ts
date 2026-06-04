@@ -3,6 +3,7 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
+import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 
 type DiotRow = {
   rfcEmisor: string;
@@ -176,6 +177,23 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  let demoDownloadLimit: ReturnType<typeof consumeDemoDownloadSlot> | null = null;
+  if (demoMode) {
+    demoDownloadLimit = consumeDemoDownloadSlot(req);
+    if (!demoDownloadLimit.allowed) {
+      return new Response(
+        `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(demoDownloadLimit.retryAfterSeconds),
+            "Set-Cookie": demoDownloadLimit.setCookie,
+          },
+        }
+      );
+    }
+  }
+
   try {
     const rows = demoMode
       ? [
@@ -222,14 +240,21 @@ export async function GET(req: NextRequest) {
     const txt = lines.join("\n") + (lines.length > 0 ? "\n" : "");
 
     if (format === "json") {
-      return Response.json({
-        rfc,
-        period: period.label,
-        rows: details,
-        totalFilas: details.length,
-        totalLineasTxt: lines.length,
-        previewTxt: txt.slice(0, 4000),
-      });
+      return Response.json(
+        {
+          rfc,
+          period: period.label,
+          rows: details,
+          totalFilas: details.length,
+          totalLineasTxt: lines.length,
+          previewTxt: txt.slice(0, 4000),
+        },
+        {
+          headers: {
+            ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
+          },
+        }
+      );
     }
 
     const filename = `diot_${rfc}_${period.label}.txt`;
@@ -239,6 +264,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "text/plain; charset=utf-8",
         "Content-Disposition": `attachment; filename=\"${filename}\"`,
         "Cache-Control": "no-store",
+        ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
       },
     });
   } catch (err) {

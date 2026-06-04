@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { fetchRawCFDIForExport, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoRawCFDIForExport, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
@@ -397,6 +398,24 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  let demoDownloadLimit: ReturnType<typeof consumeDemoDownloadSlot> | null = null;
+
+  if (demoMode) {
+    demoDownloadLimit = consumeDemoDownloadSlot(req);
+    if (!demoDownloadLimit.allowed) {
+      return NextResponse.json(
+        { error: `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.` },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(demoDownloadLimit.retryAfterSeconds),
+            "Set-Cookie": demoDownloadLimit.setCookie,
+          },
+        }
+      );
+    }
+  }
+
   try {
     const [rawRows, nombreEmpresa] = demoMode
       ? [buildDemoRawCFDIForExport(rfc, dateFrom, dateTo), getDemoNombreEmpresa(rfc)]
@@ -678,6 +697,7 @@ export async function GET(req: NextRequest) {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "Content-Disposition": `attachment; filename="facturas_${rfc}_${periodLabel}.xlsx"`,
         "Cache-Control": "no-store",
+        ...(demoDownloadLimit ? { "Set-Cookie": demoDownloadLimit.setCookie } : {}),
       },
     });
   } catch (err) {
