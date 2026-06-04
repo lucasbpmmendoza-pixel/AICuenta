@@ -18,7 +18,7 @@ export async function GET(
     );
   }
 
-  return new NextResponse(exported.buffer, {
+  return new NextResponse(Uint8Array.from(exported.buffer), {
     headers: {
       "Content-Type": exported.contentType,
       "Content-Disposition": `attachment; filename="${exported.fileName}"`,
