@@ -95,8 +95,14 @@ function mulberry32(seed: number): () => number {
   };
 }
 
+/** Returns 0-3 based on the current UTC day, rotating every 4 days */
+function demoDaySlot(): number {
+  const daysSinceEpoch = Math.floor(Date.now() / 86400000);
+  return daysSinceEpoch % 4;
+}
+
 function rngFor(rfc: string, dateFrom: Date, dateTo: Date): () => number {
-  return mulberry32(hashString(`${rfc}|${dateFrom.toISOString()}|${dateTo.toISOString()}`));
+  return mulberry32(hashString(`${rfc}|${dateFrom.toISOString()}|${dateTo.toISOString()}|slot${demoDaySlot()}`));
 }
 
 function pick<T>(rand: () => number, values: T[]): T {

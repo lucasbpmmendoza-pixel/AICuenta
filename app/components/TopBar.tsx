@@ -49,7 +49,7 @@ export default function TopBar({ initialDemoMode, isDemo }: { initialDemoMode?: 
   if (!demoMode || isRegistered || hideOnAuthRoutes) return null
 
   return (
-    <div className="fixed top-[90px] right-0 z-50 p-6">
+    <div className="fixed top-[90px] right-4 z-50 flex flex-col gap-2">
       <button
         onClick={() => router.push('/register')}
         className="flex items-center gap-2 rounded-xl bg-[#7B6FE8] hover:bg-[#6955d4] text-white font-semibold py-2.5 px-6 transition-all shadow-lg dark:bg-[#91EB78] dark:text-zinc-900 dark:hover:bg-[#7ed65a]"
@@ -62,6 +62,18 @@ export default function TopBar({ initialDemoMode, isDemo }: { initialDemoMode?: 
         </svg>
         Registrarme
       </button>
+      
+      <button
+        onClick={() => router.push('/login')}
+        className="flex items-center gap-2 rounded-xl bg-[#7B6FE8] hover:bg-[#6955d4] text-white font-semibold py-2.5 px-6 transition-all shadow-lg dark:bg-[#91EB78] dark:text-zinc-900 dark:hover:bg-[#7ed65a]"
+      >
+        <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+          <circle cx="8.5" cy="7" r="4" />
+        </svg>
+        Iniciar sesión
+      </button>
     </div>
+    
   )
 }

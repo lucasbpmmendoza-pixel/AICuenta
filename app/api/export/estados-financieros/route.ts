@@ -25,6 +25,10 @@ const HEADER_BG   = "595959";
 const ING_BG      = "1A6B3C"; // verde oscuro para ingresos
 const EGR_BG      = "8B1A1A"; // rojo oscuro para egresos
 const AUD_BG      = "1F4E79";
+// ─── Estatus en Auditoria Conceptos ───────────────────────────────────────────
+const VIGENTE_BG       = "ADD395"; // fondo celda Vigente  (texto blanco)
+const CANCELADO_BG     = "E57F7F"; // fondo celda Cancelada (texto blanco)
+const CANCELADO_ROW_BG = "FFF0F0"; // tinte de toda la fila cancelada
 const MXN_FMT     = '"$"#,##0.00';
 const NUM_FMT     = "#,##0.00";
 
@@ -43,6 +47,7 @@ interface AuditoriaConceptoRow {
   cantidad: number;
   importe: number;
   descuento: number;
+  status: string;
 }
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
@@ -161,7 +166,8 @@ async function fetchAuditoriaConceptos(
         ISNULL(NULLIF(c.Descripcion,''), 'Sin descripción')           AS descripcion,
         ISNULL(TRY_CONVERT(decimal(18,4), c.Cantidad), 0)             AS cantidad,
         ISNULL(TRY_CONVERT(decimal(18,2), c.Importe), 0)              AS importe,
-        ISNULL(TRY_CONVERT(decimal(18,2), c.Descuento), 0)            AS descuento
+        ISNULL(TRY_CONVERT(decimal(18,2), c.Descuento), 0)            AS descuento,
+        ISNULL(f.Status, 'Vigente')                                    AS status
       FROM facturalo_cfdis f WITH (NOLOCK)
       INNER JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID))
         ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
@@ -253,6 +259,7 @@ export async function GET(req: NextRequest) {
     auditWs.columns = [
       { width: 38 },
       { width: 13 },
+      { width: 13 },
       { width: 12 },
       { width: 10 },
       { width: 17 },
@@ -264,7 +271,7 @@ export async function GET(req: NextRequest) {
       { width: 18, style: { numFmt: MXN_FMT } },
     ];
 
-    auditWs.mergeCells(1, 1, 1, 11);
+    auditWs.mergeCells(1, 1, 1, 12);
     const auditTitleRow = auditWs.getRow(1);
     auditTitleRow.height = 22;
     const auditTitleCell = auditTitleRow.getCell(1);
@@ -273,7 +280,7 @@ export async function GET(req: NextRequest) {
     auditTitleCell.alignment = { vertical: "middle", horizontal: "center" };
     setFill(auditTitleCell, AUD_BG);
 
-    auditWs.mergeCells(2, 1, 2, 11);
+    auditWs.mergeCells(2, 1, 2, 12);
     const auditSubRow = auditWs.getRow(2);
     auditSubRow.height = 16;
     const auditSubCell = auditSubRow.getCell(1);
@@ -285,6 +292,7 @@ export async function GET(req: NextRequest) {
     const auditHeaders = [
       "UUID Factura",
       "Fecha",
+      "Estatus",
       "Movimiento",
       "Tipo",
       "RFC Emisor",
@@ -296,6 +304,7 @@ export async function GET(req: NextRequest) {
       "Descuento",
     ];
     const auditHeaderRow = auditWs.addRow(auditHeaders);
+    auditHeaderRow.height = 30;
     auditHeaderRow.eachCell({ includeEmpty: true }, (cell) => {
       addBorder(cell);
       setFill(cell, AUD_BG);
@@ -304,9 +313,11 @@ export async function GET(req: NextRequest) {
     });
 
     for (const row of auditRows) {
+      const isCanceled = (row.status ?? '').toLowerCase().includes('cancel');
       const auditDataRow = auditWs.addRow([
         row.uuidFactura,
         row.fecha,
+        row.status,
         row.movimiento,
         row.tipoComprobante,
         row.rfcEmisor,
@@ -321,8 +332,13 @@ export async function GET(req: NextRequest) {
       auditDataRow.getCell(2).numFmt = "dd/mm/yyyy";
       auditDataRow.eachCell({ includeEmpty: true }, (cell, ci) => {
         addBorder(cell);
-        if (ci >= 9) cell.numFmt = ci === 9 ? NUM_FMT : MXN_FMT;
+        if (isCanceled) setFill(cell, CANCELADO_ROW_BG);
+        if (ci >= 10) cell.numFmt = ci === 10 ? NUM_FMT : MXN_FMT;
       });
+      const statusCell = auditDataRow.getCell(3);
+      setFill(statusCell, isCanceled ? CANCELADO_BG : VIGENTE_BG);
+      statusCell.font = { bold: false, color: { argb: '000000' } };
+      statusCell.alignment = { horizontal: 'center', vertical: 'middle' };
     }
 
     const buf = await wb.xlsx.writeBuffer();

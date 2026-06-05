@@ -165,7 +165,7 @@ export async function GET(req: NextRequest) {
   });
   await setAuthCookie(token);
 
-  const redirectTo = role === 'member' ? '/dashboard' : await getPostLoginRedirect(user.id);
+  const redirectTo = role === 'member' ? '/dashboard/chat-docs' : await getPostLoginRedirect(user.id);
   const res = NextResponse.redirect(new URL(redirectTo, req.url));
   res.cookies.delete(DEMO_COOKIE_NAME);
   return res;
