@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
+import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
+import { createChatExport } from "@/lib/chat-docs-export-store";
+import { loadFiscalContext, saveFiscalContext, type ContextMessage } from "@/lib/chat-fiscal-context";
 import {
   chatConciliarPagosRelacionados,
   chatAggregateCFDIs,
@@ -27,6 +30,7 @@ Reglas obligatorias:
 - Para preguntas sobre conceptos, gastos principales, desglose de items o gastos por tipo de producto, usa chat_get_conceptos_analysis con groupBy="clave" o "descripcion".
 - No calcules totales sumando resultados de chat_search_cfdis.
 - Si pide conciliación de complementos de pago tipo P o diferencias entre imp_pagado y monto_total_pagos, usa chat_conciliar_pagos.
+- Si el usuario pide generar o descargar Excel, usa create_excel con columnas y filas estructuradas.
 - Nunca inventes valores; si no hay datos, dilo explícitamente.
 - Responde siempre en español claro y profesional.
 - Mantén la clasificación: INGRESO = RFC cliente como emisor, EGRESO = RFC cliente como receptor.
@@ -140,7 +144,143 @@ const CHAT_TOOLS = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "create_excel",
+      description:
+        "Genera un archivo Excel (.xlsx) con los datos proporcionados. Usar cuando el usuario pida exportar o descargar resultados.",
+      parameters: {
+        type: "object",
+        properties: {
+          fileName: {
+            type: "string",
+            description: "Nombre del archivo, por ejemplo analisis_fiscal.xlsx",
+          },
+          sheetName: {
+            type: "string",
+            description: "Nombre de la hoja",
+          },
+          columns: {
+            type: "array",
+            items: { type: "string" },
+            description: "Lista de columnas en orden",
+          },
+          rows: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: {
+                anyOf: [{ type: "string" }, { type: "number" }, { type: "boolean" }, { type: "null" }],
+              },
+            },
+            description: "Arreglo de objetos que representan filas",
+          },
+        },
+        required: ["rows"],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
+
+function normalizeExcelRows(rows: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(rows)) return [];
+  return rows
+    .filter((row) => row && typeof row === "object" && !Array.isArray(row))
+    .map((row) => row as Record<string, unknown>);
+}
+
+function normalizeExcelColumns(rawColumns: unknown, rows: Record<string, unknown>[]): string[] {
+  if (Array.isArray(rawColumns)) {
+    const cols = rawColumns
+      .filter((v) => typeof v === "string")
+      .map((v) => v.trim())
+      .filter(Boolean);
+    if (cols.length > 0) return Array.from(new Set(cols));
+  }
+
+  const first = rows[0];
+  if (!first) return [];
+  return Object.keys(first);
+}
+
+function sanitizeExcelFileName(input: unknown): string {
+  const raw = typeof input === "string" ? input.trim() : "";
+  const normalized = raw
+    .normalize("NFKD")
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+  const withFallback = normalized || `reporte_fiscal_${new Date().toISOString().slice(0, 10)}`;
+  return withFallback.toLowerCase().endsWith(".xlsx") ? withFallback : `${withFallback}.xlsx`;
+}
+
+async function createExcelFromRows(args: Record<string, unknown>) {
+  const rows = normalizeExcelRows(args.rows);
+  if (rows.length === 0) {
+    return { error: "rows requerido y debe contener al menos una fila" };
+  }
+  if (rows.length > 3000) {
+    return { error: "rows excede el maximo permitido (3000)" };
+  }
+
+  const columns = normalizeExcelColumns(args.columns, rows);
+  if (columns.length === 0) {
+    return { error: "No se pudieron inferir columnas para el Excel" };
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const sheetName =
+    typeof args.sheetName === "string" && args.sheetName.trim().length > 0
+      ? args.sheetName.trim().slice(0, 31)
+      : "Analisis";
+  const ws = workbook.addWorksheet(sheetName);
+
+  ws.columns = columns.map((col) => ({
+    header: col,
+    key: col,
+    width: Math.max(12, Math.min(42, col.length + 4)),
+  }));
+
+  for (const row of rows) {
+    const normalized: Record<string, unknown> = {};
+    for (const col of columns) {
+      const value = row[col];
+      normalized[col] = value === undefined ? null : value;
+    }
+    ws.addRow(normalized);
+  }
+
+  const header = ws.getRow(1);
+  header.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  header.eachCell((cell) => {
+    cell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF4338CA" },
+    };
+    cell.border = {
+      top: { style: "thin", color: { argb: "FFD1D5DB" } },
+      left: { style: "thin", color: { argb: "FFD1D5DB" } },
+      bottom: { style: "thin", color: { argb: "FFD1D5DB" } },
+      right: { style: "thin", color: { argb: "FFD1D5DB" } },
+    };
+    cell.alignment = { vertical: "middle", horizontal: "left" };
+  });
+
+  const fileName = sanitizeExcelFileName(args.fileName);
+  const buf = Buffer.from(await workbook.xlsx.writeBuffer());
+  const exported = createChatExport(buf, fileName, "/api/chat/export");
+
+  return {
+    ok: true,
+    file_name: exported.fileName,
+    download_url: exported.url,
+    expires_at: exported.expiresAt,
+  };
+}
 
 function parseToolArgs(raw: string): Record<string, unknown> {
   try {
@@ -234,6 +374,10 @@ async function executeTool(
     });
   }
 
+  if (name === "create_excel") {
+    return createExcelFromRows(args);
+  }
+
   return { error: `Tool no soportada: ${name}` };
 }
 
@@ -264,10 +408,23 @@ export async function POST(req: Request) {
 
   try {
     const reqId = `chat_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const validMessages = sanitizeChatMessages(messages);
-    const lastUser = [...validMessages].reverse().find((m) => m.role === "user");
 
-    console.log(`[chat][${reqId}] start rfc=${rfc} dateFrom=${dateFrom} dateTo=${dateTo} msgs=${validMessages.length}`);
+    // ── Contexto persistido en BD (últimos 5 mensajes) ────────────────────────
+    const savedContext = await loadFiscalContext(session.sub, rfc);
+
+    // Tomar solo el último mensaje de usuario enviado por el cliente
+    const incomingMessages = sanitizeChatMessages(messages);
+    const newUserMsg = [...incomingMessages].reverse().find((m) => m.role === "user");
+
+    // Construir historial efectivo: contexto BD + nuevo mensaje del usuario
+    const effectiveHistory: ContextMessage[] = [
+      ...savedContext,
+      ...(newUserMsg ? [{ role: "user" as const, content: String(newUserMsg.content) }] : []),
+    ].slice(-5);
+
+    const lastUser = effectiveHistory.slice().reverse().find((m) => m.role === "user");
+
+    console.log(`[chat][${reqId}] start rfc=${rfc} dateFrom=${dateFrom} dateTo=${dateTo} savedCtx=${savedContext.length} effectiveHistory=${effectiveHistory.length}`);
     if (lastUser) {
       const preview = String(lastUser.content).replace(/\s+/g, " ").slice(0, 220);
       console.log(`[chat][${reqId}] user="${preview}${preview.length >= 220 ? "..." : ""}"`);
@@ -279,7 +436,7 @@ export async function POST(req: Request) {
         role: "system",
         content: `Contexto fijo de sesión: RFC=${rfc}, periodo=${dateFrom}..${dateTo}. Nunca consultes fuera de este RFC/período.`,
       },
-      ...validMessages,
+      ...effectiveHistory,
     ];
 
     for (let step = 0; step < 4; step++) {
@@ -300,6 +457,14 @@ export async function POST(req: Request) {
       if (toolCalls.length === 0) {
         const finalText = (msg.content ?? "No encontré información suficiente para responder.").toString();
         console.log(`[chat][${reqId}] final_without_tools chars=${finalText.length}`);
+
+        // Guardar contexto actualizado en BD (fire-and-forget)
+        const updatedContext: ContextMessage[] = [
+          ...effectiveHistory,
+          { role: "assistant", content: finalText },
+        ];
+        saveFiscalContext(session.sub, rfc, updatedContext).catch(() => {});
+
         return new Response(finalText, {
           headers: {
             "Content-Type": "text/plain; charset=utf-8",
@@ -342,7 +507,12 @@ export async function POST(req: Request) {
     }
 
     console.log(`[chat][${reqId}] max_steps_reached`);
-    return new Response("No pude completar la consulta en este momento.", {
+    const maxStepsText = "No pude completar la consulta en este momento.";
+    saveFiscalContext(session.sub, rfc, [
+      ...effectiveHistory,
+      { role: "assistant", content: maxStepsText },
+    ]).catch(() => {});
+    return new Response(maxStepsText, {
       headers: {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache, no-store",

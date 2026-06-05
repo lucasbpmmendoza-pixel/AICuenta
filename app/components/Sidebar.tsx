@@ -139,6 +139,16 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    label: 'Bot WhatsApp',
+    href: '/dashboard/whatsapp-bot',
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        <path d="M9 10h.01M12 10h.01M15 10h.01" strokeWidth="2.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     label: 'Soporte',
     href: '/dashboard/soporte',
     icon: (
@@ -256,6 +266,8 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
       '/dashboard/usuarios': 'tab_usuarios',
       '/dashboard/chat': 'tab_asistente_ia',
       '/dashboard/chat-docs': 'tab_asistente_docs',
+      '/dashboard/comprobantes': 'tab_comprobantes',
+      '/dashboard/whatsapp-bot': 'tab_comprobantes',
       '/dashboard/unete': 'tab_aichikenelo',
     }
     return tabMap[href] ?? null

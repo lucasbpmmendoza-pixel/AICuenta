@@ -4,6 +4,7 @@ import { put } from '@vercel/blob'
 import path from 'path'
 import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
+import { loadOwnerPlanLimits } from '@/lib/account-plan'
 
 const RFC_SAFE = /^[A-Za-z0-9_\-]{1,50}$/
 
@@ -45,6 +46,38 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
     return { success: false, message: 'El archivo KEY debe tener extension .key' }
   }
 
+  const effectiveUserId = session.ownerId ?? session.sub
+
+  // Validar limites por plan antes de subir archivos
+  try {
+    const db = await getDb()
+    const limits = await loadOwnerPlanLimits(db, effectiveUserId)
+
+    const countResult = await db
+      .request()
+      .input('user_id', effectiveUserId)
+      .input('rfc', rfc)
+      .query<{ total: number; exists_rfc: number }>(`
+        SELECT
+          COUNT(1) AS total,
+          SUM(CASE WHEN rfc = @rfc THEN 1 ELSE 0 END) AS exists_rfc
+        FROM EFIELES
+        WHERE user_id = @user_id
+      `)
+
+    const total = countResult.recordset[0]?.total ?? 0
+    const existsRfc = (countResult.recordset[0]?.exists_rfc ?? 0) > 0
+    if (!existsRfc && total >= limits.maxRfcs) {
+      return {
+        success: false,
+        message: `Tu plan ${limits.planType} permite hasta ${limits.maxRfcs} RFC(s). Actualiza tu plan para registrar mas RFCs.`,
+      }
+    }
+  } catch (err) {
+    console.error('[uploadFiles] limit check error:', (err as Error).message)
+    return { success: false, message: 'No se pudo validar el limite de RFCs. Intenta de nuevo.' }
+  }
+
   // Sanitize filenames (keep only safe characters)
   const safeCerName = cerFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
   const safeKeyName = keyFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
@@ -58,7 +91,7 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
     const db = await getDb()
     await db
       .request()
-      .input('user_id', session.sub)
+      .input('user_id', effectiveUserId)
       .input('rfc', rfc)
       .input('fiel', efiel)
       .query(`

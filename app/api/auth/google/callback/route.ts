@@ -135,8 +135,8 @@ export async function GET(req: NextRequest) {
         .input("email", sql.NVarChar(254), googleUser.email)
         .input("googleId", sql.NVarChar(255), googleUser.id)
         .query(
-          `INSERT INTO users (id, name, email, google_id, password_hash, email_verified, is_active)
-           VALUES (NEWID(), @name, @email, @googleId, NULL, 1, 1)`,
+          `INSERT INTO users (id, name, email, google_id, password_hash, email_verified, is_active, plan_type)
+           VALUES (NEWID(), @name, @email, @googleId, NULL, 1, 1, 'basic')`,
         );
 
       const created = await db
