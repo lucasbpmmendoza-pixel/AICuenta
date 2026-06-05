@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
 
   // Members y chikenelo siempre van al dashboard (no necesitan configurar EFIEL)
   const redirectTo = (role === 'member' || role === 'chikenelo')
-    ? '/dashboard/chat-docs'
+    ? '/dashboard'
     : await getPostLoginRedirect(user.id);
   const res = NextResponse.json({ ok: true, redirectTo });
   res.cookies.delete(DEMO_COOKIE_NAME);

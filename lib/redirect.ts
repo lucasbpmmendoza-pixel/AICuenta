@@ -14,10 +14,10 @@ export async function getPostLoginRedirect(userId: string): Promise<string> {
         `SELECT COUNT(1) AS cnt FROM EFIELES WHERE user_id = @userId`,
       );
     const count = result.recordset[0]?.cnt ?? 0;
-    return count > 0 ? "/dashboard/chat-docs" : "/upload-fiel";
+    return count > 0 ? "/dashboard" : "/upload-fiel";
   } catch (err) {
     console.error("[getPostLoginRedirect] DB error:", (err as Error).message);
     // Si falla la consulta, mandamos al dashboard por defecto
-    return "/dashboard/chat-docs";
+    return "/dashboard";
   }
 }

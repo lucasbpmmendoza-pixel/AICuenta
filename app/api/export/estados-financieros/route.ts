@@ -26,8 +26,8 @@ const ING_BG      = "1A6B3C"; // verde oscuro para ingresos
 const EGR_BG      = "8B1A1A"; // rojo oscuro para egresos
 const AUD_BG      = "1F4E79";
 // ─── Estatus en Auditoria Conceptos ───────────────────────────────────────────
-const VIGENTE_BG       = "ADD395"; // fondo celda Vigente  (texto blanco)
-const CANCELADO_BG     = "E57F7F"; // fondo celda Cancelada (texto blanco)
+const VIGENTE_BG       = "EBF1DE"; // fondo celda Vigente  (texto blanco)
+const CANCELADO_BG     = "E6B8B7"; // fondo celda Cancelada (texto blanco)
 const CANCELADO_ROW_BG = "FFF0F0"; // tinte de toda la fila cancelada
 const MXN_FMT     = '"$"#,##0.00';
 const NUM_FMT     = "#,##0.00";
