@@ -487,10 +487,13 @@ export interface flujoRow {
   moneda:              string;
   tipoCambio:          number;
   subtotal:            number;
-  iva:                 number;
+  importe_pagado:      number;
+  tasa_o_cuota:        number;
+  importe_impuesto:    number;
   retISR:              number;
   retIVA:              number;
   total:               number;
+  iva:                 number;
   movimiento:          "INGRESO" | "EGRESO";
 
 }
@@ -530,7 +533,12 @@ export async function fetchflujo(
           ISNULL(p.moneda,'MXN')                                            AS moneda,
           ISNULL(p.tipoCambio, 1)                                           AS tipoCambio,
           ISNULL((SELECT SUM(ISNULL(dd.base,0))     FROM dbo.facturalo_pago_doc_relacionado dd WHERE dd.pago_id = p.id), 0) AS subtotal,
-          ISNULL((SELECT SUM(ISNULL(dd.impuesto,0)) FROM dbo.facturalo_pago_doc_relacionado dd WHERE dd.pago_id = p.id), 0) AS iva,
+          ISNULL((SELECT SUM(ISNULL(dd.saldo_pagado,0)) FROM dbo.facturalo_pago_doc_relacionado dd WHERE dd.pago_id = p.id), 0) AS importe_pagado,
+          ISNULL((SELECT TOP 1 ISNULL(dd.tasa_o_cuota,0) FROM dbo.facturalo_pago_doc_relacionado dd WHERE dd.pago_id = p.id ORDER BY dd.numParcialidad DESC, dd.id DESC), 0) AS tasa_o_cuota,
+          ISNULL(
+            TRY_CONVERT(decimal(18,2), p.total_trasladados_impuesto),
+            ISNULL(TRY_CONVERT(decimal(18,2), p.total_trasladados_impuesto), 0)
+          ) AS importe_impuesto,
           0                                                                 AS retISR,
           0                                                                 AS retIVA,
           ISNULL(TRY_CONVERT(decimal(18,2), p.monto_total_pagos), 0)       AS total
@@ -559,7 +567,9 @@ export async function fetchflujo(
           ISNULL(Moneda,'MXN')                                              AS moneda,
           ISNULL(NULLIF(TRY_CONVERT(decimal(18,6), tipoCambio),0), 1)      AS tipoCambio,
           TRY_CONVERT(decimal(18,2), ISNULL(Subtotal,0))                   AS subtotal,
-          TRY_CONVERT(decimal(18,2), ISNULL(TotalTrasladado,0))            AS iva,
+          TRY_CONVERT(decimal(18,2), ISNULL(Subtotal,0))                   AS importe_pagado,
+          0                                                               AS tasa_o_cuota,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalTrasladado,0))            AS importe_impuesto,
           TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoISR,0))           AS retISR,
           TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoIVA,0))           AS retIVA,
           TRY_CONVERT(decimal(18,2), ISNULL(Total,0))                      AS total

@@ -32,10 +32,10 @@ const EP_HEADERS = [
   "RFC Emisor", "Razón Social Emisor",
   "RFC Receptor", "Razón Social Receptor",
   "Forma Pago", "Moneda", "Tipo Cambio",
-  "Subtotal", "IVA", "Ret. ISR", "Ret. IVA", "Total",
+  "Subtotal", "Importe Pagado", "Tasa o Cuota", "Importe Impuesto", "Ret. ISR", "Ret. IVA", "Total",
 ];
 
-const COL_WIDTHS = [15, 38, 42, 13, 13, 17, 30, 17, 30, 13, 10, 12, 14, 14, 13, 13, 14];
+const COL_WIDTHS = [15, 38, 42, 13, 13, 17, 30, 17, 30, 13, 10, 12, 14, 14, 12, 14, 13, 13, 14];
 const COL_COUNT  = EP_HEADERS.length;
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
@@ -128,16 +128,17 @@ export async function GET(req: NextRequest) {
       const tc = Number(row.tipoCambio) || 1;
       const subtotalMx = Number(row.subtotal) * tc;
       const totalMx = Number(row.total) * tc;
-      const rawIvaMx = Number(row.iva) * tc;
-      const ivaMx = row.fuente === "Complemento P"
-        ? Math.max(totalMx - subtotalMx, 0)
-        : rawIvaMx;
+      const importePagadoMx = Number(row.importe_pagado) * tc;
+      const tasaOCuota = Number(row.tasa_o_cuota) || 0;
+      const importeImpuestoMx = Number(row.importe_impuesto) * tc;
 
       return {
         ...row,
         tc,
         subtotalMx,
-        ivaMx,
+        importePagadoMx,
+        tasaOCuota,
+        importeImpuestoMx,
         retIsrMx: Number(row.retISR) * tc,
         retIvaMx: Number(row.retIVA) * tc,
         totalMx,
@@ -188,6 +189,9 @@ export async function GET(req: NextRequest) {
 
       for (const row of sectionRows) {
         const isPago = row.fuente === "Complemento P";
+        const importePagado = isPago ? row.importePagadoMx : null;
+        const tasaOCuota = isPago ? row.tasaOCuota : null;
+        const importeImpuesto = isPago ? row.importeImpuestoMx : null;
         const dr = ws.addRow([
           row.fuente,
           row.uuid,
@@ -202,7 +206,9 @@ export async function GET(req: NextRequest) {
           row.moneda,
           row.tc,
           row.subtotalMx,
-          row.ivaMx,
+          importePagado,
+          tasaOCuota,
+          importeImpuesto,
           row.retIsrMx,
           row.retIvaMx,
           row.totalMx,
@@ -214,26 +220,28 @@ export async function GET(req: NextRequest) {
 
         dr.eachCell({ includeEmpty: true }, (cell, ci) => {
           addBorder(cell);
-          if (ci >= 13 && ci <= 17) cell.numFmt = MXN_FMT;
+          if ([13, 14, 16, 17, 18].includes(ci)) cell.numFmt = MXN_FMT;
         });
       }
 
       const totSubtotal = sectionRows.reduce((s, r) => s + r.subtotalMx, 0);
-      const totIva = sectionRows.reduce((s, r) => s + r.ivaMx, 0);
+      const totImportePagado = sectionRows.reduce((s, r) => s + r.importePagadoMx, 0);
+      const totTasaOCuota = sectionRows.reduce((s, r) => s + r.tasaOCuota, 0);
+      const totImporteImpuesto = sectionRows.reduce((s, r) => s + r.importeImpuestoMx, 0);
       const totRetISR = sectionRows.reduce((s, r) => s + r.retIsrMx, 0);
       const totRetIVA = sectionRows.reduce((s, r) => s + r.retIvaMx, 0);
       const totTotal = sectionRows.reduce((s, r) => s + r.totalMx, 0);
 
       const totRow = ws.addRow([
         `TOTAL ${title}`, null, null, null, null, null, null, null, null, null, null, null,
-        totSubtotal, totIva, totRetISR, totRetIVA, totTotal,
+        totSubtotal, totImportePagado, totTasaOCuota, totImporteImpuesto, totRetISR, totRetIVA, totTotal,
       ]);
       totRow.font = { bold: true };
       totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
         addBorder(cell);
         setFill(cell, HEADER_BG);
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        if (ci >= 13 && ci <= 17) cell.numFmt = MXN_FMT;
+        if ([13, 14, 16, 17, 18].includes(ci)) cell.numFmt = MXN_FMT;
       });
 
       ws.addRow([]);
@@ -244,7 +252,9 @@ export async function GET(req: NextRequest) {
 
     const sumSection = (rowsToSum: typeof normalizedRows) => ({
       subtotal: rowsToSum.reduce((s, r) => s + r.subtotalMx, 0),
-      iva: rowsToSum.reduce((s, r) => s + r.ivaMx, 0),
+      importePagado: rowsToSum.reduce((s, r) => s + r.importePagadoMx, 0),
+      tasaOCuota: rowsToSum.reduce((s, r) => s + r.tasaOCuota, 0),
+      importeImpuesto: rowsToSum.reduce((s, r) => s + r.importeImpuestoMx, 0),
       retISR: rowsToSum.reduce((s, r) => s + r.retIsrMx, 0),
       retIVA: rowsToSum.reduce((s, r) => s + r.retIvaMx, 0),
       total: rowsToSum.reduce((s, r) => s + r.totalMx, 0),
@@ -254,21 +264,23 @@ export async function GET(req: NextRequest) {
     const sumEgresos = sumSection(egresos);
 
     const grandSubtotal = sumIngresos.subtotal - sumEgresos.subtotal;
-    const grandIva = sumIngresos.iva - sumEgresos.iva;
+    const grandImportePagado = sumIngresos.importePagado - sumEgresos.importePagado;
+    const grandTasaOCuota = sumIngresos.tasaOCuota - sumEgresos.tasaOCuota;
+    const grandImporteImpuesto = sumIngresos.importeImpuesto - sumEgresos.importeImpuesto;
     const grandRetISR = sumIngresos.retISR - sumEgresos.retISR;
     const grandRetIVA = sumIngresos.retIVA - sumEgresos.retIVA;
     const grandTotal = sumIngresos.total - sumEgresos.total;
 
     const grandRow = ws.addRow([
       "TOTAL GENERAL", null, null, null, null, null, null, null, null, null, null, null,
-      grandSubtotal, grandIva, grandRetISR, grandRetIVA, grandTotal,
+      grandSubtotal, grandImportePagado, grandTasaOCuota, grandImporteImpuesto, grandRetISR, grandRetIVA, grandTotal,
     ]);
     grandRow.font = { bold: true };
     grandRow.eachCell({ includeEmpty: true }, (cell, ci) => {
       addBorder(cell);
       setFill(cell, HEADER_BG);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      if (ci >= 13 && ci <= 17) cell.numFmt = MXN_FMT;
+      if ([13, 14, 16, 17, 18].includes(ci)) cell.numFmt = MXN_FMT;
     });
 
     const buf = await wb.xlsx.writeBuffer();

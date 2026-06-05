@@ -514,6 +514,7 @@ export function buildDemoFlujo(rfc: string, dateFrom: Date, dateTo: Date): flujo
     const subtotal = money(rand, 4500, 90000);
     const iva = Number((subtotal * 0.16).toFixed(2));
     const total = Number((subtotal + iva).toFixed(2));
+    const importePagado = i % 2 === 0 ? total : subtotal;
     return {
       uuid: uuidLike("u", i),
       fuente: i % 2 === 0 ? "Complemento P" : "Factura PUE",
@@ -528,8 +529,11 @@ export function buildDemoFlujo(rfc: string, dateFrom: Date, dateTo: Date): flujo
       moneda: "MXN",
       tipoCambio: 1,
       subtotal,
-      iva,
+        importe_pagado: i % 2 === 0 ? importePagado : 0,
+        tasa_o_cuota: i % 2 === 0 ? 0.16 : 0,
+        importe_impuesto: i % 2 === 0 ? iva : 0,
       retISR: 0,
+      iva,
       retIVA: 0,
       total,
       movimiento: i % 2 === 0 ? "INGRESO" : "EGRESO",

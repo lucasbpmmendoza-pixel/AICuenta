@@ -30,11 +30,11 @@ const PAGOS_HEADERS = [
   "Forma Pago", "Moneda Pago", "Tipo Cambio", "Total Pago",
   "UUID Documento", "Moneda Documento", "Num Parcialidad",
   "Saldo Anterior", "Importe Pagado", "Saldo Insoluto",
-  "Base", "Impuesto", "Tipo Factor", "Tasa o Cuota", "Importe Impuesto", "Objeto Impuesto",
+  "Base", "Tipo Factor", "Tasa o Cuota", "Importe Impuesto", "Objeto Impuesto",
 ];
 
 // Column widths match ajustarAnchoColumnas() in variablesEspecificas.js
-const COL_WIDTHS = [13, 13, 18, 17, 16, 13, 13, 13, 13, 18, 13, 13, 13, 13, 13, 10, 13, 13, 15, 13, 13];
+const COL_WIDTHS = [13, 13, 18, 17, 16, 13, 13, 13, 13, 18, 13, 13, 13, 13, 13, 10, 13, 15, 13, 13];
 const COL_COUNT  = PAGOS_HEADERS.length;
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
@@ -172,21 +172,20 @@ export async function GET(req: NextRequest) {
         Number(row.saldo_pagado)   * tc,   // 14 Importe Pagado
         Number(row.saldo_insoluto) * tc,   // 15 Saldo Insoluto
         Number(row.base)           * tc,   // 16 Base
-        Number(row.impuesto)       * tc,   // 17 Impuesto
-        row.tipo_factor,                   // 18 Tipo Factor
-        row.tasa_o_cuota,                  // 19 Tasa o Cuota
-        Number(row.importe)        * tc,   // 20 Importe Impuesto
-        row.objetoImpuesto,                // 21 Objeto Impuesto
+        row.tipo_factor,                   // 17 Tipo Factor
+        row.tasa_o_cuota,                  // 18 Tasa o Cuota
+        Number(row.importe)        * tc,   // 19 Importe Impuesto
+        row.objetoImpuesto,                // 20 Objeto Impuesto
       ]);
 
       // Date format for cols 1 & 2
       dr.getCell(1).numFmt = DATE_FMT;
       dr.getCell(2).numFmt = DATE_FMT;
 
-      // Money format and borders (cols 8-18 match original pagos.js: colIndex >= 8 && colIndex <= 18)
+      // Money format and borders (cols 8-17 match original pagos.js: colIndex >= 8 && colIndex <= 17)
       dr.eachCell({ includeEmpty: true }, (cell, ci) => {
         addBorder(cell);
-        if (ci >= 8 && ci <= 18) cell.numFmt = MXN;
+        if (ci >= 8 && ci <= 17) cell.numFmt = MXN;
       });
     }
 
@@ -211,17 +210,16 @@ export async function GET(req: NextRequest) {
       sum(r => Number(r.saldo_pagado)   * (Number(r.tipoCambio) || 1)),   // 14 Importe Pagado
       sum(r => Number(r.saldo_insoluto) * (Number(r.tipoCambio) || 1)),   // 15 Saldo Insoluto
       sum(r => Number(r.base)           * (Number(r.tipoCambio) || 1)),   // 16 Base
-      sum(r => Number(r.impuesto)       * (Number(r.tipoCambio) || 1)),   // 17 Impuesto
-      null,           // 18 Tipo Factor
-      null,           // 19 Tasa o Cuota
-      sum(r => Number(r.importe)        * (Number(r.tipoCambio) || 1)),   // 20 Importe Impuesto
-      null,           // 21 Objeto Impuesto
+      null,           // 17 Tipo Factor
+      null,           // 18 Tasa o Cuota
+      sum(r => Number(r.importe)        * (Number(r.tipoCambio) || 1)),   // 19 Importe Impuesto
+      null,           // 20 Objeto Impuesto
     ]);
     totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
       addBorder(cell);
       setFill(cell, HEADER_BG);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      if ([9, 13, 14, 15, 16, 17, 20].includes(ci)) cell.numFmt = MXN;
+      if ([9, 13, 14, 15, 16, 19].includes(ci)) cell.numFmt = MXN;
     });
 
     // Stream response

@@ -595,7 +595,7 @@ export default function FacturasView({ session, accountType }: Props) {
             <div className="mt-6 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
               <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-slate-200 dark:border-zinc-800">
                 <div>
-                  <h2 className="text-sm font-bold text-sky-700 dark:text-sky-300">flujo</h2>
+                  <h2 className="text-sm font-bold text-sky-700 dark:text-sky-300">Flujo de efectivo</h2>
                   <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">Complementos de pago (P) + Facturas PUE del período</p>
                 </div>
                 <div className="flex items-center gap-2">
