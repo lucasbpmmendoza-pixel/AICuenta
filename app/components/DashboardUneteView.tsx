@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
 import { rfcDisplay } from '@/lib/rfc-aliases'
+
+const UNETE_HINT_KEY = 'aicuenta_unete_first_visit'
 
 interface Props {
   session: JWTPayload
@@ -19,10 +21,32 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
   const [nombre, setNombre] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [showNamePulse, setShowNamePulse] = useState(false)
   // Checkboxes: por defecto todos seleccionados
   const [checkedRfcs, setCheckedRfcs] = useState<Set<string>>(new Set(allRfcs))
   // RFC principal para el mensaje de WhatsApp (el primero seleccionado)
   const selectedRfc = allRfcs.find(r => checkedRfcs.has(r)) ?? ''
+
+  // First-visit name input pulse
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const visited = localStorage.getItem(UNETE_HINT_KEY)
+    if (!visited) {
+      setShowNamePulse(true)
+      localStorage.setItem(UNETE_HINT_KEY, 'true')
+    }
+  }, [])
+
+  // Auto-hide pulse after 30s
+  useEffect(() => {
+    if (!showNamePulse) return
+    const timer = setTimeout(() => setShowNamePulse(false), 30000)
+    return () => clearTimeout(timer)
+  }, [showNamePulse])
+
+  function dismissNamePulse() {
+    setShowNamePulse(false)
+  }
 
   function toggleRfc(rfc: string) {
     if (readOnly) return
@@ -98,10 +122,13 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
                 <input
                   type="text"
                   value={nombre}
-                  onChange={(e) => setNombre(e.target.value)}
+                  onChange={(e) => {
+                    setNombre(e.target.value)
+                    dismissNamePulse()
+                  }}
                   disabled={readOnly}
                   placeholder="Ingresa tu nombre completo"
-                  className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-sm"
+                  className={`rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition text-sm ${showNamePulse ? 'animate-wave-input-emerald' : ''}`}
                 />
               </div>
 

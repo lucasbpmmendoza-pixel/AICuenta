@@ -40,7 +40,7 @@ const sections = [
   },
   {
     title: "9. Limitacion de responsabilidad",
-    body: "En la medida permitida por la ley, AIcuenta no sera responsable por danos indirectos, incidentales o consecuenciales derivados del uso o imposibilidad de uso del servicio.",
+    body: "En la medida permitida por la ley, AIcuenta no sera responsable por daños indirectos, incidentales o consecuenciales derivados del uso o imposibilidad de uso del servicio.",
   },
   {
     title: "10. Cambios a estos terminos",

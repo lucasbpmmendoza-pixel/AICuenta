@@ -55,10 +55,13 @@ function MessageBubble({ msg }: { msg: Message }) {
   )
 }
 
+const CHAT_DOCS_HINT_KEY = 'aicuenta_chat_docs_first_visit'
+
 export default function ChatDocsView({ session, accountType }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [showChatPulse, setShowChatPulse] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -67,9 +70,32 @@ export default function ChatDocsView({ session, accountType }: Props) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // First-visit chat pulse
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const visited = localStorage.getItem(CHAT_DOCS_HINT_KEY)
+    if (!visited) {
+      setShowChatPulse(true)
+      localStorage.setItem(CHAT_DOCS_HINT_KEY, 'true')
+    }
+  }, [])
+
+  // Auto-hide pulse after 30s
+  useEffect(() => {
+    if (!showChatPulse) return
+    const timer = setTimeout(() => setShowChatPulse(false), 30000)
+    return () => clearTimeout(timer)
+  }, [showChatPulse])
+
+  function dismissChatPulse() {
+    setShowChatPulse(false)
+  }
+
   async function sendMessage() {
     const text = input.trim()
     if (!text || sending) return
+
+    dismissChatPulse()
 
     const userMsg: Message = { role: 'user', content: text }
     const history = [...messages, userMsg]
@@ -206,7 +232,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
               disabled={sending}
               placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de linea)"
               rows={2}
-              className="flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition disabled:opacity-50"
+              className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-docs' : ''}`}
             />
             <button
               onClick={sendMessage}

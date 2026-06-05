@@ -10,7 +10,7 @@ export default async function LoginPage() {
   
   // Registered users should not access login page
   if (session && !isDemo) {
-    redirect("/dashboard");
+    redirect("/dashboard/chat-docs");
   }
   
   return (

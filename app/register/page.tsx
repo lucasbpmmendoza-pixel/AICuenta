@@ -9,7 +9,7 @@ export default async function RegisterPage() {
   
   // Registered users should not access register page
   if (session && !isDemo) {
-    redirect("/dashboard");
+    redirect("/dashboard/chat-docs");
   }
   
   return <RegisterView />;

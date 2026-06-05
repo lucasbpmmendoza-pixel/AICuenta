@@ -149,6 +149,34 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   const [egresos,     setEgresos]     = useState<ConceptoRow[]>([])
   const [loading,     setLoading]     = useState(false)
   const [exporting,   setExporting]   = useState(false)
+  const [showDownloadPulse, setShowDownloadPulse] = useState(false)
+  const EF_HINT_KEY = 'aicuenta_ef_first_visit'
+
+  // Check if first visit to Estados Financieros and enable download button pulse
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const visited = localStorage.getItem(EF_HINT_KEY)
+    if (!visited) {
+      setShowDownloadPulse(true)
+    }
+  }, [])
+
+  // Dismiss pulse when user makes download or leaves after 30s
+  useEffect(() => {
+    if (!showDownloadPulse) return
+    const timer = setTimeout(() => {
+      setShowDownloadPulse(false)
+      try { localStorage.setItem(EF_HINT_KEY, '1') } catch {}
+    }, 30000)
+    return () => clearTimeout(timer)
+  }, [showDownloadPulse])
+
+  const dismissDownloadPulse = useCallback(() => {
+    if (showDownloadPulse) {
+      try { localStorage.setItem(EF_HINT_KEY, '1') } catch {}
+      setShowDownloadPulse(false)
+    }
+  }, [showDownloadPulse])
 
   // Cargar RFCs al montar
   useEffect(() => {
@@ -206,6 +234,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
 
   async function handleExport() {
     if (!selectedRfc || exporting) return
+    dismissDownloadPulse()
     setExporting(true)
     logAction('btn_descargar_estados_financieros')
     try {
@@ -272,7 +301,9 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                 <button
                   onClick={handleExport}
                   disabled={exporting || loading}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                  className={`inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                    showDownloadPulse ? 'animate-wave-emerald' : ''
+                  }`}
                 >
                   {exporting ? (
                     <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>

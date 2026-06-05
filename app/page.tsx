@@ -7,10 +7,10 @@ export default async function Home() {
   const isDemo = isDemoSession(session);
   
   // Demo users -> chat demo
-  // Registered users -> dashboard
+  // Registered users -> docs assistant
   // No session -> landing/login fallback
   if (session && !isDemo) {
-    redirect("/dashboard");
+    redirect("/dashboard/chat-docs");
   }
   
   redirect("/dashboard/chat-docs?demo=1");

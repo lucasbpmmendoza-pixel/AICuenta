@@ -75,6 +75,8 @@ function MessageBubble({ msg }: { msg: Message }) {
   )
 }
 
+const CHAT_HINT_KEY = 'aicuenta_chat_first_visit'
+
 export default function ChatbotView({ session, accountType }: Props) {
   const now = startOfDay(new Date())
   const fixedDateFrom = new Date(now.getFullYear(), 0, 1)
@@ -86,6 +88,7 @@ export default function ChatbotView({ session, accountType }: Props) {
   const [messages,    setMessages]    = useState<Message[]>([])
   const [input,       setInput]       = useState('')
   const [sending,     setSending]     = useState(false)
+  const [showChatPulse, setShowChatPulse] = useState(false)
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -103,6 +106,27 @@ export default function ChatbotView({ session, accountType }: Props) {
     }).catch(() => {})
   }, [])
 
+  // First-visit chat pulse
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const visited = localStorage.getItem(CHAT_HINT_KEY)
+    if (!visited) {
+      setShowChatPulse(true)
+      localStorage.setItem(CHAT_HINT_KEY, 'true')
+    }
+  }, [])
+
+  // Auto-hide pulse after 30s
+  useEffect(() => {
+    if (!showChatPulse) return
+    const timer = setTimeout(() => setShowChatPulse(false), 30000)
+    return () => clearTimeout(timer)
+  }, [showChatPulse])
+
+  function dismissChatPulse() {
+    setShowChatPulse(false)
+  }
+
   useEffect(() => {
     if (!selectedRfc) return
     saveSelectedRfc(selectedRfc)
@@ -116,6 +140,8 @@ export default function ChatbotView({ session, accountType }: Props) {
   async function sendMessage() {
     const text = input.trim()
     if (!text || sending || !selectedRfc) return
+
+    dismissChatPulse()
 
     const userMsg: Message = { role: 'user', content: text }
     const history = [...messages, userMsg]
@@ -294,7 +320,7 @@ export default function ChatbotView({ session, accountType }: Props) {
                   : 'Escribe tu pregunta… (Enter para enviar, Shift+Enter para salto de línea)'
               }
               rows={2}
-              className="flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8] dark:focus:ring-[#91EB78] transition disabled:opacity-50"
+              className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8] dark:focus:ring-[#91EB78] transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-chat' : ''}`}
             />
             <button
               onClick={sendMessage}

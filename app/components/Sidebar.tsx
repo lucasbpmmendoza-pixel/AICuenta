@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/app/hooks/useTheme'
 import { logAction } from '@/lib/logs'
+import OnboardingBeacon from './OnboardingBeacon'
+import OnboardingModal from './OnboardingModal'
 
 export type AccountType = 'single' | 'multi'
 
@@ -13,6 +15,8 @@ interface Props {
   role?: 'owner' | 'member' | 'chikenelo'
   ownerId?: string
   isDemo?: boolean
+  showBeacons?: boolean
+  onDismissBeacons?: () => void
 }
 
 interface NavItem {
@@ -159,7 +163,7 @@ const NAV_ITEMS: NavItem[] = [
           <circle cx="6" cy="5" r="2" fill="currentColor" />
           <circle cx="7" cy="3.6" r="2" fill="currentColor" />
           <circle cx="8.5" cy="4.5" r="2" fill="currentColor" />
-          
+
           {/* cabeza/cuello/cuerpo */}
           <path d="M4.7 8.5c.9-1.5 2.5-2.3 4.2-2.3 2.7 0 5 2.1 5.2 4.8A2.7 2.7 0 0 0 14 12v6.3c0 2.7-2.2 4.9-4.9 4.9H8.9C6.2 23.2 4 21 4 18.3V11c0-1.5.8-2.9 2.1-3.9Z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
 
@@ -174,7 +178,7 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
-export default function Sidebar({ userName, accountType, role, ownerId, isDemo = false }: Props) {
+export default function Sidebar({ userName, accountType, role, ownerId, isDemo = false, showBeacons, onDismissBeacons }: Props) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -184,6 +188,58 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
 
   // isOwner: true solo si role es 'owner' Y no tiene ownerId (subordinados siempre tienen ownerId)
   const isOwner = role === 'owner' && !ownerId
+
+  // hrefs que reciben beacon en onboarding
+  const BEACON_HREFS = ['/dashboard', '/dashboard/facturas', '/dashboard/estados-financieros', '/dashboard/chat', '/dashboard/chat-docs', '/dashboard/unete']
+  const BEACON_HREFS_SET = new Set(BEACON_HREFS)
+  const VISITED_KEY = 'aicuenta_beacons_visited'
+  const BEACONS_DONE_KEY = 'aicuenta_beacons_done'
+  const isShowBeaconsControlled = showBeacons !== undefined
+
+  const [internalShowBeacons, setInternalShowBeacons] = useState(false)
+  const [showHelpModal, setShowHelpModal] = useState(false)
+
+  useEffect(() => {
+    if (isShowBeaconsControlled) {
+      setInternalShowBeacons(Boolean(showBeacons))
+      return
+    }
+    // Keep beacons active by default (manual modal only), until user completes/dismisses beacon flow.
+    if (typeof window === 'undefined') return
+    const beaconsDismissed = localStorage.getItem(BEACONS_DONE_KEY)
+    setInternalShowBeacons(!beaconsDismissed)
+  }, [isShowBeaconsControlled, showBeacons])
+
+  const beaconsEnabled = isShowBeaconsControlled ? Boolean(showBeacons) : internalShowBeacons
+
+  // Tracks which beacon routes the user has actually visited
+  const [visitedBeacons, setVisitedBeacons] = useState<Set<string>>(() => {
+    if (typeof window === 'undefined') return new Set()
+    try {
+      const raw = localStorage.getItem(VISITED_KEY)
+      return raw ? new Set(JSON.parse(raw) as string[]) : new Set()
+    } catch { return new Set() }
+  })
+
+  // Mark current page as visited when pathname changes
+  useEffect(() => {
+    if (!beaconsEnabled) return
+    if (!BEACON_HREFS_SET.has(pathname)) return
+    setVisitedBeacons((prev) => {
+      if (prev.has(pathname)) return prev
+      const next = new Set(prev)
+      next.add(pathname)
+      try { localStorage.setItem(VISITED_KEY, JSON.stringify([...next])) } catch {}
+      // All beacons visited -> signal parent to hide
+      if (BEACON_HREFS.every((h) => next.has(h))) {
+        try { localStorage.setItem(BEACONS_DONE_KEY, '1') } catch {}
+        setInternalShowBeacons(false)
+        if (onDismissBeacons) onDismissBeacons()
+      }
+      return next
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, beaconsEnabled])
 
   const visibleItems = NAV_ITEMS.filter((item) => {
     if (item.onlyMulti && accountType !== 'multi') return false
@@ -205,10 +261,24 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
     return tabMap[href] ?? null
   }
 
-  function handleNavClick(href: string) {
+  function handleNavClick(href: string, isBeaconHref = false) {
     const tabName = getTabNameFromHref(href)
     if (tabName) {
       logAction(tabName)
+    }
+    if (isBeaconHref && beaconsEnabled) {
+      setVisitedBeacons((prev) => {
+        if (prev.has(href)) return prev
+        const next = new Set(prev)
+        next.add(href)
+        try { localStorage.setItem(VISITED_KEY, JSON.stringify([...next])) } catch {}
+        if (BEACON_HREFS.every((h) => next.has(h))) {
+          try { localStorage.setItem(BEACONS_DONE_KEY, '1') } catch {}
+          setInternalShowBeacons(false)
+          if (onDismissBeacons) onDismissBeacons()
+        }
+        return next
+      })
     }
     setMobileOpen(false)
   }
@@ -227,6 +297,13 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
 
   const navContent = (
     <div className="flex h-full flex-col">
+      <OnboardingModal
+        userName={userName}
+        forceOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        onDone={() => setShowHelpModal(false)}
+      />
+
       {/* Logo */}
       <div className="flex items-center gap-4 px-2 py-1 border-b border-slate-200 dark:border-zinc-800">
         <div className="flex items-center justify-center" style={{ width: 75, height: 75 }}>
@@ -254,12 +331,12 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
               onClick={(e) => {
                 e.preventDefault()
                 if (isDisabled) return
-                handleNavClick(item.href)
+                handleNavClick(item.href, BEACON_HREFS_SET.has(item.href))
                 router.push(item.href)
               }}
               aria-disabled={isDisabled}
               className={[
-                'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
+                'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
                 isDisabled
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500'
                   : isActive
@@ -270,9 +347,29 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
             >
               {item.icon}
               {item.label}
+              {beaconsEnabled && BEACON_HREFS_SET.has(item.href) && !visitedBeacons.has(item.href) && (
+                <OnboardingBeacon
+                  position="top-right"
+                  color={item.href === '/dashboard/chat' || item.href === '/dashboard/chat-docs' ? 'green' : item.href === '/dashboard/unete' ? 'amber' : 'brand'}
+                  size={12}
+                />
+              )}
             </a>
           )
         })}
+
+        <button
+          type="button"
+          onClick={() => setShowHelpModal(true)}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957] dark:hover:text-[#6BDA4D] transition-all duration-150"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <circle cx="12" cy="17" r=".5" fill="currentColor" />
+          </svg>
+          Ayuda
+        </button>
       </nav>
 
       {/* User + theme + logout */}

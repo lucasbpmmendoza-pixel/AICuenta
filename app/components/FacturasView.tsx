@@ -76,6 +76,34 @@ export default function FacturasView({ session, accountType }: Props) {
   const [loadingEfectivamente, setLoadingEfectivamente]         = useState(false)
   const [exportingEfectivamente, setExportingEfectivamente]     = useState(false)
   const [exportingDiot, setExportingDiot]                       = useState(false)
+  const [showDownloadPulse, setShowDownloadPulse]               = useState(false)
+  const FACTURAS_HINT_KEY = 'aicuenta_facturas_first_visit'
+
+  // Check if first visit to Facturas and enable download button pulse
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const visited = localStorage.getItem(FACTURAS_HINT_KEY)
+    if (!visited) {
+      setShowDownloadPulse(true)
+    }
+  }, [])
+
+  // Dismiss pulse when user makes any download or leaves after 30s
+  useEffect(() => {
+    if (!showDownloadPulse) return
+    const timer = setTimeout(() => {
+      setShowDownloadPulse(false)
+      try { localStorage.setItem(FACTURAS_HINT_KEY, '1') } catch {}
+    }, 30000)
+    return () => clearTimeout(timer)
+  }, [showDownloadPulse])
+
+  const dismissDownloadPulse = useCallback(() => {
+    if (showDownloadPulse) {
+      try { localStorage.setItem(FACTURAS_HINT_KEY, '1') } catch {}
+      setShowDownloadPulse(false)
+    }
+  }, [showDownloadPulse])
 
   useEffect(() => {
     fetch('/api/rfcs').then(r => r.json()).then(d => {
@@ -196,6 +224,7 @@ export default function FacturasView({ session, accountType }: Props) {
 
   async function handleExportNotas() {
     if (!selectedRfc || exportingNotas) return
+    dismissDownloadPulse()
     setExportingNotas(true)
     logAction('btn_descargar_notas_facturas')
     try {
@@ -214,6 +243,7 @@ export default function FacturasView({ session, accountType }: Props) {
 
   async function handleExportEfectivamente() {
     if (!selectedRfc || exportingEfectivamente) return
+    dismissDownloadPulse()
     setExportingEfectivamente(true)
     logAction('btn_descargar_flujo_facturas')
     try {
@@ -232,6 +262,7 @@ export default function FacturasView({ session, accountType }: Props) {
 
   async function handleExportPagos() {
     if (!selectedRfc || exportingPagos) return
+    dismissDownloadPulse()
     setExportingPagos(true)
     logAction('btn_descargar_pagos_facturas')
     try {
@@ -250,6 +281,7 @@ export default function FacturasView({ session, accountType }: Props) {
 
   async function handleExport() {
     if (!selectedRfc || exporting) return
+    dismissDownloadPulse()
     setExporting(true)
     logAction('btn_descargar_excel_facturas')
     try {
@@ -268,6 +300,7 @@ export default function FacturasView({ session, accountType }: Props) {
 
   async function handleExportDiot() {
     if (!selectedRfc || exportingDiot) return
+    dismissDownloadPulse()
     setExportingDiot(true)
     logAction('btn_descargar_diot_facturas')
     try {
@@ -358,7 +391,7 @@ export default function FacturasView({ session, accountType }: Props) {
                     onClick={() => setPeriodType(pt)}
                     className={`px-3 py-1.5 text-xs font-semibold transition ${periodType === pt ? 'bg-[#7B6FE8] text-white dark:bg-[#91eb78] dark:text-black' : 'text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957]  dark:hover:text-[#6BDA4D]'}`}
                   >
-                    {pt === 'month' ? 'Mes' : pt === 'quarter' ? 'Trimestre' : pt === 'year' ? 'Ano' : 'Rango'}
+                    {pt === 'month' ? 'Mes' : pt === 'quarter' ? 'Trimestre' : pt === 'year' ? 'Año' : 'Rango'}
                   </button>
                 ))}
               </div>
@@ -432,7 +465,9 @@ export default function FacturasView({ session, accountType }: Props) {
                   <button
                     onClick={handleExportDiot}
                     disabled={exportingDiot || loading || !data}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                      showDownloadPulse ? 'animate-wave-indigo' : ''
+                    }`}
                   >
                     {exportingDiot ? (
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
@@ -445,7 +480,9 @@ export default function FacturasView({ session, accountType }: Props) {
                   <button
                     onClick={handleExport}
                     disabled={exporting || loading || !data}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                      showDownloadPulse ? 'animate-wave-emerald' : ''
+                    }`}
                   >
                     {exporting ? (
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
@@ -533,7 +570,9 @@ export default function FacturasView({ session, accountType }: Props) {
                   <button
                     onClick={handleExportPagos}
                     disabled={exportingPagos || loadingPagos}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                      showDownloadPulse ? 'animate-wave-teal' : ''
+                    }`}
                   >
                     {exportingPagos ? (
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
@@ -568,7 +607,9 @@ export default function FacturasView({ session, accountType }: Props) {
                   <button
                     onClick={handleExportEfectivamente}
                     disabled={exportingEfectivamente || loadingEfectivamente}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                      showDownloadPulse ? 'animate-wave-sky' : ''
+                    }`}
                   >
                     {exportingEfectivamente ? (
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
@@ -602,7 +643,9 @@ export default function FacturasView({ session, accountType }: Props) {
                   <button
                     onClick={handleExportNotas}
                     disabled={exportingNotas || loadingNotas}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition"
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                      showDownloadPulse ? 'animate-wave-orange' : ''
+                    }`}
                   >
                     {exportingNotas ? (
                       <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
