@@ -12,6 +12,11 @@ import {
   chatSearchCFDIs,
   chatGetConceptosAnalysis,
   chatGetTopFacturas,
+  chatGetResumenFiscal,
+  chatGetIvaDesglose,
+  chatGetNomina,
+  chatGetFlujoEfectivo,
+  chatGetFacturasCanceladas,
 } from "@/lib/facturas-query";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -30,6 +35,11 @@ Reglas obligatorias:
 - Para preguntas sobre conceptos, gastos principales, desglose de items o gastos por tipo de producto, usa chat_get_conceptos_analysis con groupBy="clave" o "descripcion".
 - No calcules totales sumando resultados de chat_search_cfdis.
 - Si pide conciliación de complementos de pago tipo P o diferencias entre imp_pagado y monto_total_pagos, usa chat_conciliar_pagos.
+- Si el usuario pide un resumen general, resumen fiscal, situación del periodo o panorama general, usa chat_resumen_fiscal.
+- Para preguntas sobre IVA (IVA a pagar, IVA a favor, IVA trasladado, IVA acreditable, desglose por tasa), usa chat_get_iva_desglose.
+- Para preguntas sobre nómina, sueldos, empleados, ISR de nómina, usa chat_get_nomina.
+- Para preguntas sobre flujo de efectivo real, cuánto cobré/pagué efectivamente, complementos de pago por forma de pago, usa chat_get_flujo_efectivo.
+- Para preguntas sobre facturas canceladas, cancelaciones del periodo, usa chat_get_facturas_canceladas.
 - Si el usuario pide generar o descargar Excel, usa create_excel con columnas y filas estructuradas.
 - Nunca inventes valores; si no hay datos, dilo explícitamente.
 - Responde siempre en español claro y profesional.
@@ -139,6 +149,88 @@ const CHAT_TOOLS = [
           movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
           tipoComprobante: { type: "string", enum: ["I", "E", "N", "P"] },
           limit: { type: "number", description: "Máximo de facturas (1-200)", default: 20 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_resumen_fiscal",
+      description: "Devuelve un resumen fiscal completo del periodo: totales de ingresos, egresos, nómina, notas de crédito, complementos de pago y canceladas. Usar para preguntas como 'dame un resumen', 'cuál es mi situación fiscal', 'resumen del periodo'.",
+      parameters: {
+        type: "object",
+        properties: {},
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_iva_desglose",
+      description: "Desglosa el IVA por tasa (16%, 8%, 0%, exento) para ingresos y egresos, calcula IVA trasladado, acreditable y neto a pagar. Usar para preguntas sobre IVA, declaración de IVA, IVA a favor/a cargo.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_nomina",
+      description: "Analiza los CFDIs de nómina (tipo N) agrupados por empleado o patrón. Usar para preguntas sobre nómina, sueldos, ISR retenido en nómina, empleados.",
+      parameters: {
+        type: "object",
+        properties: {
+          direccion: {
+            type: "string",
+            enum: ["EMITIDA", "RECIBIDA", "AMBAS"],
+            default: "AMBAS",
+            description: "EMITIDA = nóminas que el RFC emite (patrón), RECIBIDA = nóminas que el RFC recibe (empleado)",
+          },
+          limit: { type: "number", description: "Máximo de registros (1-200)", default: 50 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_flujo_efectivo",
+      description: "Calcula el flujo de efectivo real: montos efectivamente cobrados/pagados a partir de complementos de pago (tipo P) y facturas PUE. Usar para preguntas sobre flujo de caja, cuánto cobré/pagué realmente, efectivo del periodo.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
+          groupBy: {
+            type: "string",
+            enum: ["none", "mes", "formaPago"],
+            default: "none",
+            description: "Agrupar resultados por: none (total), mes, formaPago (efectivo, transferencia, etc.)",
+          },
+          limit: { type: "number", description: "Máximo de grupos (1-300)", default: 50 },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "chat_get_facturas_canceladas",
+      description: "Lista y resume las facturas canceladas del periodo. Usar para preguntas sobre cancelaciones, facturas canceladas, cuánto se canceló.",
+      parameters: {
+        type: "object",
+        properties: {
+          movimiento: { type: "string", enum: ["INGRESO", "EGRESO", "AMBOS"], default: "AMBOS" },
+          limit: { type: "number", description: "Máximo de facturas (1-200)", default: 50 },
         },
         additionalProperties: false,
       },
@@ -370,6 +462,36 @@ async function executeTool(
     return chatGetTopFacturas(rfc, dfrom, dto, {
       movimiento: args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined,
       tipoComprobante: args.tipoComprobante as "I" | "E" | "N" | "P" | undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
+  }
+
+  if (name === "chat_resumen_fiscal") {
+    return chatGetResumenFiscal(rfc, dfrom, dto);
+  }
+
+  if (name === "chat_get_iva_desglose") {
+    return chatGetIvaDesglose(rfc, dfrom, dto, args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined);
+  }
+
+  if (name === "chat_get_nomina") {
+    return chatGetNomina(rfc, dfrom, dto, {
+      direccion: args.direccion as "EMITIDA" | "RECIBIDA" | "AMBAS" | undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
+  }
+
+  if (name === "chat_get_flujo_efectivo") {
+    return chatGetFlujoEfectivo(rfc, dfrom, dto, {
+      movimiento: args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined,
+      groupBy: args.groupBy as "none" | "mes" | "formaPago" | undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
+  }
+
+  if (name === "chat_get_facturas_canceladas") {
+    return chatGetFacturasCanceladas(rfc, dfrom, dto, {
+      movimiento: args.movimiento as "INGRESO" | "EGRESO" | "AMBOS" | undefined,
       limit: typeof args.limit === "number" ? args.limit : undefined,
     });
   }

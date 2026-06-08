@@ -1502,6 +1502,371 @@ export async function chatGetConceptosAnalysis(
   };
 }
 
+// ─── Chat: Resumen Fiscal General ────────────────────────────────────────────
+
+export async function chatGetResumenFiscal(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+) {
+  const db = await getDbLong();
+  const TC = `ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)`;
+
+  const res = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .query(`
+      SELECT
+        COUNT(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN 1 END) AS ingresosCount,
+        ISNULL(SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(Subtotal,0)*${TC} END),0) AS ingresosSubtotal,
+        ISNULL(SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalTrasladado,0)*${TC} END),0) AS ingresosIVA,
+        ISNULL(SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoISR,0)*${TC} END),0) AS ingresosRetISR,
+        ISNULL(SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoIVA,0)*${TC} END),0) AS ingresosRetIVA,
+        ISNULL(SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(Total,0)*${TC} END),0) AS ingresosTotal,
+
+        COUNT(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN 1 END) AS egresosCount,
+        ISNULL(SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(Subtotal,0)*${TC} END),0) AS egresosSubtotal,
+        ISNULL(SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalTrasladado,0)*${TC} END),0) AS egresosIVA,
+        ISNULL(SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoISR,0)*${TC} END),0) AS egresosRetISR,
+        ISNULL(SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoIVA,0)*${TC} END),0) AS egresosRetIVA,
+        ISNULL(SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(Total,0)*${TC} END),0) AS egresosTotal,
+
+        COUNT(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='N' AND UPPER(Status)='VIGENTE' THEN 1 END) AS nominaCount,
+        ISNULL(SUM(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='N' AND UPPER(Status)='VIGENTE' THEN ISNULL(Subtotal,0)*${TC} END),0) AS nominaSubtotal,
+        ISNULL(SUM(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='N' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoISR,0)*${TC} END),0) AS nominaRetISR,
+        ISNULL(SUM(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='N' AND UPPER(Status)='VIGENTE' THEN ISNULL(Total,0)*${TC} END),0) AS nominaTotal,
+
+        COUNT(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='E' AND UPPER(Status)='VIGENTE' THEN 1 END) AS notasCreditoCount,
+        ISNULL(SUM(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='E' AND UPPER(Status)='VIGENTE' THEN ISNULL(Total,0)*${TC} END),0) AS notasCreditoTotal,
+
+        COUNT(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND TipoComprobante='P' AND UPPER(Status)='VIGENTE' THEN 1 END) AS complementosPagoCount,
+
+        COUNT(CASE WHEN (RFC_Emisor=@rfc OR RFC_Receptor=@rfc) AND UPPER(Status)<>'VIGENTE' THEN 1 END) AS canceladasCount
+      FROM facturalo_cfdis WITH (NOLOCK)
+      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
+        AND Fecha>=@dateFrom AND Fecha<@dateTo
+    `);
+
+  const row = res.recordset[0] ?? {};
+  return {
+    periodo: { desde: dateFrom.toISOString().slice(0, 10), hasta: dateTo.toISOString().slice(0, 10) },
+    ingresos: {
+      facturas: row.ingresosCount ?? 0,
+      subtotal: row.ingresosSubtotal ?? 0,
+      iva: row.ingresosIVA ?? 0,
+      retISR: row.ingresosRetISR ?? 0,
+      retIVA: row.ingresosRetIVA ?? 0,
+      total: row.ingresosTotal ?? 0,
+    },
+    egresos: {
+      facturas: row.egresosCount ?? 0,
+      subtotal: row.egresosSubtotal ?? 0,
+      iva: row.egresosIVA ?? 0,
+      retISR: row.egresosRetISR ?? 0,
+      retIVA: row.egresosRetIVA ?? 0,
+      total: row.egresosTotal ?? 0,
+    },
+    nomina: {
+      cfdi: row.nominaCount ?? 0,
+      subtotal: row.nominaSubtotal ?? 0,
+      retISR: row.nominaRetISR ?? 0,
+      total: row.nominaTotal ?? 0,
+    },
+    notasCredito: {
+      cfdi: row.notasCreditoCount ?? 0,
+      total: row.notasCreditoTotal ?? 0,
+    },
+    complementosPago: { cfdi: row.complementosPagoCount ?? 0 },
+    canceladas: { cfdi: row.canceladasCount ?? 0 },
+  };
+}
+
+// ─── Chat: Desglose de IVA por tasa ──────────────────────────────────────────
+
+export async function chatGetIvaDesglose(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  movimiento?: "INGRESO" | "EGRESO" | "AMBOS",
+) {
+  const db = await getDbLong();
+  const mov = movimiento ?? "AMBOS";
+  const TC = `ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)`;
+
+  const res = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("movimiento", sql.NVarChar, mov)
+    .query(`
+      SELECT
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVA16,0)*${TC} ELSE 0 END) AS ingresosBase16,
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalTrasladadoIVADieciseis,0)*${TC} ELSE 0 END) AS ingresosIVA16,
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVA8,0)*${TC} ELSE 0 END) AS ingresosBase8,
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalTrasladadoIVAOcho,0)*${TC} ELSE 0 END) AS ingresosIVA8,
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVA0,0)*${TC} ELSE 0 END) AS ingresosBase0,
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVAExento,0)*${TC} ELSE 0 END) AS ingresosBaseExento,
+        SUM(CASE WHEN RFC_Emisor=@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='INGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoIVA,0)*${TC} ELSE 0 END) AS ingresosRetIVA,
+
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVA16,0)*${TC} ELSE 0 END) AS egresosBase16,
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalTrasladadoIVADieciseis,0)*${TC} ELSE 0 END) AS egresosIVA16,
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVA8,0)*${TC} ELSE 0 END) AS egresosBase8,
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalTrasladadoIVAOcho,0)*${TC} ELSE 0 END) AS egresosIVA8,
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVA0,0)*${TC} ELSE 0 END) AS egresosBase0,
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(BaseIVAExento,0)*${TC} ELSE 0 END) AS egresosBaseExento,
+        SUM(CASE WHEN RFC_Receptor=@rfc AND RFC_Emisor<>@rfc AND TipoComprobante='I' AND UPPER(Movimiento)='EGRESO' AND UPPER(Status)='VIGENTE' THEN ISNULL(TotalRetenidoIVA,0)*${TC} ELSE 0 END) AS egresosRetIVA
+      FROM facturalo_cfdis WITH (NOLOCK)
+      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
+        AND Fecha>=@dateFrom AND Fecha<@dateTo
+        AND TipoComprobante='I'
+    `);
+
+  const r = res.recordset[0] ?? {};
+  return {
+    ingresos: {
+      tasa16: { base: r.ingresosBase16 ?? 0, iva: r.ingresosIVA16 ?? 0 },
+      tasa8:  { base: r.ingresosBase8 ?? 0, iva: r.ingresosIVA8 ?? 0 },
+      tasa0:  { base: r.ingresosBase0 ?? 0 },
+      exento: { base: r.ingresosBaseExento ?? 0 },
+      retenidoIVA: r.ingresosRetIVA ?? 0,
+      ivaNetoPagar: (r.ingresosIVA16 ?? 0) + (r.ingresosIVA8 ?? 0) - (r.ingresosRetIVA ?? 0),
+    },
+    egresos: {
+      tasa16: { base: r.egresosBase16 ?? 0, iva: r.egresosIVA16 ?? 0 },
+      tasa8:  { base: r.egresosBase8 ?? 0, iva: r.egresosIVA8 ?? 0 },
+      tasa0:  { base: r.egresosBase0 ?? 0 },
+      exento: { base: r.egresosBaseExento ?? 0 },
+      retenidoIVA: r.egresosRetIVA ?? 0,
+      ivaAcreditar: (r.egresosIVA16 ?? 0) + (r.egresosIVA8 ?? 0),
+    },
+    ivaNeto: {
+      descripcion: "IVA de ingresos menos IVA acreditable de egresos",
+      resultado: ((r.ingresosIVA16 ?? 0) + (r.ingresosIVA8 ?? 0)) - ((r.egresosIVA16 ?? 0) + (r.egresosIVA8 ?? 0)),
+    },
+  };
+}
+
+// ─── Chat: Nómina ─────────────────────────────────────────────────────────────
+
+export interface ChatNominaFilters {
+  direccion?: "EMITIDA" | "RECIBIDA" | "AMBAS";
+  limit?: number;
+}
+
+export async function chatGetNomina(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatNominaFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 50, 200));
+  const dir = filters.direccion ?? "AMBAS";
+  const TC = `ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)`;
+
+  const res = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .query(`
+      SELECT TOP (@limit)
+        CASE WHEN RFC_Emisor=@rfc THEN 'EMITIDA' ELSE 'RECIBIDA' END AS direccion,
+        ISNULL(NULLIF(CASE WHEN RFC_Emisor=@rfc THEN RazonSocialReceptor ELSE RazonSocialEmisor END,''),
+               CASE WHEN RFC_Emisor=@rfc THEN RFC_Receptor ELSE RFC_Emisor END) AS contraparte,
+        CASE WHEN RFC_Emisor=@rfc THEN RFC_Receptor ELSE RFC_Emisor END AS rfcContraparte,
+        COUNT(*) AS cfdi,
+        ISNULL(SUM(ISNULL(Subtotal,0)*${TC}),0) AS subtotal,
+        ISNULL(SUM(ISNULL(TotalRetenidoISR,0)*${TC}),0) AS retISR,
+        ISNULL(SUM(ISNULL(TotalRetenidoIVA,0)*${TC}),0) AS retIVA,
+        ISNULL(SUM(ISNULL(Total,0)*${TC}),0) AS total
+      FROM facturalo_cfdis WITH (NOLOCK)
+      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
+        AND TipoComprobante='N'
+        AND UPPER(Status)='VIGENTE'
+        AND Fecha>=@dateFrom AND Fecha<@dateTo
+        AND (
+          '${dir}' = 'AMBAS' OR
+          ('${dir}' = 'EMITIDA' AND RFC_Emisor=@rfc) OR
+          ('${dir}' = 'RECIBIDA' AND RFC_Receptor=@rfc)
+        )
+      GROUP BY
+        CASE WHEN RFC_Emisor=@rfc THEN 'EMITIDA' ELSE 'RECIBIDA' END,
+        CASE WHEN RFC_Emisor=@rfc THEN RazonSocialReceptor ELSE RazonSocialEmisor END,
+        CASE WHEN RFC_Emisor=@rfc THEN RFC_Receptor ELSE RFC_Emisor END
+      ORDER BY total DESC
+    `);
+
+  const rows = res.recordset;
+  const totalSubtotal = rows.reduce((s, r) => s + (Number(r.subtotal) || 0), 0);
+  const totalRetISR   = rows.reduce((s, r) => s + (Number(r.retISR) || 0), 0);
+  const totalTotal    = rows.reduce((s, r) => s + (Number(r.total) || 0), 0);
+
+  return {
+    direccion: dir,
+    resumen: { subtotal: totalSubtotal, retISR: totalRetISR, total: totalTotal },
+    count: rows.length,
+    rows,
+  };
+}
+
+// ─── Chat: Flujo Efectivo (Complementos P + Facturas PUE) ────────────────────
+
+export interface ChatFlujoEfectivoFilters {
+  movimiento?: "INGRESO" | "EGRESO" | "AMBOS";
+  groupBy?: "none" | "mes" | "formaPago";
+  limit?: number;
+}
+
+export async function chatGetFlujoEfectivo(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatFlujoEfectivoFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 50, 300));
+  const mov = filters.movimiento ?? "AMBOS";
+  const groupBy = filters.groupBy ?? "none";
+
+  const res = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .query(`
+      WITH flujo AS (
+        -- Complementos de pago vigentes
+        SELECT
+          CASE WHEN fc.RFC_Emisor=@rfc THEN 'INGRESO' ELSE 'EGRESO' END AS movimiento,
+          'Complemento P' AS fuente,
+          CONVERT(varchar(7), p.fecha_pago, 120) AS mes,
+          ISNULL(p.forma_pago,'') AS formaPago,
+          ISNULL(TRY_CONVERT(decimal(18,2), p.monto_total_pagos), 0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),p.tipoCambio),0),1) AS monto
+        FROM dbo.facturalo_cfdis fc WITH (NOLOCK)
+        INNER JOIN dbo.facturalo_pagos p WITH (NOLOCK) ON p.UUID = fc.UUID
+        WHERE (fc.RFC_Emisor=@rfc OR fc.RFC_Receptor=@rfc)
+          AND fc.TipoComprobante='P'
+          AND fc.Status='Vigente'
+          AND p.fecha_pago>=@dateFrom AND p.fecha_pago<@dateTo
+
+        UNION ALL
+
+        -- Facturas PUE (pago en una sola exhibición)
+        SELECT
+          CASE WHEN RFC_Emisor=@rfc THEN 'INGRESO' ELSE 'EGRESO' END AS movimiento,
+          'Factura PUE' AS fuente,
+          CONVERT(varchar(7), Fecha, 120) AS mes,
+          ISNULL(TipoPago,'') AS formaPago,
+          ISNULL(TRY_CONVERT(decimal(18,2),Total),0)
+            * ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1) AS monto
+        FROM dbo.facturalo_cfdis WITH (NOLOCK)
+        WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
+          AND TipoComprobante='I'
+          AND MetodoPago='PUE'
+          AND Status='Vigente'
+          AND Fecha>=@dateFrom AND Fecha<@dateTo
+      )
+      SELECT TOP (@limit)
+        CASE
+          WHEN '${groupBy}'='mes' THEN mes
+          WHEN '${groupBy}'='formaPago' THEN formaPago
+          ELSE 'TOTAL'
+        END AS groupKey,
+        movimiento,
+        COUNT(*) AS operaciones,
+        SUM(monto) AS monto
+      FROM flujo
+      WHERE '${mov}'='AMBOS' OR movimiento='${mov}'
+      GROUP BY
+        movimiento,
+        CASE
+          WHEN '${groupBy}'='mes' THEN mes
+          WHEN '${groupBy}'='formaPago' THEN formaPago
+          ELSE 'TOTAL'
+        END
+      ORDER BY SUM(monto) DESC
+    `);
+
+  const rows = res.recordset;
+  const ingreso = rows.filter(r => r.movimiento === 'INGRESO').reduce((s, r) => s + (Number(r.monto) || 0), 0);
+  const egreso  = rows.filter(r => r.movimiento === 'EGRESO').reduce((s, r) => s + (Number(r.monto) || 0), 0);
+
+  return {
+    movimiento: mov,
+    groupBy,
+    resumen: { ingreso, egreso, neto: ingreso - egreso },
+    count: rows.length,
+    rows,
+  };
+}
+
+// ─── Chat: Facturas Canceladas ────────────────────────────────────────────────
+
+export interface ChatCanceladasFilters {
+  movimiento?: "INGRESO" | "EGRESO" | "AMBOS";
+  limit?: number;
+}
+
+export async function chatGetFacturasCanceladas(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+  filters: ChatCanceladasFilters = {},
+) {
+  const db = await getDbLong();
+  const limit = Math.max(1, Math.min(filters.limit ?? 50, 200));
+  const mov = filters.movimiento ?? "AMBOS";
+  const TC = `ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1)`;
+
+  const res = await db.request()
+    .input("rfc", sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime, dateFrom)
+    .input("dateTo", sql.DateTime, dateTo)
+    .input("limit", sql.Int, limit)
+    .query(`
+      SELECT TOP (@limit)
+        ISNULL(UUID,'') AS uuid,
+        Fecha AS fecha,
+        ISNULL(TipoComprobante,'') AS tipoComprobante,
+        CASE WHEN RFC_Emisor=@rfc THEN 'INGRESO' ELSE 'EGRESO' END AS movimiento,
+        ISNULL(Status,'') AS status,
+        ISNULL(RFC_Emisor,'') AS rfcEmisor,
+        ISNULL(RazonSocialEmisor,'') AS razonSocialEmisor,
+        ISNULL(RFC_Receptor,'') AS rfcReceptor,
+        ISNULL(RazonSocialReceptor,'') AS razonSocialReceptor,
+        ISNULL(TRY_CONVERT(decimal(18,2),Total),0)*${TC} AS total
+      FROM facturalo_cfdis WITH (NOLOCK)
+      WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
+        AND UPPER(Status)<>'VIGENTE'
+        AND Fecha>=@dateFrom AND Fecha<@dateTo
+        AND TipoComprobante IN ('I','E','N','P')
+        AND (
+          '${mov}'='AMBOS' OR
+          ('${mov}'='INGRESO' AND RFC_Emisor=@rfc) OR
+          ('${mov}'='EGRESO' AND RFC_Receptor=@rfc AND RFC_Emisor<>@rfc)
+        )
+      ORDER BY Fecha DESC
+    `);
+
+  const rows = res.recordset;
+  const byStatus: Record<string, number> = {};
+  for (const r of rows) {
+    const s = String(r.status);
+    byStatus[s] = (byStatus[s] ?? 0) + 1;
+  }
+
+  return {
+    movimiento: mov,
+    totalCanceladas: rows.length,
+    porStatus: byStatus,
+    montoTotal: rows.reduce((s, r) => s + (Number(r.total) || 0), 0),
+    rows,
+  };
+}
+
 // ─── Chat: Top Facturas by Importe (Individual Invoices) ───────────────────
 export interface ChatTopFacturasFilters {
   movimiento?: "INGRESO" | "EGRESO" | "AMBOS";
