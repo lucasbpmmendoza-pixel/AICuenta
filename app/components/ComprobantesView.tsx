@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useTheme } from '@/app/hooks/useTheme'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,8 +60,6 @@ function fmtDate(iso: string): string {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ComprobantesView() {
-  const { dark } = useTheme()
-
   const [status, setStatus]         = useState<ConnectionStatus>('disconnected')
   const [qrDataUrl, setQrDataUrl]   = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
@@ -189,14 +186,14 @@ export default function ComprobantesView() {
   const isActive = status === 'connected' || status === 'qr' || status === 'connecting'
 
   return (
-    <div className={`flex-1 p-4 sm:p-6 space-y-6 ${dark ? 'text-zinc-100' : 'text-zinc-900'}`}>
+    <div className="flex-1 p-4 sm:p-6 space-y-6 text-zinc-900 dark:text-zinc-100">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Comprobantes de Pago</h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
-            Bot WhatsApp — registra comprobantes enviados como imágenes automáticamente.
+            Scan Bot — registra comprobantes enviados como imágenes automáticamente.
           </p>
         </div>
 
@@ -205,7 +202,7 @@ export default function ComprobantesView() {
           <button
             onClick={handleExportExcel}
             disabled={exporting || total === 0}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${dark ? 'border-zinc-700 hover:bg-zinc-800 text-zinc-200' : 'border-zinc-200 hover:bg-zinc-50 text-zinc-700'}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-zinc-200 text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
           >
             {exporting ? (
               <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -229,7 +226,7 @@ export default function ComprobantesView() {
       </div>
 
       {/* ── Connection card ────────────────────────────────────────────────── */}
-      <div className={`rounded-xl border p-5 ${dark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
+      <div className="rounded-xl border p-5 bg-white border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
 
         {/* Disconnected or connecting */}
         {(status === 'disconnected' || (status === 'connecting' && !qrDataUrl)) && (
@@ -328,7 +325,7 @@ export default function ComprobantesView() {
       </div>
 
       {/* ── Comprobantes table ─────────────────────────────────────────────── */}
-      <div className={`rounded-xl border ${dark ? 'bg-zinc-900 border-zinc-800' : 'bg-white border-zinc-200'}`}>
+      <div className="rounded-xl border bg-white border-zinc-200 dark:bg-zinc-900 dark:border-zinc-800">
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 dark:border-zinc-800">
           <div>
             <h2 className="font-medium text-sm">Comprobantes registrados</h2>
@@ -339,7 +336,7 @@ export default function ComprobantesView() {
           <button
             onClick={() => loadComprobantes(page)}
             disabled={loading}
-            className={`p-1.5 rounded-md transition-colors ${dark ? 'hover:bg-zinc-800' : 'hover:bg-zinc-100'} disabled:opacity-50`}
+            className="p-1.5 rounded-md transition-colors hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
             title="Actualizar"
           >
             <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -352,7 +349,7 @@ export default function ComprobantesView() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className={`text-left ${dark ? 'bg-zinc-800 text-zinc-400' : 'bg-zinc-50 text-zinc-500'}`}>
+              <tr className="text-left bg-zinc-50 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
                 {['Remitente','Teléfono','Banco','Fecha','Monto','Folio','Concepto','Referencia','Registrado'].map(h => (
                   <th key={h} className="px-3 py-2 font-medium whitespace-nowrap">{h}</th>
                 ))}
@@ -366,7 +363,7 @@ export default function ComprobantesView() {
                   </td>
                 </tr>
               ) : rows.map(r => (
-                <tr key={r.id} className={`transition-colors ${dark ? 'hover:bg-zinc-800/50' : 'hover:bg-zinc-50'}`}>
+                <tr key={r.id} className="transition-colors hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                   <td className="px-3 py-2 whitespace-nowrap">{r.remitente_nombre ?? '—'}</td>
                   <td className="px-3 py-2 whitespace-nowrap text-zinc-500 dark:text-zinc-400">{r.remitente_telefono ?? '—'}</td>
                   <td className="px-3 py-2 whitespace-nowrap">{r.banco ?? '—'}</td>

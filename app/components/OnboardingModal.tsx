@@ -61,7 +61,7 @@ const STEPS: Step[] = [
     ),
   },
   {
-    title: 'Asistente IA',
+    title: 'FinDoc',
     description:
       'Analiza tus propios datos y responde preguntas sobre tus cifras: IVA, ISR, ingresos, egresos y tendencias de tus periodos.',
     icon: (
@@ -74,7 +74,7 @@ const STEPS: Step[] = [
   {
     title: 'Asistente Fiscal',
     description:
-      'Te orienta con reglas y criterios fiscales (SAT, obligaciones, conceptos). Diferencia clave: este explica normativa; Asistente IA analiza tus datos reales.',
+      'Te orienta con reglas y criterios fiscales (SAT, obligaciones, conceptos). Diferencia clave: este explica normativa; FinDoc analiza tus datos reales.',
     icon: (
       <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M6 2h9l5 5v15a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" />

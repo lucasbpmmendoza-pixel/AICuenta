@@ -230,7 +230,7 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
           <div className="border-b border-slate-200 px-5 py-3.5">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-slate-800">Asistente Documental IA</p>
+                <p className="text-sm font-semibold text-slate-800">Fiscal gpt</p>
                 <p className="mt-0.5 text-xs text-slate-500">Inicia sesion para acceder al modo premium.</p>
               </div>
               <div className="flex items-center gap-2">

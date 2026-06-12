@@ -248,7 +248,7 @@ export default function ChatbotView({ session, accountType }: Props) {
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">Asistente Fiscal IA</h1>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">FinDoc</h1>
               <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
                 Analiza tus CFDIs con inteligencia artificial
               </p>

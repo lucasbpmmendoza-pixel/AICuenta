@@ -1,5 +1,5 @@
 -- ============================================================
--- AIcuenta · Tabla de contexto del Asistente Fiscal IA
+-- AIcuenta · Tabla de contexto del FinDoc
 -- Guarda los últimos N mensajes por usuario + RFC para
 -- mantener coherencia de conversación entre sesiones.
 -- ============================================================

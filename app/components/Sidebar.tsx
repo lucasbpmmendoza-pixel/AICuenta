@@ -117,7 +117,7 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: 'Asistente IA',
+    label: 'FinDoc',
     href: '/dashboard/chat',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -127,7 +127,7 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: 'Asistente Docs',
+    label: 'Fiscal gpt',
     href: '/dashboard/chat-docs',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -139,24 +139,13 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: 'Bot WhatsApp',
-    href: '/dashboard/whatsapp-bot',
+    label: 'Scan Bot',
+    href: '/dashboard/comprobantes',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        <path d="M9 10h.01M12 10h.01M15 10h.01" strokeWidth="2.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Soporte',
-    href: '/dashboard/soporte',
-    icon: (
-      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-        >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-        <circle cx="12" cy="17" r=".5" fill="currentColor" />
+        <path d="M4 4v17l2.5-1.5L9 21l2.5-1.5L14 21l2.5-1.5L19 21l1-.6V4l-1 .6L16.5 3 14 4.5 11.5 3 9 4.5 6.5 3z" />
+        <line x1="8" y1="10" x2="16" y2="10" />
+        <line x1="8" y1="14" x2="14" y2="14" />
       </svg>
     ),
   },
@@ -208,6 +197,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
 
   const [internalShowBeacons, setInternalShowBeacons] = useState(false)
   const [showHelpModal, setShowHelpModal] = useState(false)
+  const [floatingOpen, setFloatingOpen] = useState(false)
 
   useEffect(() => {
     if (isShowBeaconsControlled) {
@@ -267,7 +257,6 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
       '/dashboard/chat': 'tab_asistente_ia',
       '/dashboard/chat-docs': 'tab_asistente_docs',
       '/dashboard/comprobantes': 'tab_comprobantes',
-      '/dashboard/whatsapp-bot': 'tab_comprobantes',
       '/dashboard/unete': 'tab_aichikenelo',
     }
     return tabMap[href] ?? null
@@ -309,13 +298,6 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
 
   const navContent = (
     <div className="flex h-full flex-col">
-      <OnboardingModal
-        userName={userName}
-        forceOpen={showHelpModal}
-        onClose={() => setShowHelpModal(false)}
-        onDone={() => setShowHelpModal(false)}
-      />
-
       {/* Logo */}
       <div className="flex items-center gap-4 px-2 py-1 border-b border-slate-200 dark:border-zinc-800">
         <div className="flex items-center justify-center" style={{ width: 75, height: 75 }}>
@@ -369,61 +351,73 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
             </a>
           )
         })}
-
-        <button
-          type="button"
-          onClick={() => setShowHelpModal(true)}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957] dark:hover:text-[#6BDA4D] transition-all duration-150"
-        >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-            <circle cx="12" cy="17" r=".5" fill="currentColor" />
-          </svg>
-          Ayuda
-        </button>
       </nav>
 
-      {/* User + theme + logout */}
-      <div className="border-t border-slate-200 dark:border-zinc-800 px-3 py-4 space-y-1">
-        {/* Theme toggle */}
-        <button
-          onClick={toggle}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-[#450c7d] dark:hover:text-[#6BDA4D]"
-        >                   
-          {dark ? (
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="5" />
-              <line x1="12" y1="1" x2="12" y2="3" />
-              <line x1="12" y1="21" x2="12" y2="23" />
-              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-              <line x1="1" y1="12" x2="3" y2="12" />
-              <line x1="21" y1="12" x2="23" y2="12" />
-              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-            </svg>
-          ) : (
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-            </svg>
-          )}
-          {dark ? 'Modo claro' : 'Modo oscuro'}
-        </button>
-
-        <div className="flex items-center gap-3 rounded-xl px-3 py-2.5">
+            {/* User + theme + logout */}
+      <div className="border-t border-slate-200 dark:border-zinc-800 px-3 py-6 space-y-1">
+        {/* Usuario + toggle de tema en una fila */}
+        <div className="flex items-center gap-2.5 rounded-xl px-2.5 py-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 dark:bg-zinc-700 text-xs font-bold text-slate-700 dark:text-white">
             {initials}
           </div>
-          <span className="truncate text-sm font-medium text-slate-700 dark:text-zinc-300">{userName}</span>
+          <span className="flex-1 truncate text-sm font-medium text-slate-700 dark:text-zinc-300">{userName}</span>
+
+          {/* Switch de tema — transición lenta (700ms) y morph sol/luna */}
+          <button
+            onClick={toggle}
+            role="switch"
+            aria-checked={dark}
+            aria-label={dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+            className={[
+              'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-700 ease-in-out',
+              dark ? 'bg-[#5E6957]' : 'bg-[#EBE9FB]', // hover 'bg-[#5E6957]' : 'bg-[#EBE9FB]'  SELECT 'bg-[#91EB78]' : 'bg-[#7B6FE8]'
+            ].join(' ')}
+          >
+            <span
+              className={[
+                'relative inline-flex h-5 w-5 transform items-center justify-center rounded-full bg-white shadow transition-transform duration-700 ease-in-out',
+                dark ? 'translate-x-5' : 'translate-x-0.5',
+              ].join(' ')}
+            >
+              {/* Sol: visible en claro, gira y se encoge al pasar a oscuro */}
+              <svg
+                className={[
+                  'absolute inset-0 m-auto h-3 w-3 text-amber-500 transition-all duration-700 ease-in-out',
+                  dark ? 'rotate-90 scale-0 opacity-0' : 'rotate-0 scale-100 opacity-100',
+                ].join(' ')}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="4" />
+                <line x1="12" y1="2" x2="12" y2="4" />
+                <line x1="12" y1="20" x2="12" y2="22" />
+                <line x1="2" y1="12" x2="4" y2="12" />
+                <line x1="20" y1="12" x2="22" y2="12" />
+                <line x1="4.9" y1="4.9" x2="6.3" y2="6.3" />
+                <line x1="17.7" y1="17.7" x2="19.1" y2="19.1" />
+                <line x1="4.9" y1="19.1" x2="6.3" y2="17.7" />
+                <line x1="17.7" y1="6.3" x2="19.1" y2="4.9" />
+              </svg>
+              {/* Luna: oculta en claro, gira y crece al pasar a oscuro */}
+              <svg
+                className={[
+                  'absolute inset-0 m-auto h-3 w-3 text-zinc-700 transition-all duration-700 ease-in-out',
+                  dark ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0',
+                ].join(' ')}
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              >
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+              </svg>
+            </span>
+          </button>
         </div>
+
         {!demoEnabled && (
           <button
             onClick={() => {
               void handleLogout()
             }}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-red-500 dark:hover:text-red-400"
-          >                                                                                                                              
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-500 dark:text-zinc-400 transition-all hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] hover:text-red-500 dark:hover:text-red-400"
+          >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
               <polyline points="16 17 21 12 16 7" />
@@ -438,6 +432,82 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
 
   return (
     <>
+      {/* Modal de ayuda (siempre montado para que el menú flotante funcione en cualquier vista) */}
+      <OnboardingModal
+        userName={userName}
+        forceOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+        onDone={() => setShowHelpModal(false)}
+      />
+
+      {/* ── Menú flotante derecho (Soporte + Ayuda) ── */}
+      <div className="fixed right-0 top-3/4 z-40 -translate-y-1/2 ">
+        <div
+          className={[
+            'flex items-stretch transition-transform duration-300 ease-out',
+            floatingOpen ? 'translate-x-0' : 'translate-x-48',
+          ].join(' ')}
+        >
+          {/* Pestaña: abre/cierra el panel (se desplaza junto con el panel) */}
+          <button
+            type="button"
+            onClick={() => setFloatingOpen((v) => !v)}
+            aria-label={floatingOpen ? 'Ocultar ayuda y soporte' : 'Mostrar ayuda y soporte'}
+            aria-expanded={floatingOpen}
+            className="flex shrink-0 items-center self-center rounded-l-xl bg-[#7B6FE8] px-0.5 py-5 text-white shadow-lg transition-colors hover:bg-[#6a5ed6] dark:bg-[#91EB78] dark:text-zinc-900 dark:hover:bg-[#7fd968]"
+          >
+            <svg
+              className={['h-5 w-5 transition-transform duration-300', floatingOpen ? 'rotate-180' : ''].join(' ')}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+
+          {/* Panel desplegable */}
+          <div className="flex w-48 shrink-0 flex-col justify-center gap-2 rounded-l-2xl border-y border-l border-slate-200 bg-white px-3 py-4 shadow-xl dark:border-zinc-800 dark:bg-zinc-900">
+            <button
+              type="button"
+              onClick={() => {
+                setFloatingOpen(false)
+                setMobileOpen(false)
+                router.push('/dashboard/soporte')
+              }}
+              className="flex w-full items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-all hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957] dark:hover:text-[#6BDA4D]"
+            >
+              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 14v-2a9 9 0 0 1 18 0v2" />
+                <path d="M21 14v3a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z" />
+                <path d="M3 14v3a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                <path d="M19 19v1a3 3 0 0 1-3 3h-3" />
+              </svg>
+              Soporte
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setFloatingOpen(false)
+                setShowHelpModal(true)
+              }}
+              className="flex w-full items-center gap-3 whitespace-nowrap rounded-xl px-3 py-2.5 text-sm font-medium text-slate-600 transition-all hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957] dark:hover:text-[#6BDA4D]"
+            >
+              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                <circle cx="12" cy="17" r=".5" fill="currentColor" />
+              </svg>
+              Ayuda
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* ── Desktop sidebar ── */}
       <aside className="hidden lg:flex fixed top-0 left-0 h-screen w-60 flex-col bg-white dark:bg-zinc-900 border-r border-slate-200 dark:border-zinc-800 z-20 overflow-hidden">        {navContent}
       </aside>
