@@ -127,7 +127,7 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: 'Fiscal gpt',
+    label: 'FiscalGPT',
     href: '/dashboard/chat-docs',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

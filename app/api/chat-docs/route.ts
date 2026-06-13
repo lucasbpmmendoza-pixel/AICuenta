@@ -4,7 +4,7 @@ import type { ChatCompletionMessageParam } from "openai/resources/chat/completio
 import { headers } from "next/headers";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
-import { docsSearch, docsGetDetail, docsListCategorias, catprodSearch } from "@/lib/docs-query";
+import { docsSearch, docsGetDetail, docsListCategorias, catprodSearch, cedulasSearch } from "@/lib/docs-query";
 import { createChatDocsExport } from "../../../lib/chat-docs-export-store";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -39,6 +39,7 @@ Reglas obligatorias:
 - Si el resultado de docs_search no tiene suficiente detalle, usa docs_get_detail para obtener el contenido completo del documento.
 - Si necesitas saber qué categorías existen, usa docs_list_categorias.
 - Cuando el usuario pregunte sobre claves de producto o servicio SAT, conceptos CFDI, descripciones de productos o servicios, o necesite identificar la clave SAT correcta para un artículo, usa catprod_search para buscar en el catálogo oficial del SAT.
+- Cuando el usuario pregunte sobre SU cédula fiscal (RFC propio, domicilio fiscal, régimen, situación, obligaciones, actividades económicas, CURP, IDCIF), usa cedulas_search para consultar las cédulas que él mismo registró.
 - Si el usuario pide generar un Excel, usa create_excel con datos estructurados y luego incluye en tu respuesta el campo download_url devuelto por la herramienta.
 - Nunca inventes información; si no encuentras datos relevantes en los documentos, dilo explícitamente.
 - Cita el título del documento fuente cuando respondas.
@@ -131,6 +132,30 @@ const CHAT_TOOLS = [
             type: "number",
             description: "Número máximo de resultados (1-30, por defecto 20)",
             default: 20,
+          },
+        },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "cedulas_search",
+      description:
+        "Busca cédulas de identificación fiscal (CIF) registradas por el usuario en sesión. Filtra por RFC, razón social o nombre. Úsala cuando el usuario pregunte por datos de su cédula fiscal: domicilio fiscal, régimen, obligaciones, actividades económicas, situación, CURP, IDCIF, etc.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "RFC, razón social, nombre o palabra clave para buscar en las cédulas del usuario",
+          },
+          limit: {
+            type: "number",
+            description: "Número máximo de resultados (1-10)",
+            default: 5,
           },
         },
         required: ["query"],
@@ -355,6 +380,7 @@ function compactToolResult(result: unknown): string {
 async function executeTool(
   name: string,
   args: Record<string, unknown>,
+  ctx: { ownerId: string | null },
 ): Promise<unknown> {
   if (name === "docs_search") {
     const query = typeof args.query === "string" ? args.query.trim() : "";
@@ -400,6 +426,21 @@ async function executeTool(
     return results;
   }
 
+  if (name === "cedulas_search") {
+    if (!ctx.ownerId) {
+      return { error: "Inicia sesión para consultar tus cédulas fiscales." };
+    }
+    const query = typeof args.query === "string" ? args.query.trim() : "";
+    if (!query) return { error: "query requerido" };
+    const rawLimit = typeof args.limit === "number" ? args.limit : 5;
+    const safeLimit = Math.min(Math.max(1, rawLimit), 10);
+    const results = await cedulasSearch(ctx.ownerId, query, safeLimit);
+    if (!results.length) {
+      return { message: "No se encontraron cédulas fiscales del usuario que coincidan." };
+    }
+    return results;
+  }
+
   if (name === "create_excel") {
     return createExcelFromRows(args);
   }
@@ -419,6 +460,10 @@ function hasUsefulToolData(name: string, result: unknown): boolean {
   }
 
   if (name === "catprod_search") {
+    return !row.message;
+  }
+
+  if (name === "cedulas_search") {
     return !row.message;
   }
 
@@ -477,7 +522,7 @@ export async function POST(req: Request) {
   const session = await getSession();
   const isPublicRequest = !session;
 
-  let body: { messages?: unknown[] };
+  let body: { messages?: unknown[]; rfc?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -487,6 +532,11 @@ export async function POST(req: Request) {
   const { messages } = body;
   if (!Array.isArray(messages))
     return NextResponse.json({ error: "messages requerido" }, { status: 400 });
+
+  const requestedRfc =
+    typeof body.rfc === "string" && /^[A-Za-z0-9&Ññ]{10,13}$/.test(body.rfc.trim())
+      ? body.rfc.trim().toUpperCase()
+      : null;
 
   if (!process.env.OPENAI_API_KEY)
     return NextResponse.json({ error: "OPENAI_API_KEY no configurada" }, { status: 500 });
@@ -521,11 +571,53 @@ export async function POST(req: Request) {
 
   try {
     const selectedModel = isPublicRequest ? PUBLIC_MODEL : PREMIUM_MODEL;
+    const ownerId = session ? session.ownerId ?? session.sub : null;
+    const toolCtx = { ownerId };
     const convo: any[] = [
       { role: "system", content: SYSTEM_PROMPT },
-      ...validMessages,
     ];
+
+    let cedulaContextNote: string | null = null;
+    if (requestedRfc && ownerId) {
+      try {
+        const cedulas = await cedulasSearch(ownerId, requestedRfc, 1);
+        const cedula = cedulas.find((c) => c.rfc.toUpperCase() === requestedRfc) ?? cedulas[0];
+        if (cedula) {
+          const ctx = JSON.stringify(cedula, null, 2);
+          convo.push({
+            role: "system",
+            content:
+              `RFC seleccionado por el usuario: ${requestedRfc}\n\n` +
+              `Datos de su CÉDULA DE IDENTIFICACIÓN FISCAL (registrada en el sistema):\n` +
+              `${ctx}\n\n` +
+              `Cuando el usuario pregunte por "mi RFC", "mi cédula", "mi domicilio", "mi régimen", "mis obligaciones", ` +
+              `"mis actividades económicas", "mi CURP", "mi situación fiscal", etc., usa estos datos como fuente principal. ` +
+              `No necesitas llamar cedulas_search para este RFC; ya tienes la información aquí. ` +
+              `Cita el RFC en tu respuesta.`,
+          });
+          cedulaContextNote = `cedula_attached rfc=${requestedRfc}`;
+        } else {
+          convo.push({
+            role: "system",
+            content:
+              `El usuario seleccionó el RFC ${requestedRfc} pero aún no ha subido la cédula fiscal de ese RFC. ` +
+              `Si pregunta por datos específicos de su cédula (domicilio, régimen, obligaciones, etc.), indícale ` +
+              `que primero suba la cédula fiscal desde el botón "Subir cédula fiscal" del Asistente Documental.`,
+          });
+          cedulaContextNote = `cedula_missing rfc=${requestedRfc}`;
+        }
+      } catch (err) {
+        console.error(`[chat-docs][${reqId}] cedula_lookup_error:`, (err as Error).message);
+      }
+    }
+
+    convo.push(...validMessages);
     let hasRelevantToolData = false;
+    if (cedulaContextNote) {
+      console.log(`[chat-docs][${reqId}] ${cedulaContextNote}`);
+      // Si ya tenemos cédula adjunta, el modelo no necesita herramientas para tener datos útiles
+      hasRelevantToolData = cedulaContextNote.startsWith("cedula_attached");
+    }
 
     for (let step = 0; step < 5; step++) {
       const t0 = Date.now();
@@ -572,7 +664,7 @@ export async function POST(req: Request) {
         const tTool = Date.now();
         let result: unknown;
         try {
-          result = await executeTool(tc.function.name, args);
+          result = await executeTool(tc.function.name, args, toolCtx);
           if (hasUsefulToolData(tc.function.name, result)) {
             hasRelevantToolData = true;
           }

@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
+import CedulaFiscalUploadModal from './CedulaFiscalUploadModal'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -79,11 +80,23 @@ function MessageBubble({ msg }: { msg: Message }) {
 
 const CHAT_DOCS_HINT_KEY = 'aicuenta_chat_docs_first_visit'
 
+interface RfcOption {
+  id: string
+  rfc: string
+  alias: string | null
+}
+
+const CHAT_DOCS_RFC_KEY = 'aicuenta_chat_docs_active_rfc'
+
 export default function ChatDocsView({ session, accountType }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [showChatPulse, setShowChatPulse] = useState(false)
+  const [showCedulaModal, setShowCedulaModal] = useState(false)
+  const [rfcs, setRfcs] = useState<RfcOption[]>([])
+  const [rfcsLoading, setRfcsLoading] = useState(true)
+  const [activeRfc, setActiveRfc] = useState<string>('')
 
   const chatEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -91,6 +104,47 @@ export default function ChatDocsView({ session, accountType }: Props) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+    useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/rfcs')
+        const json = await res.json().catch(() => ({}))
+        if (cancelled) return
+        const list: RfcOption[] = Array.isArray(json.rfcs)
+          ? json.rfcs.map((r: { id: string; rfc: string; alias: string | null }) => ({
+              id: r.id,
+              rfc: r.rfc,
+              alias: r.alias ?? null,
+            }))
+          : []
+        setRfcs(list)
+        const persisted = typeof window !== 'undefined' ? localStorage.getItem(CHAT_DOCS_RFC_KEY) : null
+        const match = persisted && list.find((r) => r.rfc.toUpperCase() === persisted.toUpperCase())
+        if (match) {
+          setActiveRfc(match.rfc.toUpperCase())
+        } else if (list.length === 1) {
+          setActiveRfc(list[0].rfc.toUpperCase())
+        }
+      } catch {
+        // silencioso: el chat sigue funcionando sin RFC seleccionado
+      } finally {
+        if (!cancelled) setRfcsLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  function handleRfcChange(value: string) {
+    setActiveRfc(value)
+    if (typeof window !== 'undefined') {
+      if (value) localStorage.setItem(CHAT_DOCS_RFC_KEY, value)
+      else localStorage.removeItem(CHAT_DOCS_RFC_KEY)
+    }
+  }
 
   // First-visit chat pulse
   useEffect(() => {
@@ -130,7 +184,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
       const res = await fetch('/api/chat-docs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
+        body: JSON.stringify({ messages: history, rfc: activeRfc || undefined }),
       })
 
       if (!res.ok || !res.body) {
@@ -177,16 +231,73 @@ export default function ChatDocsView({ session, accountType }: Props) {
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
       <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
         <div className="lg:hidden h-14" />
-
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
             <div>
-              <h1 className="text-lg font-bold text-slate-900 dark:text-white">Fiscal gpt</h1>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">Asistente Documental IA</h1>
               <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
                 Consulta documentos internos con busqueda inteligente
               </p>
             </div>
-            <NotificationBell />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <label htmlFor="chat-docs-rfc" className="text-xs font-semibold text-slate-600 dark:text-zinc-400 uppercase tracking-wide">
+                  RFC
+                </label>
+                <select
+                  id="chat-docs-rfc"
+                  value={activeRfc}
+                  onChange={(e) => handleRfcChange(e.target.value)}
+                  disabled={rfcsLoading || rfcs.length === 0}
+                  title={
+                    rfcsLoading
+                      ? 'Cargando tus RFCs...'
+                      : rfcs.length === 0
+                        ? 'No tienes RFCs registrados en tu cuenta'
+                        : 'Al elegir un RFC, el asistente tomará su cédula como contexto'
+                  }
+                  className="rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {rfcsLoading ? 'Cargando...' : rfcs.length === 0 ? 'Sin RFCs' : 'Sin contexto'}
+                  </option>
+                  {rfcs.map((r) => (
+                    <option key={r.id} value={r.rfc.toUpperCase()}>
+                      {r.rfc.toUpperCase()}
+                      {r.alias ? ` — ${r.alias}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={() => !session.isDemo && setShowCedulaModal(true)}
+                disabled={session.isDemo}
+                aria-disabled={session.isDemo}
+                title={session.isDemo ? 'Disponible solo con sesión activa. Inicia sesión para usar esta función.' : 'Subir cédula fiscal'}
+                className={[
+                  'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition',
+                  session.isDemo
+                    ? 'border-slate-200 dark:border-zinc-700 bg-slate-100 dark:bg-zinc-800 text-slate-400 dark:text-zinc-500 cursor-not-allowed'
+                    : 'border-emerald-300 dark:border-emerald-700 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40',
+                ].join(' ')}
+              >
+                {session.isDemo ? (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                ) : (
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                )}
+                Subir cédula fiscal
+              </button>
+              <NotificationBell />
+            </div>
           </div>
         </div>
 
@@ -242,9 +353,15 @@ export default function ChatDocsView({ session, accountType }: Props) {
         </div>
 
         <div className="border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 backdrop-blur-sm px-4 py-3">
-          <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-2 px-1">
-            Este asistente responde con base en documentos almacenados en la tabla documents.
-          </p>
+          {activeRfc ? (
+            <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mb-2 px-1 font-medium">
+              Contexto activo: cédula fiscal del RFC <span className="font-mono font-bold">{activeRfc}</span>.
+            </p>
+          ) : (
+            <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-2 px-1">
+              Selecciona un RFC arriba para que el asistente use su cédula fiscal como contexto.
+            </p>
+          )}
           <div className="flex items-end gap-2">
             <textarea
               ref={textareaRef}
@@ -275,6 +392,20 @@ export default function ChatDocsView({ session, accountType }: Props) {
 
         <DashboardFooter />
       </main>
+      {showCedulaModal && (
+        <CedulaFiscalUploadModal
+          onClose={() => setShowCedulaModal(false)}
+          onSuccess={(rfc, titulo) => {
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: 'assistant',
+                content: `Cédula fiscal guardada y asociada al RFC ${rfc}.\n\n${titulo}\n\nYa puedes preguntarme por su domicilio fiscal, régimen, obligaciones, situación, etc.`,
+              },
+            ])
+          }}
+        />
+      )}
     </div>
   )
 }

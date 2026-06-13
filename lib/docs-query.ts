@@ -156,3 +156,110 @@ export async function docsListCategorias(): Promise<{ categoria: string; total: 
   `);
   return result.recordset as { categoria: string; total: number }[];
 }
+
+export interface CedulaSearchResult {
+  id: number;
+  rfc: string;
+  razon_social: string | null;
+  nombre: string | null;
+  tipo_persona: string | null;
+  situacion_contribuyente: string | null;
+  codigo_postal: string | null;
+  regimenes: unknown;
+  actividades_economicas: unknown;
+  obligaciones: unknown;
+  domicilio: {
+    calle: string | null;
+    numero_exterior: string | null;
+    numero_interior: string | null;
+    colonia: string | null;
+    municipio: string | null;
+    estado: string | null;
+    codigo_postal: string | null;
+  };
+  curp: string | null;
+  fecha_inicio_operaciones: string | null;
+  idcif: string | null;
+  fecha_emision_cif: string | null;
+  created_at: string;
+}
+
+function safeJsonParse(value: unknown): unknown {
+  if (typeof value !== "string" || !value.trim()) return [];
+  try {
+    return JSON.parse(value);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Busca cédulas fiscales del usuario por RFC, nombre o razón social.
+ * Scoped al ownerId para que cada usuario solo vea sus cédulas.
+ */
+export async function cedulasSearch(
+  ownerId: string,
+  query: string,
+  limit = 5,
+): Promise<CedulaSearchResult[]> {
+  const db = await getDb();
+  const req = db.request();
+
+  const safeLimit = Math.min(Math.max(1, limit), 20);
+  const clean = query.trim();
+  const likeVal = `%${clean.replace(/[%_[\]]/g, "\\$&")}%`;
+
+  req.input("owner", ownerId);
+  req.input("lim", safeLimit);
+  req.input("rfcExact", clean.toUpperCase());
+  req.input("q", likeVal);
+
+  const result = await req.query(`
+    SELECT TOP (@lim)
+      id, rfc, razon_social, nombre, tipo_persona, situacion_contribuyente,
+      curp, fecha_inicio_operaciones, fecha_emision_cif, idcif,
+      codigo_postal, calle, numero_exterior, numero_interior, colonia, municipio, estado,
+      regimenes, actividades_economicas, obligaciones,
+      CONVERT(VARCHAR(23), created_at, 126) AS created_at
+    FROM cedulas_fiscales
+    WHERE activo = 1
+      AND user_id = @owner
+      AND (
+        rfc = @rfcExact
+        OR rfc LIKE @q ESCAPE '\\'
+        OR razon_social LIKE @q ESCAPE '\\'
+        OR nombre LIKE @q ESCAPE '\\'
+        OR nombre_comercial LIKE @q ESCAPE '\\'
+      )
+    ORDER BY
+      CASE WHEN rfc = @rfcExact THEN 0 ELSE 1 END,
+      id DESC
+  `);
+
+  return result.recordset.map((row): CedulaSearchResult => ({
+    id: row.id,
+    rfc: row.rfc,
+    razon_social: row.razon_social ?? null,
+    nombre: row.nombre ?? null,
+    tipo_persona: row.tipo_persona ?? null,
+    situacion_contribuyente: row.situacion_contribuyente ?? null,
+    codigo_postal: row.codigo_postal ?? null,
+    curp: row.curp ?? null,
+    fecha_inicio_operaciones: row.fecha_inicio_operaciones ?? null,
+    fecha_emision_cif: row.fecha_emision_cif ?? null,
+    idcif: row.idcif ?? null,
+    regimenes: safeJsonParse(row.regimenes),
+    actividades_economicas: safeJsonParse(row.actividades_economicas),
+    obligaciones: safeJsonParse(row.obligaciones),
+    domicilio: {
+      calle: row.calle ?? null,
+      numero_exterior: row.numero_exterior ?? null,
+      numero_interior: row.numero_interior ?? null,
+      colonia: row.colonia ?? null,
+      municipio: row.municipio ?? null,
+      estado: row.estado ?? null,
+      codigo_postal: row.codigo_postal ?? null,
+    },
+    created_at: row.created_at,
+  }));
+}
