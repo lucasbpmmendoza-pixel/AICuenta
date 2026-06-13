@@ -172,6 +172,9 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
     monto: money(rand, 15000, 170000),
   }));
 
+  const conteoEmitidos = Math.floor(300 + rand() * 1200);
+  const conteoRecibidos = Math.floor(200 + rand() * 1000);
+
   return {
     ingresos: {
       total: ingresosTotal,
@@ -197,6 +200,11 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
       count: Math.floor(2 + rand() * 8),
       isr: Number((ingresosTotal * 0.018).toFixed(2)),
       imss: Number((ingresosTotal * 0.011).toFixed(2)),
+    },
+    conteoCfdi: {
+      emitidos: conteoEmitidos,
+      recibidos: conteoRecibidos,
+      total: conteoEmitidos + conteoRecibidos,
     },
     isrRegimenes: [
       { code: "601", name: "General de Ley Personas Morales", rateHint: "30%" },

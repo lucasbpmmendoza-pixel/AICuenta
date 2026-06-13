@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
       : `CAST(NULL AS nvarchar(max)) AS NominaDeducciones`;
 
     // Promise.allSettled — si una query es lenta/falla, las demás igual retornan
-    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes, nominaRetRes] = await Promise.allSettled([
+    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes, nominaRetRes, conteoRes] = await Promise.allSettled([
 
       // Q1: Resumen ingresos emitidos
       db.request()
@@ -263,6 +263,19 @@ export async function GET(req: NextRequest) {
             AND Fecha>=@dateFrom AND Fecha<@dateTo
           OPTION (RECOMPILE, MAXDOP 1)
         `),
+
+      // Q8: Conteo total de CFDIs por RFC (tabla conteo_cfdi)
+      db.request()
+        .input("rfc", sql.NVarChar, rfc)
+        .query(`
+          SELECT TOP 1
+            ISNULL(emitidos,  0) AS emitidos,
+            ISNULL(recibidos, 0) AS recibidos,
+            ISNULL(total,     0) AS total
+          FROM conteo_cfdi WITH (NOLOCK)
+          WHERE rfc = @rfc
+          OPTION (RECOMPILE, MAXDOP 1)
+        `),
     ]);
 
     type IngRow  = { total:number; count:number; vigentes:number; cancelados:number; ivaTotal:number; isrRetenido:number; ivaRetenido:number };
@@ -270,6 +283,7 @@ export async function GET(req: NextRequest) {
     type NomRow  = { nombre:string; monto:number };
     type ConcRow = { concepto:string; monto:number };
     type NomRetRow = { isrDB: number; tipoCambio: number; NominaDeducciones: string | null };
+    type ConteoRow = { emitidos: number; recibidos: number; total: number };
 
     // Helper: extrae recordset de un PromiseSettledResult, o retorna default
     function settled<T>(res: PromiseSettledResult<sql.IResult<T>>, def: T[]): T[] {
@@ -294,6 +308,7 @@ export async function GET(req: NextRequest) {
     const concEgr  = provs.map(p => ({ concepto: p.nombre, monto: p.monto }));
     const regRes   = regimenRes.status === 'fulfilled' ? regimenRes.value.recordset[0] : undefined;
     const nominaRows = settled<NomRetRow>(nominaRetRes, []);
+    const conteoRow  = settledOne<ConteoRow>(conteoRes, { emitidos: 0, recibidos: 0, total: 0 });
     const regimen  = String((regRes as { regimenFiscal: string } | undefined)?.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
 
     const ingresosMXN = Number(ingRow.total)       || 0;
@@ -377,6 +392,11 @@ export async function GET(req: NextRequest) {
         count: nominaRows.length,
         isr: nominaIsr,
         imss: nominaImss,
+      },
+      conteoCfdi: {
+        emitidos:  Number(conteoRow.emitidos)  || 0,
+        recibidos: Number(conteoRow.recibidos) || 0,
+        total:     Number(conteoRow.total)     || 0,
       },
       isrRegimenes: ISR_REGIMENES,
     });
