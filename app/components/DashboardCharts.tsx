@@ -35,6 +35,11 @@ export interface DashboardData {
     isr: number
     imss: number
   }
+  conteoCfdi: {
+    emitidos: number
+    recibidos: number
+    total: number
+  }
   isrRegimenes: IsrRegimenOption[]
 }
 
@@ -141,6 +146,67 @@ function KpiCard({ label, value, sub, color = 'slate', icon, skeleton }: {
   )
 }
 
+// ── Tarjeta de conteo de facturas (Facturas del año) ───────────
+type ConteoView = 'total' | 'emitidos' | 'recibidos'
+
+const conteoAccent = (v: ConteoView): string =>
+  v === 'emitidos'  ? 'text-emerald-600 dark:text-emerald-400'
+  : v === 'recibidos' ? 'text-rose-500 dark:text-rose-400'
+  : 'text-[#7B6FE8] dark:text-[#91eb78]'
+
+function ConteoCard({ conteo, skeleton }: {
+  conteo: { emitidos: number; recibidos: number; total: number }; skeleton?: boolean
+}) {
+  const [view, setView] = useState<ConteoView>('total')
+
+  const opciones: Array<{ key: ConteoView; label: string }> = [
+    { key: 'total',     label: 'Totales'   },
+    { key: 'emitidos',  label: 'Emitidas'  },
+    { key: 'recibidos', label: 'Recibidas' },
+  ]
+  const valor = view === 'total' ? conteo.total : view === 'emitidos' ? conteo.emitidos : conteo.recibidos
+
+  return (
+    <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm px-5 py-4 flex flex-col">
+      {/* Parte de arriba: icono + texto y número a su derecha */}
+      <div className="flex items-start gap-4">
+        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-800">
+          <IconFacturasAnio />
+        </div>
+        <div className="min-w-0 flex-1">
+          {skeleton ? (
+            <div className="h-6 w-20 rounded-lg bg-slate-100 dark:bg-zinc-800 animate-pulse mt-1" />
+          ) : (
+            <p className={`text-xl font-black tracking-tight leading-none ${conteoAccent(view)}`}>
+              {valor.toLocaleString('es-MX')}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Parte de abajo: botones centrados */}
+      {!skeleton && (
+        <div className="mt-3 grid grid-cols-3 gap-0.5 w-full rounded-lg bg-slate-100 dark:bg-zinc-800 p-0.5">
+          {opciones.map((o) => (
+            <button
+              key={o.key}
+              type="button"
+              onClick={() => setView(o.key)}
+              className={`min-w-0 px-1 py-0.5 rounded-md text-[10px] font-semibold text-center whitespace-nowrap transition ${
+                view === o.key
+                  ? `bg-white dark:bg-zinc-900 shadow-sm ${conteoAccent(o.key)}`
+                  : 'text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Chart Card ─────────────────────────────────────────────────
 function ChartCard({ title, subtitle, children, className = '' }: {
   title: string; subtitle?: string; children: React.ReactNode; className?: string
@@ -192,6 +258,14 @@ const IconCFDI = () => (
     <line x1="9" y1="17" x2="12" y2="17" />
   </svg>
 )
+const IconFacturasAnio = () => (
+  <svg className="h-5 w-5 text-[#7B6FE8] dark:text-[#91eb78]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
+  </svg>
+)
 const IconISR = () => (
   <svg className="h-5 w-5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="2" y="7" width="20" height="14" rx="2" />
@@ -222,6 +296,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
   const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
   const egresos   = data?.egresos   ?? { total: 0, count: 0 }
   const nominaRet = data?.nominaRetenciones ?? { count: 0, isr: 0, imss: 0 }
+  const conteo    = data?.conteoCfdi ?? { emitidos: 0, recibidos: 0, total: 0 }
   const regimenes = data?.isrRegimenes ?? []
 
   const [regimenSeleccionado, setRegimenSeleccionado] = useState('')
@@ -267,11 +342,12 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
     <div className="space-y-6">
 
       {/* ── Fila 1: KPIs principales ─────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard label="Ingresos del mes"  skeleton={loading} value={MXN(ingresos.total)} color="blue"    icon={<IconIngresos />} />
         <KpiCard label="Egresos del mes"   skeleton={loading} value={MXN(egresos.total)}  color="rose"    icon={<IconEgresos />} />
         <KpiCard label="Utilidad estimada" skeleton={loading} value={MXN(utilidad)}       color={utilidad >= 0 ? 'emerald' : 'rose'} sub="Ingresos − Egresos" icon={<IconUtilidad />} />
         <KpiCard label="CFDIs emitidos"    skeleton={loading} value={String(ingresos.count)} color="slate" sub={`${ingresos.vigentes} vigentes · ${ingresos.cancelados} cancelados`} icon={<IconCFDI />} />
+        <ConteoCard conteo={conteo} skeleton={loading} />
       </div>
 
       {/* ── Fila 2: KPIs fiscales + estado CFDIs ─────────────── */}
