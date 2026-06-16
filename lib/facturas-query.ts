@@ -11,6 +11,24 @@ export function clearEfCache() { _efCache.clear(); }
 
 const TC = "ISNULL(NULLIF(tipoCambio,0),1)";
 
+// ─── Columna de deducciones de nómina ─────────────────────────────────────────
+// El nombre real de la columna varía entre despliegues. Se detecta una sola vez
+// y se memoiza a nivel de proceso para no pagar un round-trip a INFORMATION_SCHEMA
+// en cada export / carga de dashboard.
+let _nominaDedCol: string | null | undefined; // undefined = aún no consultado
+export async function getNominaDeduccionesColumn(): Promise<string | null> {
+  if (_nominaDedCol !== undefined) return _nominaDedCol;
+  const db = await getDb();
+  const columns = await db.request().query<{ COLUMN_NAME: string }>(`
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = 'facturalo_cfdis'
+      AND COLUMN_NAME IN ('NominaDeducciones', 'nomina_deducciones', 'nominaDeducciones')
+  `);
+  _nominaDedCol = columns.recordset[0]?.COLUMN_NAME ?? null;
+  return _nominaDedCol;
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface IngresoCFDI {
@@ -336,17 +354,16 @@ export async function fetchRawCFDIForExport(
 ): Promise<RawCFDIExport[]> {
   const db = await getDb();
 
-  const columns = await db.request().query<{ COLUMN_NAME: string }>(`
-    SELECT COLUMN_NAME
-    FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE TABLE_NAME = 'facturalo_cfdis'
-      AND COLUMN_NAME IN ('NominaDeducciones', 'nomina_deducciones', 'nominaDeducciones')
-  `);
-  const nominaCol = columns.recordset[0]?.COLUMN_NAME ?? null;
-  const nominaSelect = nominaCol
-    ? `TRY_CONVERT(nvarchar(max), [${nominaCol.replace(/\]/g, "]]" )}]) AS NominaDeducciones`
-    : `CAST(NULL AS nvarchar(max)) AS NominaDeducciones`;
+  const nominaCol = await getNominaDeduccionesColumn();
+  // Columna cruda de nómina; la conversión a nvarchar(max) se hace en el SELECT externo.
+  const nominaRaw = nominaCol
+    ? `[${nominaCol.replace(/\]/g, "]]")}]`
+    : `CAST(NULL AS nvarchar(max))`;
 
+  // SARGable: se eliminan los UPPER() (la colación de SQL Server ya es case-insensitive,
+  // así que envolver la columna sólo impedía el uso de índices) y se separa el OR
+  // emisor/receptor en UNION ALL para que cada rama haga index seek por su rol
+  // (mismo patrón que las queries de nómina/retenciones de este archivo).
   const result = await db
     .request()
     .input("rfc",      sql.NVarChar, rfc)
@@ -383,18 +400,40 @@ export async function fetchRawCFDIForExport(
         ISNULL(TipoPago,'')                                                 AS TipoPago,
         ISNULL(MetodoPago,'')                                               AS MetodoPago,
         ISNULL(UsoCFDI,'')                                                  AS UsoCFDI,
-        ${nominaSelect}
-      FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE (
-              (RFC_Emisor   = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'INGRESO')
-           OR (RFC_Emisor   = @rfc AND TipoComprobante = 'N')
-           OR (RFC_Receptor = @rfc AND TipoComprobante = 'N')
-           OR (RFC_Emisor   = @rfc AND TipoComprobante = 'E' AND UPPER(Movimiento) = 'EGRESO')
-           OR (RFC_Receptor = @rfc AND TipoComprobante = 'I' AND UPPER(Movimiento) = 'EGRESO')
-           OR (RFC_Receptor = @rfc AND TipoComprobante = 'E' AND UPPER(Movimiento) = 'INGRESO')
-            )
-        AND UPPER(Status) = 'VIGENTE'
-        AND Fecha >= @dateFrom AND Fecha < @dateTo
+        TRY_CONVERT(nvarchar(max), NominaRaw)                               AS NominaDeducciones
+      FROM (
+        SELECT
+          UUID, Fecha, RFC_Emisor, RegimenFiscal, RFC_Receptor, RegimenFiscalReceptor,
+          Subtotal, TotalTrasladadoIVAOcho, TotalTrasladadoIVADieciseis, TotalTrasladado,
+          TotalRetenidoISR, TotalRetenidoIVA, Descuento, Total, Moneda, tipoCambio,
+          Movimiento, TipoComprobante, TipoPago, MetodoPago, UsoCFDI,
+          ${nominaRaw} AS NominaRaw
+        FROM facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Emisor = @rfc
+          AND Status = 'Vigente'
+          AND Fecha >= @dateFrom AND Fecha < @dateTo
+          AND (
+                (TipoComprobante = 'I' AND Movimiento = 'Ingreso')
+             OR (TipoComprobante = 'N')
+             OR (TipoComprobante = 'E' AND Movimiento = 'Egreso')
+              )
+        UNION ALL
+        SELECT
+          UUID, Fecha, RFC_Emisor, RegimenFiscal, RFC_Receptor, RegimenFiscalReceptor,
+          Subtotal, TotalTrasladadoIVAOcho, TotalTrasladadoIVADieciseis, TotalTrasladado,
+          TotalRetenidoISR, TotalRetenidoIVA, Descuento, Total, Moneda, tipoCambio,
+          Movimiento, TipoComprobante, TipoPago, MetodoPago, UsoCFDI,
+          ${nominaRaw} AS NominaRaw
+        FROM facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Receptor = @rfc
+          AND Status = 'Vigente'
+          AND Fecha >= @dateFrom AND Fecha < @dateTo
+          AND (
+                (TipoComprobante = 'N')
+             OR (TipoComprobante = 'I' AND Movimiento = 'Egreso')
+             OR (TipoComprobante = 'E' AND Movimiento = 'Ingreso')
+              )
+      ) f
       ORDER BY Fecha
     `);
   return result.recordset;
@@ -736,10 +775,10 @@ export async function fetchEstadosFinancieros(
           LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
           LEFT JOIN tb_catprodserv cat WITH (NOLOCK) ON cat.clave = c.ClaveProductoServicio
           WHERE (
-                  (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
-               OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
+                  (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND f.Movimiento = 'Ingreso')
+               OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND f.Movimiento = 'Ingreso')
                 )
-            AND UPPER(f.Status) = 'VIGENTE'
+            AND f.Status = 'Vigente'
             AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
         )
         SELECT ${top}
@@ -781,10 +820,10 @@ export async function fetchEstadosFinancieros(
           LEFT JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID)) ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
           LEFT JOIN tb_catprodserv cat WITH (NOLOCK) ON cat.clave = c.ClaveProductoServicio
           WHERE (
-                  (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
-               OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
+                  (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND f.Movimiento = 'Egreso')
+               OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND f.Movimiento = 'Egreso')
                 )
-            AND UPPER(f.Status) = 'VIGENTE'
+            AND f.Status = 'Vigente'
             AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
         )
         SELECT ${top}
@@ -814,10 +853,10 @@ export async function fetchEstadosFinancieros(
         SELECT COUNT(DISTINCT f.UUID) AS total
         FROM facturalo_cfdis f WITH (NOLOCK)
         WHERE (
-                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'INGRESO')
-             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'INGRESO')
+                (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'I' AND f.Movimiento = 'Ingreso')
+             OR (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'E' AND f.Movimiento = 'Ingreso')
               )
-          AND UPPER(f.Status) = 'VIGENTE'
+          AND f.Status = 'Vigente'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
       `),
 
@@ -830,10 +869,10 @@ export async function fetchEstadosFinancieros(
         SELECT COUNT(DISTINCT f.UUID) AS total
         FROM facturalo_cfdis f WITH (NOLOCK)
         WHERE (
-                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND UPPER(f.Movimiento) = 'EGRESO')
-             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND UPPER(f.Movimiento) = 'EGRESO')
+                (f.RFC_Receptor = @rfc AND f.TipoComprobante = 'I' AND f.Movimiento = 'Egreso')
+             OR (f.RFC_Emisor   = @rfc AND f.TipoComprobante = 'E' AND f.Movimiento = 'Egreso')
               )
-          AND UPPER(f.Status) = 'VIGENTE'
+          AND f.Status = 'Vigente'
           AND f.Fecha >= @dateFrom AND f.Fecha < @dateTo
       `),
   ]);

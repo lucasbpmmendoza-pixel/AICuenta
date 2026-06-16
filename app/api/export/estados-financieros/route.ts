@@ -14,9 +14,11 @@ import { rfcDisplay } from "@/lib/rfc-aliases";
 function setFill(cell: ExcelJS.Cell, hex: string) {
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: `FF${hex}` } };
 }
+// Borde compartido — misma referencia en todas las celdas (ver export/facturas).
+const THIN_BORDER = { style: "thin" as const };
+const BORDER_ALL = { top: THIN_BORDER, left: THIN_BORDER, bottom: THIN_BORDER, right: THIN_BORDER };
 function addBorder(cell: ExcelJS.Cell) {
-  const b = { style: "thin" as const };
-  cell.border = { top: b, left: b, bottom: b, right: b };
+  cell.border = BORDER_ALL;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -144,6 +146,11 @@ function buildSheet(
   });
 }
 
+// Válvula de seguridad: una hoja de auditoría con cientos de miles de conceptos
+// construida en memoria por ExcelJS puede agotar RAM o exceder el timeout. Se acota
+// a este máximo; si se supera, el reporte añade una fila indicando el truncamiento.
+const AUDIT_MAX_ROWS = 100_000;
+
 async function fetchAuditoriaConceptos(
   rfc: string,
   dateFrom: Date,
@@ -154,8 +161,9 @@ async function fetchAuditoriaConceptos(
     .input("rfc", sql.NVarChar, rfc)
     .input("dateFrom", sql.DateTime, dateFrom)
     .input("dateTo", sql.DateTime, dateTo)
+    .input("maxRows", sql.Int, AUDIT_MAX_ROWS)
     .query<AuditoriaConceptoRow>(`
-      SELECT
+      SELECT TOP (@maxRows)
         f.UUID                                                        AS uuidFactura,
         f.Fecha                                                       AS fecha,
         CASE WHEN f.RFC_Emisor = @rfc THEN 'INGRESO' ELSE 'EGRESO' END AS movimiento,
@@ -339,6 +347,17 @@ export async function GET(req: NextRequest) {
       setFill(statusCell, isCanceled ? CANCELADO_BG : VIGENTE_BG);
       statusCell.font = { bold: false, color: { argb: '000000' } };
       statusCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    }
+
+    // Aviso de truncamiento si se alcanzó el tope de la auditoría.
+    if (auditRows.length >= AUDIT_MAX_ROWS) {
+      const noticeRowNum = auditWs.rowCount + 1;
+      auditWs.mergeCells(noticeRowNum, 1, noticeRowNum, 12);
+      const noticeRow = auditWs.getRow(noticeRowNum);
+      const noticeCell = noticeRow.getCell(1);
+      noticeCell.value = `⚠ Auditoría limitada a ${AUDIT_MAX_ROWS.toLocaleString("es-MX")} conceptos. Reduce el periodo para ver el detalle completo.`;
+      noticeCell.font = { bold: true, color: { argb: "FF8B1A1A" } };
+      noticeCell.alignment = { vertical: "middle", horizontal: "center" };
     }
 
     const buf = await wb.xlsx.writeBuffer();

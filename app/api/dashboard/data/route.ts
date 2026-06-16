@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { getNominaDeduccionesColumn } from "@/lib/facturas-query";
 import { buildDemoDashboardData } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
 
@@ -136,13 +137,7 @@ export async function GET(req: NextRequest) {
   try {
     const db = await getDb();
 
-    const dedCols = await db.request().query<{ COLUMN_NAME: string }>(`
-      SELECT COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_NAME = 'facturalo_cfdis'
-        AND COLUMN_NAME IN ('NominaDeducciones', 'nomina_deducciones', 'nominaDeducciones')
-    `);
-    const nominaDedCol = dedCols.recordset[0]?.COLUMN_NAME ?? null;
+    const nominaDedCol = await getNominaDeduccionesColumn();
     const nominaDedSelect = nominaDedCol
       ? `TRY_CONVERT(nvarchar(max), [${nominaDedCol.replace(/\]/g, "]]" )}]) AS NominaDeducciones`
       : `CAST(NULL AS nvarchar(max)) AS NominaDeducciones`;

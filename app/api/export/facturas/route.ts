@@ -247,9 +247,12 @@ const COL_WIDTHS_RET = [16, 20, 16, 20, 22, 14, 13, 13, 16, 13, 14, 14, 16, 13, 
 
 // ─── Excel style helpers ───────────────────────────────────────────────────────
 
+// Borde compartido — se reutiliza la misma referencia en todas las celdas para
+// evitar crear cientos de miles de objetos de estilo en reportes grandes.
+const THIN_BORDER: ExcelJS.Border = { style: "thin", color: { argb: "FF000000" } };
+const BORDER_ALL: Partial<ExcelJS.Borders> = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
 function addBorder(cell: ExcelJS.Cell) {
-  const b: ExcelJS.Border = { style: "thin", color: { argb: "FF000000" } };
-  cell.border = { top: b, bottom: b, left: b, right: b };
+  cell.border = BORDER_ALL;
 }
 function setFill(cell: ExcelJS.Cell, hex: string) {
   cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF" + hex } };
