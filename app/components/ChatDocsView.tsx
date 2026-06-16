@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
+import MicButton from './MicButton'
 import CedulaFiscalUploadModal from './CedulaFiscalUploadModal'
 
 interface Message {
@@ -372,6 +373,15 @@ export default function ChatDocsView({ session, accountType }: Props) {
               placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de linea)"
               rows={2}
               className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-docs' : ''}`}
+            />
+            <MicButton
+              variant="emerald"
+              disabled={sending}
+              onTranscript={(text) => {
+                dismissChatPulse()
+                setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
+                textareaRef.current?.focus()
+              }}
             />
             <button
               onClick={sendMessage}

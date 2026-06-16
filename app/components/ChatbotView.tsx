@@ -6,6 +6,7 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import NotificationBell from './NotificationBell'
+import MicButton from './MicButton'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 interface RfcOption { id: string; rfc: string; alias: string | null }
@@ -356,6 +357,15 @@ export default function ChatbotView({ session, accountType }: Props) {
               }
               rows={2}
               className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8] dark:focus:ring-[#91EB78] transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-chat' : ''}`}
+            />
+            <MicButton
+              variant="indigo"
+              disabled={!selectedRfc || sending}
+              onTranscript={(text) => {
+                dismissChatPulse()
+                setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
+                textareaRef.current?.focus()
+              }}
             />
             <button
               onClick={sendMessage}
