@@ -1723,7 +1723,7 @@ export async function chatGetNomina(
       FROM facturalo_cfdis WITH (NOLOCK)
       WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
         AND TipoComprobante='N'
-        AND UPPER(Status)='VIGENTE'
+        AND Status='Vigente'
         AND Fecha>=@dateFrom AND Fecha<@dateTo
         AND (
           '${dir}' = 'AMBAS' OR
@@ -1879,7 +1879,7 @@ export async function chatGetFacturasCanceladas(
         ISNULL(TRY_CONVERT(decimal(18,2),Total),0)*${TC} AS total
       FROM facturalo_cfdis WITH (NOLOCK)
       WHERE (RFC_Emisor=@rfc OR RFC_Receptor=@rfc)
-        AND UPPER(Status)<>'VIGENTE'
+        AND Status<>'Vigente'
         AND Fecha>=@dateFrom AND Fecha<@dateTo
         AND TipoComprobante IN ('I','E','N','P')
         AND (
