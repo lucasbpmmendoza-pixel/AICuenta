@@ -25,7 +25,7 @@ export interface DashboardData {
     regimenFiscal: string;
     regimenLabel: string;
   }
-  egresos: { total: number; count: number }
+  egresos: { total: number; count: number; vigentes: number; cancelados: number }
   topClientes:          Array<{ nombre: string; monto: number }>
   topProveedores:       Array<{ nombre: string; monto: number }>
   topConceptosIngresos: Array<{ concepto: string; monto: number }>
@@ -174,6 +174,7 @@ function ConteoCard({ conteo, skeleton }: {
           <IconFacturasAnio />
         </div>
         <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-0.5">CFDIs del SAT</p>
           {skeleton ? (
             <div className="h-6 w-20 rounded-lg bg-slate-100 dark:bg-zinc-800 animate-pulse mt-1" />
           ) : (
@@ -294,7 +295,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
   const periodo = `${mes} ${anio}`
 
   const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
-  const egresos   = data?.egresos   ?? { total: 0, count: 0 }
+  const egresos   = data?.egresos   ?? { total: 0, count: 0, vigentes: 0, cancelados: 0 }
   const nominaRet = data?.nominaRetenciones ?? { count: 0, isr: 0, imss: 0 }
   const conteo    = data?.conteoCfdi ?? { emitidos: 0, recibidos: 0, total: 0 }
   const regimenes = data?.isrRegimenes ?? []
@@ -333,9 +334,12 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
 
   const utilidad  = ingresos.total - egresos.total
   const mostrarTagNomina = !loading && nominaRet.count > 0
+  const cfdiTotal      = ingresos.count      + egresos.count
+  const cfdiVigentes   = ingresos.vigentes   + egresos.vigentes
+  const cfdiCancelados = ingresos.cancelados + egresos.cancelados
   const cfdiData  = [
-    { name: 'Vigentes',   value: ingresos.vigentes  },
-    { name: 'Cancelados', value: ingresos.cancelados },
+    { name: 'Vigentes',   value: cfdiVigentes   },
+    { name: 'Cancelados', value: cfdiCancelados },
   ]
 
   return (
@@ -346,7 +350,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
         <KpiCard label="Ingresos del mes"  skeleton={loading} value={MXN(ingresos.total)} color="blue"    icon={<IconIngresos />} />
         <KpiCard label="Egresos del mes"   skeleton={loading} value={MXN(egresos.total)}  color="rose"    icon={<IconEgresos />} />
         <KpiCard label="Utilidad estimada" skeleton={loading} value={MXN(utilidad)}       color={utilidad >= 0 ? 'emerald' : 'rose'} sub="Ingresos − Egresos" icon={<IconUtilidad />} />
-        <KpiCard label="CFDIs emitidos"    skeleton={loading} value={String(ingresos.count)} color="slate" sub={`${ingresos.vigentes} vigentes · ${ingresos.cancelados} cancelados`} icon={<IconCFDI />} />
+        <KpiCard label="CFDIs emitidos + recibidos" skeleton={loading} value={String(cfdiTotal)} color="slate" sub={`${cfdiVigentes} vigentes · ${cfdiCancelados} cancelados`} icon={<IconCFDI />} />
         <ConteoCard conteo={conteo} skeleton={loading} />
       </div>
 
@@ -407,14 +411,14 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
             <p className="text-xs font-semibold text-slate-400 dark:text-zinc-500 uppercase tracking-wider mb-2">CFDIs por estado</p>
             <div className="flex gap-4">
               <div>
-                <p className="text-xl font-black text-blue-500 dark:text-blue-400 leading-none">{ingresos.vigentes}</p>
+                <p className="text-xl font-black text-blue-500 dark:text-blue-400 leading-none">{cfdiVigentes}</p>
                 <div className="flex items-center gap-1 mt-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
                   <p className="text-xs text-slate-400 dark:text-zinc-500">Vigentes</p>
                 </div>
               </div>
               <div>
-                <p className="text-xl font-black text-rose-500 dark:text-rose-400 leading-none">{ingresos.cancelados}</p>
+                <p className="text-xl font-black text-rose-500 dark:text-rose-400 leading-none">{cfdiCancelados}</p>
                 <div className="flex items-center gap-1 mt-0.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
                   <p className="text-xs text-slate-400 dark:text-zinc-500">Cancelados</p>

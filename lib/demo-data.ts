@@ -188,10 +188,16 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
       regimenFiscal: "601",
       regimenLabel: "General de Ley Personas Morales",
     },
-    egresos: {
-      total: egresosTotal,
-      count: Math.floor(20 + rand() * 70),
-    },
+    egresos: (() => {
+      const count = Math.floor(20 + rand() * 70);
+      const cancelados = Math.floor(rand() * Math.min(3, Math.max(1, Math.floor(count / 20))));
+      return {
+        total: egresosTotal,
+        count,
+        vigentes: Math.max(count - cancelados, 0),
+        cancelados,
+      };
+    })(),
     topClientes,
     topProveedores,
     topConceptosIngresos,

@@ -173,7 +173,9 @@ export async function GET(req: NextRequest) {
         .query(`
           SELECT
             ISNULL(SUM(CASE WHEN Status='Vigente' THEN Total * ISNULL(NULLIF(tipoCambio,0),1) ELSE 0 END),0) AS total,
-            COUNT(*) AS count
+            COUNT(*)                                            AS count,
+            SUM(CASE WHEN Status='Vigente'  THEN 1 ELSE 0 END) AS vigentes,
+            SUM(CASE WHEN Status!='Vigente' THEN 1 ELSE 0 END) AS cancelados
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE RFC_Receptor=@rfc AND TipoComprobante='I'
             AND Fecha>=@dateFrom AND Fecha<@dateTo
@@ -259,22 +261,25 @@ export async function GET(req: NextRequest) {
           OPTION (RECOMPILE, MAXDOP 1)
         `),
 
-      // Q8: Conteo total de CFDIs por RFC (tabla conteo_cfdi)
+      // Q8: Conteo mensual de CFDIs del SAT por RFC (todos los TipoComprobante, vigentes + cancelados)
       db.request()
-        .input("rfc", sql.NVarChar, rfc)
+        .input("rfc",      sql.NVarChar, rfc)
+        .input("dateFrom", sql.DateTime, dateFrom)
+        .input("dateTo",   sql.DateTime, dateTo)
         .query(`
-          SELECT TOP 1
-            ISNULL(emitidos,  0) AS emitidos,
-            ISNULL(recibidos, 0) AS recibidos,
-            ISNULL(total,     0) AS total
-          FROM conteo_cfdi WITH (NOLOCK)
-          WHERE rfc = @rfc
+          SELECT
+            SUM(CASE WHEN RFC_Emisor   = @rfc THEN 1 ELSE 0 END) AS emitidos,
+            SUM(CASE WHEN RFC_Receptor = @rfc THEN 1 ELSE 0 END) AS recibidos,
+            COUNT(*)                                             AS total
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
+            AND Fecha >= @dateFrom AND Fecha < @dateTo
           OPTION (RECOMPILE, MAXDOP 1)
         `),
     ]);
 
     type IngRow  = { total:number; count:number; vigentes:number; cancelados:number; ivaTotal:number; isrRetenido:number; ivaRetenido:number };
-    type EgrRow  = { total:number; count:number };
+    type EgrRow  = { total:number; count:number; vigentes:number; cancelados:number };
     type NomRow  = { nombre:string; monto:number };
     type ConcRow = { concepto:string; monto:number };
     type NomRetRow = { isrDB: number; tipoCambio: number; NominaDeducciones: string | null };
@@ -293,7 +298,7 @@ export async function GET(req: NextRequest) {
     }
 
     const defIng: IngRow = { total:0, count:0, vigentes:0, cancelados:0, ivaTotal:0, isrRetenido:0, ivaRetenido:0 };
-    const defEgr: EgrRow = { total:0, count:0 };
+    const defEgr: EgrRow = { total:0, count:0, vigentes:0, cancelados:0 };
 
     const ingRow   = settledOne<IngRow>(ingRes,  defIng);
     const egrRow   = settledOne<EgrRow>(egrRes,  defEgr);
@@ -376,8 +381,10 @@ export async function GET(req: NextRequest) {
         regimenLabel:  labelRegimen(regimen),
       },
       egresos: {
-        total: Number(egrRow.total),
-        count: Number(egrRow.count),
+        total:      Number(egrRow.total),
+        count:      Number(egrRow.count),
+        vigentes:   Number(egrRow.vigentes)   || 0,
+        cancelados: Number(egrRow.cancelados) || 0,
       },
       topClientes:          clientes.map(r => ({ nombre: r.nombre,     monto: Number(r.monto) })),
       topProveedores:       provs.map(r    => ({ nombre: r.nombre,     monto: Number(r.monto) })),
