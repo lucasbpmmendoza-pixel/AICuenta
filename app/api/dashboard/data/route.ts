@@ -262,7 +262,9 @@ export async function GET(req: NextRequest) {
         `),
 
       // Q8: Conteo de CFDIs en nuestra base (facturalo_cfdis) por RFC — emitidos vs recibidos.
-      //     Alimenta la tarjeta "CFDIs emitidos + recibidos".
+      //     Solo vigentes (excluye canceladas). El filtro rfc_cliente = @rfc evita contar
+      //     dos veces los CFDIs entre dos RFCs que ambos son clientes en nuestra BD (el
+      //     comprobante se almacena una vez por cada cliente). Alimenta "CFDIs emitidos + recibidos".
       db.request()
         .input("rfc",      sql.NVarChar, rfc)
         .input("dateFrom", sql.DateTime, dateFrom)
@@ -274,6 +276,8 @@ export async function GET(req: NextRequest) {
             COUNT(*)                                             AS total
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
+            AND rfc_cliente = @rfc
+            AND Status = 'Vigente'
             AND Fecha >= @dateFrom AND Fecha < @dateTo
           OPTION (RECOMPILE, MAXDOP 1)
         `),
