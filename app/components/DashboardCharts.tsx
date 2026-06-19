@@ -334,7 +334,10 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
 
   const utilidad  = ingresos.total - egresos.total
   const mostrarTagNomina = !loading && nominaRet.count > 0
-  const cfdiTotal      = ingresos.count      + egresos.count
+  // CFDIs emitidos + recibidos: todos los tipos de comprobante, clasificados por RFC
+  // (emitidos = RFC_Emisor = rfc seleccionado, recibidos = RFC_Receptor = rfc seleccionado).
+  // Viene de Q8 (conteoCfdi), no de ingresos/egresos que están limitados a TipoComprobante='I'.
+  const cfdiTotal      = conteo.total
   const cfdiVigentes   = ingresos.vigentes   + egresos.vigentes
   const cfdiCancelados = ingresos.cancelados + egresos.cancelados
   const cfdiData  = [
@@ -350,7 +353,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
         <KpiCard label="Ingresos del mes"  skeleton={loading} value={MXN(ingresos.total)} color="blue"    icon={<IconIngresos />} />
         <KpiCard label="Egresos del mes"   skeleton={loading} value={MXN(egresos.total)}  color="rose"    icon={<IconEgresos />} />
         <KpiCard label="Utilidad estimada" skeleton={loading} value={MXN(utilidad)}       color={utilidad >= 0 ? 'emerald' : 'rose'} sub="Ingresos − Egresos" icon={<IconUtilidad />} />
-        <KpiCard label="CFDIs emitidos + recibidos" skeleton={loading} value={String(cfdiTotal)} color="slate" sub={`${cfdiVigentes} vigentes · ${cfdiCancelados} cancelados`} icon={<IconCFDI />} />
+        <KpiCard label="CFDIs emitidos + recibidos" skeleton={loading} value={String(cfdiTotal)} color="slate" sub={`${conteo.emitidos} emitidos · ${conteo.recibidos} recibidos`} icon={<IconCFDI />} />
         <ConteoCard conteo={conteo} skeleton={loading} />
       </div>
 
