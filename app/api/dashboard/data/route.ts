@@ -143,7 +143,7 @@ export async function GET(req: NextRequest) {
       : `CAST(NULL AS nvarchar(max)) AS NominaDeducciones`;
 
     // Promise.allSettled — si una query es lenta/falla, las demás igual retornan
-    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes, nominaRetRes, conteoRes] = await Promise.allSettled([
+    const [ingRes, egrRes, clientesRes, provsRes, concIngRes, regimenRes, nominaRetRes, conteoRes, satRes] = await Promise.allSettled([
 
       // Q1: Resumen ingresos emitidos
       db.request()
@@ -261,7 +261,8 @@ export async function GET(req: NextRequest) {
           OPTION (RECOMPILE, MAXDOP 1)
         `),
 
-      // Q8: Conteo mensual de CFDIs del SAT por RFC (todos los TipoComprobante, vigentes + cancelados)
+      // Q8: Conteo de CFDIs en nuestra base (facturalo_cfdis) por RFC — emitidos vs recibidos.
+      //     Alimenta la tarjeta "CFDIs emitidos + recibidos".
       db.request()
         .input("rfc",      sql.NVarChar, rfc)
         .input("dateFrom", sql.DateTime, dateFrom)
@@ -274,6 +275,19 @@ export async function GET(req: NextRequest) {
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
             AND Fecha >= @dateFrom AND Fecha < @dateTo
+          OPTION (RECOMPILE, MAXDOP 1)
+        `),
+
+      // Q9: Conteo oficial del SAT (tabla pre-agregada conteo_cfdi) para el mes seleccionado.
+      //     Fuente independiente de facturalo_cfdis. Alimenta la tarjeta "CFDIs del SAT".
+      db.request()
+        .input("rfc",  sql.NVarChar, rfc)
+        .input("anio", sql.SmallInt, year)
+        .input("mes",  sql.TinyInt,  month)
+        .query(`
+          SELECT TOP 1 emitidos, recibidos, total
+          FROM conteo_cfdi WITH (NOLOCK)
+          WHERE rfc = @rfc AND anio = @anio AND mes = @mes
           OPTION (RECOMPILE, MAXDOP 1)
         `),
     ]);
@@ -308,7 +322,10 @@ export async function GET(req: NextRequest) {
     const concEgr  = provs.map(p => ({ concepto: p.nombre, monto: p.monto }));
     const regRes   = regimenRes.status === 'fulfilled' ? regimenRes.value.recordset[0] : undefined;
     const nominaRows = settled<NomRetRow>(nominaRetRes, []);
-    const conteoRow  = settledOne<ConteoRow>(conteoRes, { emitidos: 0, recibidos: 0, total: 0 });
+    // CFDIs en nuestra base (facturalo_cfdis) vs. conteo oficial del SAT (conteo_cfdi).
+    // Son dos fuentes independientes: comparar ambas permite detectar CFDIs faltantes.
+    const conteoRow = settledOne<ConteoRow>(conteoRes, { emitidos: 0, recibidos: 0, total: 0 });
+    const satRow    = settledOne<ConteoRow>(satRes,    { emitidos: 0, recibidos: 0, total: 0 });
     const regimen  = String((regRes as { regimenFiscal: string } | undefined)?.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
 
     const ingresosMXN = Number(ingRow.total)       || 0;
@@ -399,6 +416,11 @@ export async function GET(req: NextRequest) {
         emitidos:  Number(conteoRow.emitidos)  || 0,
         recibidos: Number(conteoRow.recibidos) || 0,
         total:     Number(conteoRow.total)     || 0,
+      },
+      conteoSat: {
+        emitidos:  Number(satRow.emitidos)  || 0,
+        recibidos: Number(satRow.recibidos) || 0,
+        total:     Number(satRow.total)     || 0,
       },
       isrRegimenes: ISR_REGIMENES,
     });

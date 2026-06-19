@@ -175,6 +175,11 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
   const conteoEmitidos = Math.floor(300 + rand() * 1200);
   const conteoRecibidos = Math.floor(200 + rand() * 1000);
 
+  // Conteo oficial del SAT (conteo_cfdi): fuente independiente. Suele ser un poco mayor
+  // que nuestra base porque incluye CFDIs aún no descargados a facturalo_cfdis.
+  const satEmitidos = conteoEmitidos + Math.floor(rand() * 8);
+  const satRecibidos = conteoRecibidos + Math.floor(rand() * 8);
+
   return {
     ingresos: {
       total: ingresosTotal,
@@ -211,6 +216,11 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
       emitidos: conteoEmitidos,
       recibidos: conteoRecibidos,
       total: conteoEmitidos + conteoRecibidos,
+    },
+    conteoSat: {
+      emitidos: satEmitidos,
+      recibidos: satRecibidos,
+      total: satEmitidos + satRecibidos,
     },
     isrRegimenes: [
       { code: "601", name: "General de Ley Personas Morales", rateHint: "30%" },

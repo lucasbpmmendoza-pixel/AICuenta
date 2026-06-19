@@ -40,6 +40,11 @@ export interface DashboardData {
     recibidos: number
     total: number
   }
+  conteoSat: {
+    emitidos: number
+    recibidos: number
+    total: number
+  }
   isrRegimenes: IsrRegimenOption[]
 }
 
@@ -298,6 +303,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
   const egresos   = data?.egresos   ?? { total: 0, count: 0, vigentes: 0, cancelados: 0 }
   const nominaRet = data?.nominaRetenciones ?? { count: 0, isr: 0, imss: 0 }
   const conteo    = data?.conteoCfdi ?? { emitidos: 0, recibidos: 0, total: 0 }
+  const conteoSat = data?.conteoSat  ?? { emitidos: 0, recibidos: 0, total: 0 }
   const regimenes = data?.isrRegimenes ?? []
 
   const [regimenSeleccionado, setRegimenSeleccionado] = useState('')
@@ -354,7 +360,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
         <KpiCard label="Egresos del mes"   skeleton={loading} value={MXN(egresos.total)}  color="rose"    icon={<IconEgresos />} />
         <KpiCard label="Utilidad estimada" skeleton={loading} value={MXN(utilidad)}       color={utilidad >= 0 ? 'emerald' : 'rose'} sub="Ingresos − Egresos" icon={<IconUtilidad />} />
         <KpiCard label="CFDIs emitidos + recibidos" skeleton={loading} value={String(cfdiTotal)} color="slate" sub={`${conteo.emitidos} emitidos · ${conteo.recibidos} recibidos`} icon={<IconCFDI />} />
-        <ConteoCard conteo={conteo} skeleton={loading} />
+        <ConteoCard conteo={conteoSat} skeleton={loading} />
       </div>
 
       {/* ── Fila 2: KPIs fiscales + estado CFDIs ─────────────── */}
