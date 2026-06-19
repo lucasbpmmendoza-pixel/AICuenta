@@ -174,6 +174,7 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
 
   const conteoEmitidos = Math.floor(300 + rand() * 1200);
   const conteoRecibidos = Math.floor(200 + rand() * 1000);
+  const conteoCancelados = Math.floor(rand() * 12);
 
   // Conteo oficial del SAT (conteo_cfdi): fuente independiente. Suele ser un poco mayor
   // que nuestra base porque incluye CFDIs aún no descargados a facturalo_cfdis.
@@ -216,6 +217,7 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
       emitidos: conteoEmitidos,
       recibidos: conteoRecibidos,
       total: conteoEmitidos + conteoRecibidos,
+      cancelados: conteoCancelados,
     },
     conteoSat: {
       emitidos: satEmitidos,

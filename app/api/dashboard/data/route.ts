@@ -261,23 +261,24 @@ export async function GET(req: NextRequest) {
           OPTION (RECOMPILE, MAXDOP 1)
         `),
 
-      // Q8: Conteo de CFDIs en nuestra base (facturalo_cfdis) por RFC — emitidos vs recibidos.
-      //     Solo vigentes (excluye canceladas). El filtro rfc_cliente = @rfc evita contar
-      //     dos veces los CFDIs entre dos RFCs que ambos son clientes en nuestra BD (el
-      //     comprobante se almacena una vez por cada cliente). Alimenta "CFDIs emitidos + recibidos".
+      // Q8: Conteo de CFDIs en nuestra base (facturalo_cfdis) por RFC.
+      //     emitidos/recibidos/total cuentan SOLO vigentes (la tarjeta "CFDIs emitidos +
+      //     recibidos" ignora canceladas); cancelados se reporta aparte para "CFDIs por estado".
+      //     rfc_cliente = @rfc evita contar dos veces los CFDIs entre dos RFCs que ambos son
+      //     clientes en nuestra BD (el comprobante se almacena una vez por cada cliente).
       db.request()
         .input("rfc",      sql.NVarChar, rfc)
         .input("dateFrom", sql.DateTime, dateFrom)
         .input("dateTo",   sql.DateTime, dateTo)
         .query(`
           SELECT
-            SUM(CASE WHEN RFC_Emisor   = @rfc THEN 1 ELSE 0 END) AS emitidos,
-            SUM(CASE WHEN RFC_Receptor = @rfc THEN 1 ELSE 0 END) AS recibidos,
-            COUNT(*)                                             AS total
+            SUM(CASE WHEN RFC_Emisor   = @rfc AND Status = 'Vigente' THEN 1 ELSE 0 END) AS emitidos,
+            SUM(CASE WHEN RFC_Receptor = @rfc AND Status = 'Vigente' THEN 1 ELSE 0 END) AS recibidos,
+            SUM(CASE WHEN Status =  'Vigente' THEN 1 ELSE 0 END)                         AS total,
+            SUM(CASE WHEN Status != 'Vigente' THEN 1 ELSE 0 END)                         AS cancelados
           FROM facturalo_cfdis WITH (NOLOCK)
           WHERE (RFC_Emisor = @rfc OR RFC_Receptor = @rfc)
             AND rfc_cliente = @rfc
-            AND Status = 'Vigente'
             AND Fecha >= @dateFrom AND Fecha < @dateTo
           OPTION (RECOMPILE, MAXDOP 1)
         `),
@@ -301,7 +302,8 @@ export async function GET(req: NextRequest) {
     type NomRow  = { nombre:string; monto:number };
     type ConcRow = { concepto:string; monto:number };
     type NomRetRow = { isrDB: number; tipoCambio: number; NominaDeducciones: string | null };
-    type ConteoRow = { emitidos: number; recibidos: number; total: number };
+    type ConteoRow = { emitidos: number; recibidos: number; total: number; cancelados: number };
+    type SatRow    = { emitidos: number; recibidos: number; total: number };
 
     // Helper: extrae recordset de un PromiseSettledResult, o retorna default
     function settled<T>(res: PromiseSettledResult<sql.IResult<T>>, def: T[]): T[] {
@@ -328,8 +330,8 @@ export async function GET(req: NextRequest) {
     const nominaRows = settled<NomRetRow>(nominaRetRes, []);
     // CFDIs en nuestra base (facturalo_cfdis) vs. conteo oficial del SAT (conteo_cfdi).
     // Son dos fuentes independientes: comparar ambas permite detectar CFDIs faltantes.
-    const conteoRow = settledOne<ConteoRow>(conteoRes, { emitidos: 0, recibidos: 0, total: 0 });
-    const satRow    = settledOne<ConteoRow>(satRes,    { emitidos: 0, recibidos: 0, total: 0 });
+    const conteoRow = settledOne<ConteoRow>(conteoRes, { emitidos: 0, recibidos: 0, total: 0, cancelados: 0 });
+    const satRow    = settledOne<SatRow>(satRes,       { emitidos: 0, recibidos: 0, total: 0 });
     const regimen  = String((regRes as { regimenFiscal: string } | undefined)?.regimenFiscal ?? '').trim().replace(/\D/g, '').slice(0, 3);
 
     const ingresosMXN = Number(ingRow.total)       || 0;
@@ -417,9 +419,10 @@ export async function GET(req: NextRequest) {
         imss: nominaImss,
       },
       conteoCfdi: {
-        emitidos:  Number(conteoRow.emitidos)  || 0,
-        recibidos: Number(conteoRow.recibidos) || 0,
-        total:     Number(conteoRow.total)     || 0,
+        emitidos:   Number(conteoRow.emitidos)   || 0,
+        recibidos:  Number(conteoRow.recibidos)  || 0,
+        total:      Number(conteoRow.total)      || 0,
+        cancelados: Number(conteoRow.cancelados) || 0,
       },
       conteoSat: {
         emitidos:  Number(satRow.emitidos)  || 0,

@@ -39,6 +39,7 @@ export interface DashboardData {
     emitidos: number
     recibidos: number
     total: number
+    cancelados: number
   }
   conteoSat: {
     emitidos: number
@@ -302,7 +303,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
   const ingresos  = data?.ingresos  ?? { total: 0, count: 0, vigentes: 0, cancelados: 0, ivaTotal: 0, ivaRetenido: 0, isrRetenido: 0, isrEstimado: 0, regimenFiscal: '', regimenLabel: '' }
   const egresos   = data?.egresos   ?? { total: 0, count: 0, vigentes: 0, cancelados: 0 }
   const nominaRet = data?.nominaRetenciones ?? { count: 0, isr: 0, imss: 0 }
-  const conteo    = data?.conteoCfdi ?? { emitidos: 0, recibidos: 0, total: 0 }
+  const conteo    = data?.conteoCfdi ?? { emitidos: 0, recibidos: 0, total: 0, cancelados: 0 }
   const conteoSat = data?.conteoSat  ?? { emitidos: 0, recibidos: 0, total: 0 }
   const regimenes = data?.isrRegimenes ?? []
 
@@ -340,12 +341,13 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
 
   const utilidad  = ingresos.total - egresos.total
   const mostrarTagNomina = !loading && nominaRet.count > 0
-  // CFDIs emitidos + recibidos: todos los tipos de comprobante, clasificados por RFC
-  // (emitidos = RFC_Emisor = rfc seleccionado, recibidos = RFC_Receptor = rfc seleccionado).
-  // Viene de Q8 (conteoCfdi), no de ingresos/egresos que están limitados a TipoComprobante='I'.
+  // CFDIs por estado: todos los tipos de comprobante, clasificados por RFC y deduplicados
+  // por rfc_cliente. Viene de Q8 (conteoCfdi), no de ingresos/egresos que están limitados
+  // a TipoComprobante='I'. conteo.total ya cuenta solo vigentes; cancelados viene aparte,
+  // de modo que "Vigentes" coincide con la tarjeta "CFDIs emitidos + recibidos".
   const cfdiTotal      = conteo.total
-  const cfdiVigentes   = ingresos.vigentes   + egresos.vigentes
-  const cfdiCancelados = ingresos.cancelados + egresos.cancelados
+  const cfdiVigentes   = conteo.total
+  const cfdiCancelados = conteo.cancelados
   const cfdiData  = [
     { name: 'Vigentes',   value: cfdiVigentes   },
     { name: 'Cancelados', value: cfdiCancelados },
