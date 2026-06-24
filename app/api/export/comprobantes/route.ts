@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server'
 import ExcelJS from 'exceljs'
 import { getSession } from '@/lib/session'
-import { isFreemium } from '@/lib/membership'
 import { getDb } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +16,6 @@ function n(v: unknown): number { const x = Number(v); return isFinite(x) ? x : 0
 export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return new Response('Unauthorized', { status: 401 })
-  if (await isFreemium(session)) return new Response('Las descargas requieren un plan de pago', { status: 403 })
 
   const ownerId = session.ownerId ?? session.sub
 

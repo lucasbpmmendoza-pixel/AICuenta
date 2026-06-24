@@ -2,7 +2,6 @@
 
 import path from 'path'
 import { getSession } from '@/lib/session'
-import { isFreemium } from '@/lib/membership'
 import { getDb } from '@/lib/db'
 import { loadOwnerPlanLimits } from '@/lib/account-plan'
 import { uploadRfcFiles } from '@/lib/rfc-storage'
@@ -15,8 +14,6 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
 
   // Miembros no pueden modificar RFCs
   if (session.role === 'member') return { success: false, message: 'No tienes permisos para realizar esta accion.' }
-
-  const userIsFree = await isFreemium(session)
 
   // Para multi-cuenta, usar el owner_id como propietario de los datos
   const effectiveUserId = session.ownerId ?? session.sub
@@ -76,33 +73,22 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
   }
 
   // UPSERT en EFIELES
-  //
-  // Para cuentas gratis: al registrar (INSERT) un RFC nuevo, fijamos
-  // last_update al primer dia del mes en curso, asi el cron del SAT
-  // solo descarga CFDIs desde principio de mes en adelante (no historico).
-  // Para cuentas de pago: NOW (default actual via trigger).
-  const now = new Date()
-  const lastUpdate = userIsFree
-    ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-    : now
-
   try {
     const db = await getDb()
     await db
       .request()
-      .input('user_id',     effectiveUserId)
-      .input('rfc',         rfc)
-      .input('fiel',        efiel)
-      .input('last_update', lastUpdate)
+      .input('user_id', effectiveUserId)
+      .input('rfc',     rfc)
+      .input('fiel',    efiel)
       .query(`
         MERGE EFIELES AS target
         USING (SELECT @user_id AS user_id, @rfc AS rfc) AS source
           ON  target.user_id = source.user_id AND target.rfc = source.rfc
         WHEN MATCHED THEN
-          UPDATE SET fiel = @fiel
+          UPDATE SET fiel = @fiel, last_update = SYSUTCDATETIME()
         WHEN NOT MATCHED THEN
-          INSERT (user_id, rfc, fiel, last_update)
-          VALUES (@user_id, @rfc, @fiel, @last_update);
+          INSERT (user_id, rfc, fiel)
+          VALUES (@user_id, @rfc, @fiel);
       `)
   } catch (err) {
     console.error('[uploadRfc] DB error:', (err as Error).message)

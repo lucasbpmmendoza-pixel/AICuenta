@@ -6,7 +6,6 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import MicButton from './MicButton'
-import FreemiumBanner from './FreemiumBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 import {
   FINDOC_CHAT_KEY,
@@ -310,7 +309,6 @@ export default function ChatbotView({ session, accountType }: Props) {
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
     <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
         <div className="lg:hidden h-14" />
-        <FreemiumBanner message="Plan gratis: FinDoc esta disponible solo en planes de pago. Usa FiscalGPT para preguntas fiscales generales." />
 
         {/* ── Header ── */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">

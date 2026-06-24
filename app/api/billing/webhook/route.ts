@@ -160,20 +160,6 @@ export async function POST(req: NextRequest) {
           .input("user_id", userId)
           .input("plan", String(planId))
           .query(`UPDATE users SET plan_type = @plan WHERE id = @user_id`);
-
-        // Upgrade desde free: el cron de SAT usa EFIELES.last_update como
-        // ventana de descarga. Para que el usuario nuevo recien suscrito
-        // reciba el historico completo, resetear last_update de todos
-        // sus RFCs a hace 5 anios. El trigger TR_efieles_updated_at
-        // respeta updates explicitos de last_update.
-        await db
-          .request()
-          .input("user_id", userId)
-          .query(`
-            UPDATE EFIELES
-            SET last_update = DATEADD(year, -5, SYSUTCDATETIME())
-            WHERE user_id = @user_id
-          `);
         break;
       }
 

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/session";
-import { isFreemium } from "@/lib/membership";
 import { getDb } from "@/lib/db";
 
 // DELETE /api/team/[id] — El owner elimina uno de sus miembros
@@ -11,12 +10,6 @@ export async function DELETE(
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (session.role && session.role !== "owner") return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
-  if (await isFreemium(session)) {
-    return NextResponse.json(
-      { error: "Eliminar usuarios requiere un plan de pago" },
-      { status: 403 },
-    );
-  }
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });

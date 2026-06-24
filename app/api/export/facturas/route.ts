@@ -1,7 +1,6 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
-import { isFreemium, freemiumCanDownloadMonth } from "@/lib/membership";
 import { getDb } from "@/lib/db";
 import { fetchRawCFDIForExport, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoRawCFDIForExport, getDemoNombreEmpresa } from "@/lib/demo-data";
@@ -360,15 +359,6 @@ export async function GET(req: NextRequest) {
   const dateToP   = searchParams.get("dateTo");
 
   if (!rfc) return NextResponse.json({ error: "rfc requerido" }, { status: 400 });
-
-  if (await isFreemium(session)) {
-    if (!freemiumCanDownloadMonth({ year, month: monthP, quarter: quarterP, dateFrom: dateFromP, dateTo: dateToP })) {
-      return NextResponse.json(
-        { error: "Plan gratis: solo puedes descargar el mes en curso. Suscribete para descargar otros periodos." },
-        { status: 403 },
-      );
-    }
-  }
 
   let dateFrom: Date;
   let dateTo: Date;

@@ -5,7 +5,6 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
 import { rfcDisplay } from '@/lib/rfc-aliases'
-import FreemiumBanner from './FreemiumBanner'
 
 const UNETE_HINT_KEY = 'aicuenta_unete_first_visit'
 
@@ -87,7 +86,6 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
 
     <main className="flex-1 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
-          <FreemiumBanner message="Plan gratis: AIChikenelo es solo lectura. Suscribete a un plan para participar." />
 
         {/* Header */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">

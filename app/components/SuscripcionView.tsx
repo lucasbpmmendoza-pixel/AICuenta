@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useMembership } from './MembershipProvider'
 
 type Plan = {
   id: number
@@ -68,7 +67,6 @@ function formatDuration(months: number): string {
 }
 
 export default function SuscripcionView() {
-  const { isFree } = useMembership()
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [usingFallback, setUsingFallback] = useState(false)
@@ -243,55 +241,6 @@ export default function SuscripcionView() {
             </div>
           ) : (
             <>
-              {/* Tarjeta Free */}
-              <article className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/40 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
-                      Plan Free
-                    </h2>
-                    {isFree && (
-                      <span className="rounded-full bg-[#7B6FE8] dark:bg-[#91eb78] text-white dark:text-zinc-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
-                        Plan actual
-                      </span>
-                    )}
-                  </div>
-                  <div className="mt-2 flex items-end gap-2">
-                    <p className="text-2xl font-black text-slate-900 dark:text-white">$0</p>
-                    <span className="pb-1 text-xs text-slate-500 dark:text-zinc-400">/sin costo</span>
-                  </div>
-                  <p className="mt-2 text-sm text-slate-600 dark:text-zinc-300">
-                    Acceso de solo lectura al panel. Ideal para conocer la herramienta antes de suscribirte.
-                  </p>
-                  <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-zinc-300">
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                      Dashboard y descarga del mes en curso
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                      FiscalGPT con acceso completo
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-zinc-600" />
-                      Sin historico de 5 anios
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-zinc-600" />
-                      Sin agregar RFCs ni usuarios
-                    </li>
-                  </ul>
-                </div>
-                <div className="md:w-44 shrink-0">
-                  <button
-                    disabled
-                    className="w-full rounded-xl py-2.5 text-sm font-semibold bg-slate-200 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 cursor-not-allowed"
-                  >
-                    {isFree ? 'Plan actual' : 'Gratis'}
-                  </button>
-                </div>
-              </article>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
                 {planesNormales.map((plan) => {
                   const isFeatured = featuredPlanId === plan.id

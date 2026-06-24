@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { getSession } from "@/lib/session";
-import { isFreemium } from "@/lib/membership";
 import { getDb } from "@/lib/db";
 import { loadOwnerPlanLimits } from "@/lib/account-plan";
 
@@ -42,12 +41,6 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (session.role && session.role !== "owner") return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   if (session.sub === undefined) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
-  if (await isFreemium(session)) {
-    return NextResponse.json(
-      { error: "Agregar usuarios requiere un plan de pago" },
-      { status: 403 },
-    );
-  }
 
   let body: unknown;
   try { body = await req.json(); } catch {

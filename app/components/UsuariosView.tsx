@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import FreemiumOverlay from './FreemiumOverlay'
-import { useMembership } from './MembershipProvider'
 
 interface Member {
   id: string
@@ -27,7 +25,6 @@ function getInitials(name: string) {
 }
 
 export default function UsuariosView() {
-  const { isFree } = useMembership()
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -162,12 +159,6 @@ export default function UsuariosView() {
   }
 
   return (
-    <FreemiumOverlay
-      active={isFree}
-      title="Agregar usuarios requiere un plan de pago"
-      description="Tu plan gratis no permite invitar miembros a tu equipo. Suscribete a un plan empresarial para crear cuentas adicionales."
-      variant="block"
-    >
     <div className="flex-1 flex flex-col">
       <div className="lg:hidden h-14" />
 
@@ -442,6 +433,5 @@ export default function UsuariosView() {
         </div>
       )}
     </div>
-    </FreemiumOverlay>
   )
 }

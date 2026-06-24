@@ -2,7 +2,6 @@ import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
-import { isFreemium } from "@/lib/membership";
 import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoConceptos, getDemoNombreEmpresa } from "@/lib/demo-data";
@@ -202,13 +201,6 @@ export async function GET(req: NextRequest) {
 
   if (!rfc || isNaN(year) || isNaN(month) || month < 1 || month > 12)
     return new Response("Parámetros inválidos", { status: 400 });
-
-  if (await isFreemium(session)) {
-    const now = new Date();
-    if (year !== now.getFullYear() || month !== now.getMonth() + 1) {
-      return new Response("Plan gratis: solo puedes descargar el mes en curso. Suscribete para descargar otros periodos.", { status: 403 });
-    }
-  }
 
   const demoMode = isDemoSession(session);
   if (!demoMode) {

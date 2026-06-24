@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
-import { isFreemium, freemiumCanDownloadMonth } from "@/lib/membership";
 import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
@@ -163,12 +162,6 @@ export async function GET(req: NextRequest) {
   const format = (searchParams.get("format") ?? "txt").toLowerCase();
 
   if (!rfc) return new Response("rfc requerido", { status: 400 });
-
-  if (await isFreemium(session)) {
-    if (!freemiumCanDownloadMonth({ year, month: monthP, quarter: quarterP, dateFrom: dateFromP, dateTo: dateToP })) {
-      return new Response("Plan gratis: solo puedes descargar el mes en curso. Suscribete para descargar otros periodos.", { status: 403 });
-    }
-  }
 
   let period: { dateFrom: Date; dateTo: Date; label: string };
   try {

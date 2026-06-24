@@ -2,7 +2,6 @@
 
 import path from 'path'
 import { getSession } from '@/lib/session'
-import { isFreemium } from '@/lib/membership'
 import { getDb } from '@/lib/db'
 import { loadOwnerPlanLimits } from '@/lib/account-plan'
 import { uploadRfcFiles } from '@/lib/rfc-storage'
@@ -88,32 +87,22 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
   }
 
   // Registrar / actualizar en tabla EFIELES (UPSERT por user_id + rfc)
-  //
-  // Free: al INSERT de un RFC nuevo, last_update = primer dia del mes en curso
-  // (el cron del SAT descarga solo desde esa fecha). Paid: NOW.
-  const userIsFree = await isFreemium(session)
-  const now = new Date()
-  const lastUpdate = userIsFree
-    ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-    : now
-
   try {
     const db = await getDb()
     await db
       .request()
-      .input('user_id',     effectiveUserId)
-      .input('rfc',         rfc)
-      .input('fiel',        efiel)
-      .input('last_update', lastUpdate)
+      .input('user_id', effectiveUserId)
+      .input('rfc', rfc)
+      .input('fiel', efiel)
       .query(`
         MERGE EFIELES AS target
         USING (SELECT @user_id AS user_id, @rfc AS rfc) AS source
           ON target.user_id = source.user_id AND target.rfc = source.rfc
         WHEN MATCHED THEN
-          UPDATE SET fiel = @fiel
+          UPDATE SET fiel = @fiel, last_update = SYSUTCDATETIME()
         WHEN NOT MATCHED THEN
-          INSERT (user_id, rfc, fiel, last_update)
-          VALUES (@user_id, @rfc, @fiel, @last_update);
+          INSERT (user_id, rfc, fiel)
+          VALUES (@user_id, @rfc, @fiel);
       `)
   } catch (err) {
     console.error('[uploadFiles] Error al guardar en EFIELES:', (err as Error).message)
