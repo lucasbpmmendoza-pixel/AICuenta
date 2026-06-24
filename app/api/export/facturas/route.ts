@@ -633,12 +633,24 @@ export async function GET(req: NextRequest) {
         if (ci >= 7 && ci <= 15) cell.numFmt = MXN;
       });
 
-      // Write this month to TOTALES sheet
-      for (const tipo of TIPOS) {
-        const t = totales[mes][tipo];
-        if (t.total !== 0 || t.retenidos !== 0) {
-          totalesMesRow(wsTot, mesLabel(mes), tipo, t);
-        }
+      // Write this month to TOTALES sheet — combine GASTOS + GASTOS - NOMINA into a single row
+      const tIngresosMes = totales[mes]["INGRESOS"];
+      const tGastosCombinado: Totales = {
+        subtotal:      tGa.subtotal      + tNo.subtotal,
+        iva8:          tGa.iva8          + tNo.iva8,
+        iva16:         tGa.iva16         + tNo.iva16,
+        retISR:        tGa.retISR        + tNo.retISR,
+        retSegundo:    tGa.retSegundo    + tNo.retSegundo,
+        retSecundaria: tGa.retSecundaria + tNo.retSecundaria,
+        descuento:     tGa.descuento     + tNo.descuento,
+        total:         tGa.total         + tNo.total,
+        retenidos:     tGa.retenidos     + tNo.retenidos,
+      };
+      if (tIngresosMes.total !== 0 || tIngresosMes.retenidos !== 0) {
+        totalesMesRow(wsTot, mesLabel(mes), "INGRESOS", tIngresosMes);
+      }
+      if (tGastosCombinado.total !== 0 || tGastosCombinado.retenidos !== 0) {
+        totalesMesRow(wsTot, mesLabel(mes), "GASTOS", tGastosCombinado);
       }
 
       const keys = ["subtotal","iva8","iva16","retISR","retSegundo","retSecundaria","descuento","total","retenidos"] as const;
