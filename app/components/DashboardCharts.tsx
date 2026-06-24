@@ -173,7 +173,7 @@ function ConteoCard({ conteo, skeleton }: {
   const valor = view === 'total' ? conteo.total : view === 'emitidos' ? conteo.emitidos : conteo.recibidos
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm px-5 py-4 flex flex-col">
+    <div className="rounded-2xl bg-white dark:bg-zinc-900 border-2 border-amber-400 dark:border-amber-500 shadow-sm px-5 py-4 flex flex-col">
       {/* Parte de arriba: icono + texto y número a su derecha */}
       <div className="flex items-start gap-4">
         <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-zinc-800">

@@ -6,6 +6,9 @@ import { useTheme } from '@/app/hooks/useTheme'
 import { logAction } from '@/lib/logs'
 import OnboardingBeacon from './OnboardingBeacon'
 import OnboardingModal from './OnboardingModal'
+import NotificationBell from './NotificationBell'
+import { FINDOC_CHAT_KEY, FISCALGPT_CHAT_KEY, clearChatMessages } from '@/lib/chat-persistence'
+import { clearLocalNotifications } from '@/lib/local-notifications'
 
 export type AccountType = 'single' | 'multi'
 
@@ -286,6 +289,10 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
+    // Borrar conversaciones guardadas para que no queden visibles al próximo usuario
+    clearChatMessages(FINDOC_CHAT_KEY)
+    clearChatMessages(FISCALGPT_CHAT_KEY)
+    clearLocalNotifications()
     router.push('/login')
   }
 
@@ -305,11 +312,14 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
           <img src={dark ? '/logo6-negro.png' : '/logo6-blanco.png'} alt="AIcuenta" style={{ width: '75%', height: '75%', objectFit: 'contain' }} />
         </div>
         <span className="  text-sm font-black tracking-tight text-[#7b6fe8] dark:text-[#91EB78]">AIcuenta</span>
-        {accountType === 'multi' && (
-          <span className="ml-auto rounded-full bg-[#ebe9fb] dark:bg-[#5E6957] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#7b6fe8] dark:text-[#6BDA4D] font-bold">
-            Multi
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-1.5">
+          {accountType === 'multi' && (
+            <span className="rounded-full bg-[#ebe9fb] dark:bg-[#5E6957] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#7b6fe8] dark:text-[#6BDA4D] font-bold">
+              Multi
+            </span>
+          )}
+          <NotificationBell align="left" />
+        </div>
       </div>
 
       {/* Nav items */}
@@ -525,6 +535,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
           <span className="text-sm font-black text-slate-900 dark:text-white">AI</span>
         </div>
         <div className="flex items-center gap-1">
+          <NotificationBell align="right" />
           <button
             onClick={toggle}
             className="rounded-lg p-1.5 text-slate-500 dark:text-zinc-400 hover:bg-[#EBE9FB] dark:hover:bg-zinc-800 transition"

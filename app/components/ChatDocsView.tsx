@@ -5,9 +5,16 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
-import NotificationBell from './NotificationBell'
 import MicButton from './MicButton'
 import CedulaFiscalUploadModal from './CedulaFiscalUploadModal'
+import {
+  FISCALGPT_CHAT_KEY,
+  loadChatMessages,
+  saveChatMessages,
+  setChatGenerating,
+  isChatGenerating,
+} from '@/lib/chat-persistence'
+import { pushLocalNotification } from '@/lib/local-notifications'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -80,7 +87,6 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 
 const CHAT_DOCS_HINT_KEY = 'aicuenta_chat_docs_first_visit'
-
 interface RfcOption {
   id: string
   rfc: string
@@ -91,6 +97,8 @@ const CHAT_DOCS_RFC_KEY = 'aicuenta_chat_docs_active_rfc'
 
 export default function ChatDocsView({ session, accountType }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
+  const [hydrated, setHydrated] = useState(false)
+  const [bgGenerating, setBgGenerating] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [showChatPulse, setShowChatPulse] = useState(false)
@@ -105,6 +113,35 @@ export default function ChatDocsView({ session, accountType }: Props) {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Restaurar la conversación guardada (sobrevive al navegar entre páginas).
+  // Si una respuesta sigue generándose en segundo plano, se va leyendo del
+  // almacenamiento hasta que termina, para que se actualice sola al volver.
+  useEffect(() => {
+    // Hidratación desde localStorage (almacén externo) al montar: intencional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages(loadChatMessages(FISCALGPT_CHAT_KEY))
+    setHydrated(true)
+
+    if (!isChatGenerating(FISCALGPT_CHAT_KEY)) return
+    setBgGenerating(true)
+    const startedAt = Date.now()
+    const interval = setInterval(() => {
+      setMessages(loadChatMessages(FISCALGPT_CHAT_KEY))
+      if (!isChatGenerating(FISCALGPT_CHAT_KEY) || Date.now() - startedAt > 180_000) {
+        setBgGenerating(false)
+        clearInterval(interval)
+      }
+    }, 400)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Guardar la conversación en cada cambio (tras restaurar y mientras no se esté
+  // siguiendo una generación de fondo, que escribe ella misma).
+  useEffect(() => {
+    if (!hydrated || bgGenerating) return
+    saveChatMessages(FISCALGPT_CHAT_KEY, messages)
+  }, [messages, hydrated, bgGenerating])
 
     useEffect(() => {
     let cancelled = false
@@ -170,7 +207,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
 
   async function sendMessage() {
     const text = input.trim()
-    if (!text || sending) return
+    if (!text || sending || bgGenerating) return
 
     dismissChatPulse()
 
@@ -180,6 +217,10 @@ export default function ChatDocsView({ session, accountType }: Props) {
     setMessages([...history, { role: 'assistant', content: '' }])
     setInput('')
     setSending(true)
+    // Marca la generación y guarda la pregunta de inmediato, por si el usuario
+    // navega antes de que llegue el primer fragmento de respuesta.
+    setChatGenerating(FISCALGPT_CHAT_KEY, true)
+    saveChatMessages(FISCALGPT_CHAT_KEY, history)
 
     try {
       const res = await fetch('/api/chat-docs', {
@@ -190,10 +231,9 @@ export default function ChatDocsView({ session, accountType }: Props) {
 
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: 'Error desconocido' }))
-        setMessages((prev) => [
-          ...prev.slice(0, -1),
-          { role: 'assistant', content: `Error: ${err.error ?? 'No se pudo consultar el asistente.'}` },
-        ])
+        const next: Message[] = [...history, { role: 'assistant', content: `Error: ${err.error ?? 'No se pudo consultar el asistente.'}` }]
+        setMessages(next)
+        saveChatMessages(FISCALGPT_CHAT_KEY, next)
         return
       }
 
@@ -205,14 +245,28 @@ export default function ChatDocsView({ session, accountType }: Props) {
         const { done, value } = await reader.read()
         if (done) break
         acc += decoder.decode(value, { stream: true })
-        setMessages((prev) => [...prev.slice(0, -1), { role: 'assistant', content: acc }])
+        // Calculado desde `history` para poder guardarlo en almacenamiento: la
+        // respuesta sigue escribiéndose aunque este componente ya esté desmontado.
+        const next: Message[] = [...history, { role: 'assistant', content: acc }]
+        setMessages(next)
+        saveChatMessages(FISCALGPT_CHAT_KEY, next)
+      }
+
+      // Si el usuario ya navegó a otra página, avísale que la respuesta está lista.
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard/chat-docs') {
+        pushLocalNotification({
+          title: 'FiscalGPT terminó de responder',
+          body: 'Tu respuesta ya está lista. Toca para verla.',
+          type: 'success',
+          link: '/dashboard/chat-docs',
+        })
       }
     } catch {
-      setMessages((prev) => [
-        ...prev.slice(0, -1),
-        { role: 'assistant', content: 'Error de conexion. Intenta de nuevo.' },
-      ])
+      const next: Message[] = [...history, { role: 'assistant', content: 'Error de conexion. Intenta de nuevo.' }]
+      setMessages(next)
+      saveChatMessages(FISCALGPT_CHAT_KEY, next)
     } finally {
+      setChatGenerating(FISCALGPT_CHAT_KEY, false)
       setSending(false)
       textareaRef.current?.focus()
     }
@@ -225,7 +279,16 @@ export default function ChatDocsView({ session, accountType }: Props) {
     }
   }
 
-  const canSend = !!input.trim() && !sending
+  // `busy` cubre tanto el envío activo como seguir una respuesta que se está
+  // generando en segundo plano (al volver a la página).
+  const busy = sending || bgGenerating
+  const waitingForReply =
+    busy &&
+    (messages.length === 0 ||
+      messages[messages.length - 1].role === 'user' ||
+      messages[messages.length - 1].content === '')
+
+  const canSend = !!input.trim() && !busy
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
@@ -297,7 +360,6 @@ export default function ChatDocsView({ session, accountType }: Props) {
                 )}
                 Subir cédula fiscal
               </button>
-              <NotificationBell />
             </div>
           </div>
         </div>
@@ -339,7 +401,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
             <MessageBubble key={i} msg={m} />
           ))}
 
-          {sending && messages[messages.length - 1]?.content === '' && (
+          {waitingForReply && (
             <div className="flex gap-3 justify-start">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">DOC</div>
               <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 px-4 py-3 shadow-sm">
@@ -369,14 +431,14 @@ export default function ChatDocsView({ session, accountType }: Props) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={sending}
+              disabled={busy}
               placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de linea)"
               rows={2}
               className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-docs' : ''}`}
             />
             <MicButton
               variant="emerald"
-              disabled={sending}
+              disabled={busy}
               onTranscript={(text) => {
                 dismissChatPulse()
                 setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
@@ -388,7 +450,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
               disabled={!canSend}
               className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              {sending ? (
+              {busy ? (
                 <Spinner />
               ) : (
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

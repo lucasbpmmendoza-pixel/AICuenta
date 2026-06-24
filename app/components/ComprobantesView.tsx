@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import FreemiumBanner from './FreemiumBanner'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -186,7 +187,9 @@ export default function ComprobantesView() {
   const isActive = status === 'connected' || status === 'qr' || status === 'connecting'
 
   return (
-    <div className="flex-1 p-4 sm:p-6 space-y-6 text-zinc-900 dark:text-zinc-100">
+    <div className="flex-1 text-zinc-900 dark:text-zinc-100">
+      <FreemiumBanner message="Plan gratis: puedes ver Scan Bot, pero no puedes registrar nuevos comprobantes ni descargar." />
+      <div className="p-4 sm:p-6 space-y-6">
 
       {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -401,6 +404,7 @@ export default function ComprobantesView() {
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   )

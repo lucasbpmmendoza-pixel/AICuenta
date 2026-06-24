@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { list, del } from "@vercel/blob";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { deleteRfcFiles } from "@/lib/rfc-storage";
 
 // PATCH /api/rfcs/[id] — toggle downloads_enabled
 export async function PATCH(
@@ -88,15 +88,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Error al eliminar el RFC" }, { status: 503 });
   }
 
-  // Borrar blobs (best-effort, no bloquea)
+  // Borrar archivos en aicuenta-storage (best-effort, no bloquea la respuesta)
   try {
-    const prefix = `${rfc}/`;
-    const { blobs } = await list({ prefix });
-    if (blobs.length > 0) {
-      await del(blobs.map((b) => b.url));
-    }
+    await deleteRfcFiles(rfc);
   } catch (err) {
-    console.error("[rfcs DELETE] Blob cleanup error:", (err as Error).message);
+    console.error("[rfcs DELETE] storage cleanup error:", (err as Error).message);
   }
 
   return NextResponse.json({ ok: true });

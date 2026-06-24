@@ -5,6 +5,7 @@ import DropZone from './DropZone'
 import { uploadRfc } from '@/app/api/actions/uploadRfc'
 import { rfcAlias } from '@/lib/rfc-aliases'
 import { saveRegimenForRfc } from '@/lib/rfc-regimen-preference'
+import FreemiumBanner from './FreemiumBanner'
 
 interface Rfc {
   id: string
@@ -233,6 +234,7 @@ export default function RFCsView({ readOnly = false }: Props) {
   return (
     <div className="flex-1 flex flex-col">
       <div className="lg:hidden h-14" />
+      <FreemiumBanner message="Plan gratis: puedes registrar 1 RFC. Suscribete a un plan empresarial para agregar mas." />
 
       {/* Header */}
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">

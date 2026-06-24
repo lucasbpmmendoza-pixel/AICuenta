@@ -1,10 +1,11 @@
 'use server'
 
-import { put } from '@vercel/blob'
 import path from 'path'
 import { getSession } from '@/lib/session'
+import { isFreemium } from '@/lib/membership'
 import { getDb } from '@/lib/db'
 import { loadOwnerPlanLimits } from '@/lib/account-plan'
+import { uploadRfcFiles } from '@/lib/rfc-storage'
 
 const RFC_SAFE = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i
 
@@ -14,6 +15,8 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
 
   // Miembros no pueden modificar RFCs
   if (session.role === 'member') return { success: false, message: 'No tienes permisos para realizar esta accion.' }
+
+  const userIsFree = await isFreemium(session)
 
   // Para multi-cuenta, usar el owner_id como propietario de los datos
   const effectiveUserId = session.ownerId ?? session.sub
@@ -64,39 +67,42 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
     return { success: false, message: 'No se pudo validar el limite de RFCs. Intenta de nuevo.' }
   }
 
-  // Subir a Vercel Blob bajo RFC/ (mismo formato que usa el worker)
-  const prefix = rfc
-  const safeCerName = cerFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
-  const safeKeyName = keyFile.name.replace(/[^A-Za-z0-9_\-\.]/g, '_')
-
+  // Subir al servicio aicuenta-storage (FastAPI en Ubuntu, reemplazo de Vercel Blob)
   try {
-    await Promise.all([
-      put(`${prefix}/${safeCerName}`, cerFile,  { access: 'private', allowOverwrite: true }),
-      put(`${prefix}/${safeKeyName}`, keyFile,  { access: 'private', allowOverwrite: true }),
-      put(`${prefix}/efiel.txt`,      efiel,     { access: 'private', contentType: 'text/plain', allowOverwrite: true }),
-    ])
+    await uploadRfcFiles({ rfc, efiel, cer: cerFile, key: keyFile })
   } catch (err) {
-    console.error('[uploadRfc] Blob error:', (err as Error).message)
+    console.error('[uploadRfc] storage error:', (err as Error).message)
     return { success: false, message: 'Error al subir los archivos. Intenta de nuevo.' }
   }
 
   // UPSERT en EFIELES
+  //
+  // Para cuentas gratis: al registrar (INSERT) un RFC nuevo, fijamos
+  // last_update al primer dia del mes en curso, asi el cron del SAT
+  // solo descarga CFDIs desde principio de mes en adelante (no historico).
+  // Para cuentas de pago: NOW (default actual via trigger).
+  const now = new Date()
+  const lastUpdate = userIsFree
+    ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+    : now
+
   try {
     const db = await getDb()
     await db
       .request()
-      .input('user_id', effectiveUserId)
-      .input('rfc',     rfc)
-      .input('fiel',    efiel)
+      .input('user_id',     effectiveUserId)
+      .input('rfc',         rfc)
+      .input('fiel',        efiel)
+      .input('last_update', lastUpdate)
       .query(`
         MERGE EFIELES AS target
         USING (SELECT @user_id AS user_id, @rfc AS rfc) AS source
           ON  target.user_id = source.user_id AND target.rfc = source.rfc
         WHEN MATCHED THEN
-          UPDATE SET fiel = @fiel, last_update = SYSUTCDATETIME()
+          UPDATE SET fiel = @fiel
         WHEN NOT MATCHED THEN
-          INSERT (user_id, rfc, fiel)
-          VALUES (@user_id, @rfc, @fiel);
+          INSERT (user_id, rfc, fiel, last_update)
+          VALUES (@user_id, @rfc, @fiel, @last_update);
       `)
   } catch (err) {
     console.error('[uploadRfc] DB error:', (err as Error).message)

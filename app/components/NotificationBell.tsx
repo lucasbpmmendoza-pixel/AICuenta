@@ -1,7 +1,16 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import {
+  markLocalRead,
+  markAllLocalRead,
+  isLocalNotificationId,
+  getLocalNotificationsSnapshot,
+  getLocalNotificationsServerSnapshot,
+  subscribeLocalNotifications,
+} from '@/lib/local-notifications'
 
 interface NotificationItem {
   id:         string
@@ -62,33 +71,50 @@ const TYPE_STYLES: Record<string, { bg: string; icon: React.ReactNode }> = {
   },
 }
 
-export default function NotificationBell() {
+// Ancho fijo del panel (debe coincidir con la clase Tailwind `w-80` = 320 px),
+// usado para calcular la posición horizontal cuando se ancla por la izquierda.
+const PANEL_WIDTH = 320
+
+export default function NotificationBell({ align = 'right' }: { align?: 'left' | 'right' }) {
   const router = useRouter()
   const [open,        setOpen]        = useState(false)
-  const [items,       setItems]       = useState<NotificationItem[]>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-  const [loading,     setLoading]     = useState(false)
+  const [serverItems, setServerItems] = useState<NotificationItem[]>([])
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
+  const [mounted, setMounted] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const btnRef   = useRef<HTMLButtonElement>(null)
 
-  const fetchNotifications = useCallback(async () => {
+  // El portal necesita document.body; en SSR aún no existe.
+  useEffect(() => setMounted(true), [])
+
+  // Notificaciones locales: lectura reactiva del almacén externo (localStorage).
+  // Se actualiza solo cuando cambian (p. ej. cuando una IA termina de responder).
+  const localItems = useSyncExternalStore(
+    subscribeLocalNotifications,
+    getLocalNotificationsSnapshot,
+    getLocalNotificationsServerSnapshot,
+  )
+
+  const fetchServer = useCallback(async () => {
     try {
       const res = await fetch('/api/notifications', { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
-      setItems(data.items ?? [])
-      setUnreadCount(data.unreadCount ?? 0)
+      setServerItems(data.items ?? [])
     } catch {
-      // silencioso — no interrumpir al usuario
+      // silencioso — si la base no responde, se siguen mostrando las locales
     }
   }, [])
 
-  // Carga inicial + polling
+  // Carga inicial + sondeo de las notificaciones del servidor
   useEffect(() => {
-    fetchNotifications()
-    const interval = setInterval(fetchNotifications, POLL_INTERVAL)
+    // Disparo de la primera carga al montar (la actualización de estado ocurre
+    // tras el await, de forma asíncrona): intencional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchServer()
+    const interval = setInterval(fetchServer, POLL_INTERVAL)
     return () => clearInterval(interval)
-  }, [fetchNotifications])
+  }, [fetchServer])
 
   // Cerrar al hacer clic fuera
   useEffect(() => {
@@ -105,15 +131,51 @@ export default function NotificationBell() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [open])
 
+  // Calcular la posición del panel a partir del botón. Como el panel se
+  // renderiza en un portal con position:fixed, no le afecta el overflow:hidden
+  // del sidebar y queda por encima de cualquier contenido.
+  const updatePosition = useCallback(() => {
+    const btn = btnRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    const top = rect.bottom + 8 // ~mt-2
+    const left =
+      align === 'left'
+        ? Math.max(8, rect.left)
+        : Math.max(8, Math.min(window.innerWidth - PANEL_WIDTH - 8, rect.right - PANEL_WIDTH))
+    setPos({ top, left })
+  }, [align])
+
+  useEffect(() => {
+    if (!open) return
+    updatePosition()
+    window.addEventListener('scroll', updatePosition, true)
+    window.addEventListener('resize', updatePosition)
+    return () => {
+      window.removeEventListener('scroll', updatePosition, true)
+      window.removeEventListener('resize', updatePosition)
+    }
+  }, [open, updatePosition])
+
+  // Notificaciones locales primero, luego las del servidor, ordenadas por fecha
+  const items: NotificationItem[] = [...localItems, ...serverItems].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  )
+  const unreadCount = items.filter((n) => !n.is_read).length
+  const hasUnread = unreadCount > 0
+
   async function markOne(id: string) {
-    setItems(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
-    setUnreadCount(prev => Math.max(0, prev - 1))
+    if (isLocalNotificationId(id)) {
+      markLocalRead(id)
+      return
+    }
+    setServerItems((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
     await fetch(`/api/notifications/${id}`, { method: 'PATCH' }).catch(() => {})
   }
 
   async function markAll() {
-    setItems(prev => prev.map(n => ({ ...n, is_read: true })))
-    setUnreadCount(0)
+    markAllLocalRead()
+    setServerItems((prev) => prev.map((n) => ({ ...n, is_read: true })))
     await fetch('/api/notifications', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -126,8 +188,6 @@ export default function NotificationBell() {
     setOpen(false)
     if (item.link) router.push(item.link)
   }
-
-  const hasUnread = unreadCount > 0
 
   return (
     <div className="relative">
@@ -149,11 +209,14 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown panel */}
-      {open && (
+      {/* Dropdown panel — renderizado en portal a document.body con position:fixed
+          y z-index muy alto, para que ningún overflow:hidden ni stacking context
+          lo recorte ni lo tape. */}
+      {open && mounted && pos && createPortal(
         <div
           ref={panelRef}
-          className="absolute top-full right-0 mt-2 w-80 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-xl z-50 overflow-hidden"
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: PANEL_WIDTH, zIndex: 9999 }}
+          className="rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-2xl overflow-hidden"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-zinc-800">
@@ -177,13 +240,7 @@ export default function NotificationBell() {
 
           {/* List */}
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-zinc-800">
-            {loading && (
-              <div className="flex items-center justify-center py-8 text-sm text-slate-400 dark:text-zinc-500">
-                Cargando…
-              </div>
-            )}
-
-            {!loading && items.length === 0 && (
+            {items.length === 0 && (
               <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
                 <svg className="h-8 w-8 text-slate-300 dark:text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -193,7 +250,7 @@ export default function NotificationBell() {
               </div>
             )}
 
-            {!loading && items.map(item => {
+            {items.map(item => {
               const style = TYPE_STYLES[item.type] ?? TYPE_STYLES.info
               return (
                 <button
@@ -234,7 +291,8 @@ export default function NotificationBell() {
               )
             })}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

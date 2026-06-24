@@ -5,7 +5,7 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 
 import DashboardFooter from './DashboardFooter'
-import NotificationBell from './NotificationBell'
+import FreemiumBanner from './FreemiumBanner'
 import type { ConceptoRow } from '@/lib/facturas-query'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 import { logAction } from '@/lib/logs'
@@ -259,6 +259,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
     <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
+          <FreemiumBanner message="Plan gratis: solo puedes descargar el mes en curso. Suscribete para acceder al historico de 5 anios." />
 
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
@@ -313,8 +314,6 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                   {exporting ? 'Generando…' : 'Descargar Excel'}
                 </button>
               )}
-
-              <NotificationBell />
             </div>
           </div>
         </div>

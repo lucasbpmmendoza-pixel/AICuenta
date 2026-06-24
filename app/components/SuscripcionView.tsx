@@ -1,49 +1,62 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { useMembership } from './MembershipProvider'
 
 type Plan = {
   id: number
   nombre: string
   costo: number
   duracion_meses: number
-  stripe_price_id: string
+  stripe_price_id: string | null
   descripcion: string | null
+  cfdis_5_anios: number | null
+  requiere_contacto: boolean
 }
 
 const FALLBACK_PLANS: Plan[] = [
   {
     id: 1,
-    nombre: 'Gratis',
-    costo: 0,
+    nombre: 'Plan 1',
+    costo: 240,
     duracion_meses: 1,
-    stripe_price_id: 'price_mock_free',
+    stripe_price_id: 'price_mock_1',
     descripcion: 'Empieza con lo basico y prueba el panel.',
+    cfdis_5_anios: 6000,
+    requiere_contacto: false,
   },
   {
     id: 2,
-    nombre: 'Profesional',
-    costo: 10,
+    nombre: 'Plan 2',
+    costo: 450,
     duracion_meses: 1,
-    stripe_price_id: 'price_mock_10',
+    stripe_price_id: 'price_mock_2',
     descripcion: 'Ideal para llevar el control mensual de tu operacion.',
+    cfdis_5_anios: 10000,
+    requiere_contacto: false,
   },
   {
     id: 3,
-    nombre: 'Empresarial',
-    costo: 20,
+    nombre: 'Plan 3',
+    costo: 800,
     duracion_meses: 1,
-    stripe_price_id: 'price_mock_20',
+    stripe_price_id: 'price_mock_3',
     descripcion: 'Para equipos que necesitan mas seguimiento y soporte.',
+    cfdis_5_anios: 20000,
+    requiere_contacto: false,
   },
 ]
 
-function formatUsd(value: number): string {
+function formatMoney(value: number): string {
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
+    currency: 'MXN',
+    maximumFractionDigits: 0,
   }).format(value)
+}
+
+function formatNumber(value: number): string {
+  return new Intl.NumberFormat('es-MX').format(value)
 }
 
 function formatDuration(months: number): string {
@@ -55,6 +68,7 @@ function formatDuration(months: number): string {
 }
 
 export default function SuscripcionView() {
+  const { isFree } = useMembership()
   const [plans, setPlans] = useState<Plan[]>([])
   const [loading, setLoading] = useState(true)
   const [usingFallback, setUsingFallback] = useState(false)
@@ -69,7 +83,10 @@ export default function SuscripcionView() {
       setLoading(true)
       setMessage(null)
       try {
-        const res = await fetch('/api/billing/plans', { cache: 'no-store' })
+        const res = await fetch('/api/billing/plans', {
+          method: 'GET',
+          credentials: 'include',
+        })
         if (!res.ok) throw new Error('No disponible')
 
         const data = await res.json()
@@ -100,12 +117,20 @@ export default function SuscripcionView() {
     }
   }, [])
 
-  const featuredPlanId = useMemo(() => {
-    const paidPlans = plans.filter((p) => p.costo > 0)
-    if (paidPlans.length === 0) return null
-    const sorted = [...paidPlans].sort((a, b) => a.costo - b.costo)
-    return sorted[0].id
+  // Separa los planes normales del plan corporativo (precio personalizado)
+  const { planesNormales, planCorporativo } = useMemo(() => {
+    const normales = plans
+      .filter((p) => !p.requiere_contacto)
+      .sort((a, b) => a.costo - b.costo)
+    const corp = plans.find((p) => p.requiere_contacto) ?? null
+    return { planesNormales: normales, planCorporativo: corp }
   }, [plans])
+
+  // Plan 2 (el segundo mas economico) es el recomendado
+  const featuredPlanId = useMemo(
+    () => planesNormales[1]?.id ?? null,
+    [planesNormales],
+  )
 
   async function handleSubscribe(planId: number) {
     setMessage(null)
@@ -132,6 +157,13 @@ export default function SuscripcionView() {
     } finally {
       setSubscribingPlanId(null)
     }
+  }
+
+  function handleContactSales() {
+    setMessage({
+      ok: true,
+      text: 'Para el plan Corporativo un asesor te contactara. Escribenos a ventas@aicuenta.com con tu volumen de facturas por mes.',
+    })
   }
 
   async function handleOpenPortal() {
@@ -201,8 +233,8 @@ export default function SuscripcionView() {
           )}
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {[1, 2, 3].map((i) => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+              {[1, 2, 3, 4, 5].map((i) => (
                 <div
                   key={i}
                   className="h-72 rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 animate-pulse"
@@ -210,76 +242,162 @@ export default function SuscripcionView() {
               ))}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {plans.map((plan) => {
-                const isFeatured = featuredPlanId === plan.id
-                const isFree = plan.costo === 0
-                const isSubscribing = subscribingPlanId === plan.id
-
-                return (
-                  <article
-                    key={plan.id}
-                    className={[
-                      'relative rounded-2xl border bg-white dark:bg-zinc-900 p-5 shadow-sm transition-transform duration-150',
-                      isFeatured
-                        ? 'border-[#7B6FE8] dark:border-[#91eb78] md:-translate-y-1'
-                        : 'border-slate-200 dark:border-zinc-800',
-                    ].join(' ')}
-                  >
-                    {isFeatured && (
-                      <span className="absolute -top-3 left-5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78] px-3 py-1 text-[11px] font-bold tracking-wide text-white dark:text-zinc-900">
-                        Recomendado
+            <>
+              {/* Tarjeta Free */}
+              <article className="rounded-2xl border-2 border-dashed border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-900/40 p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+                      Plan Free
+                    </h2>
+                    {isFree && (
+                      <span className="rounded-full bg-[#7B6FE8] dark:bg-[#91eb78] text-white dark:text-zinc-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">
+                        Plan actual
                       </span>
                     )}
+                  </div>
+                  <div className="mt-2 flex items-end gap-2">
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">$0</p>
+                    <span className="pb-1 text-xs text-slate-500 dark:text-zinc-400">/sin costo</span>
+                  </div>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-zinc-300">
+                    Acceso de solo lectura al panel. Ideal para conocer la herramienta antes de suscribirte.
+                  </p>
+                  <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-600 dark:text-zinc-300">
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
+                      Dashboard y descarga del mes en curso
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
+                      FiscalGPT con acceso completo
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-zinc-600" />
+                      Sin historico de 5 anios
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300 dark:bg-zinc-600" />
+                      Sin agregar RFCs ni usuarios
+                    </li>
+                  </ul>
+                </div>
+                <div className="md:w-44 shrink-0">
+                  <button
+                    disabled
+                    className="w-full rounded-xl py-2.5 text-sm font-semibold bg-slate-200 dark:bg-zinc-800 text-slate-500 dark:text-zinc-400 cursor-not-allowed"
+                  >
+                    {isFree ? 'Plan actual' : 'Gratis'}
+                  </button>
+                </div>
+              </article>
 
-                    <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
-                      {plan.nombre}
-                    </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
+                {planesNormales.map((plan) => {
+                  const isFeatured = featuredPlanId === plan.id
+                  const isFree = plan.costo === 0
+                  const isSubscribing = subscribingPlanId === plan.id
 
-                    <div className="mt-3 flex items-end gap-2">
-                      <p className="text-3xl font-black text-slate-900 dark:text-white">{formatUsd(plan.costo)}</p>
-                      <span className="pb-1 text-xs text-slate-500 dark:text-zinc-400">/{formatDuration(plan.duracion_meses)}</span>
-                    </div>
-
-                    <p className="mt-3 text-sm text-slate-600 dark:text-zinc-300 min-h-10">
-                      {plan.descripcion || 'Plan listo para configurarse en Stripe.'}
-                    </p>
-
-                    <ul className="mt-4 space-y-2 text-xs text-slate-600 dark:text-zinc-300">
-                      <li className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                        Facturacion segura con Stripe
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                        Cancelacion cuando quieras
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                        Soporte por correo
-                      </li>
-                    </ul>
-
-                    <button
-                      onClick={() => handleSubscribe(plan.id)}
-                      disabled={isSubscribing || usingFallback || isFree}
+                  return (
+                    <article
+                      key={plan.id}
                       className={[
-                        'mt-6 w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                        'relative rounded-2xl border bg-white dark:bg-zinc-900 p-5 shadow-sm transition-transform duration-150',
                         isFeatured
-                          ? 'bg-[#7B6FE8] hover:bg-[#6B5FE0] text-white dark:bg-[#91eb78] dark:hover:bg-[#83dd6a] dark:text-zinc-900'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100',
+                          ? 'border-[#7B6FE8] dark:border-[#91eb78] md:-translate-y-1'
+                          : 'border-slate-200 dark:border-zinc-800',
                       ].join(' ')}
                     >
-                      {isFree
-                        ? 'Plan actual'
-                        : isSubscribing
-                          ? 'Redirigiendo...'
-                          : 'Suscribirme'}
-                    </button>
-                  </article>
-                )
-              })}
-            </div>
+                      {isFeatured && (
+                        <span className="absolute -top-3 left-5 z-10 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78] px-3 py-1 text-[11px] font-bold tracking-wide text-white dark:text-zinc-900 shadow-sm">
+                          Recomendado
+                        </span>
+                      )}
+
+                      {/* Lazo diagonal transparente: lo mas LARGO posible (extremos fuera del wrapper) y lo mas DELGADO posible */}
+                      <div className="pointer-events-none absolute top-0 right-0 h-20 w-200 overflow-hidden rounded-tr-2xl">
+                        <div className="absolute top-6 -right-10 w-35 rotate-45 border-y border-amber-500/70 dark:border-amber-400/70 text-center py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-amber-500 dark:text-amber-400">
+                          30 dias gratis
+                        </div>
+                      </div>
+
+                      <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-zinc-400">
+                        {plan.nombre}
+                      </h2>
+
+                      <div className="mt-3 flex items-end gap-2">
+                        <p className="text-3xl font-black text-slate-900 dark:text-white">{formatMoney(plan.costo)}</p>
+                        <span className="pb-1 text-xs text-slate-500 dark:text-zinc-400">/{formatDuration(plan.duracion_meses)}</span>
+                      </div>
+
+                      {plan.cfdis_5_anios != null && (
+                        <p className="mt-2 text-xs font-semibold text-[#7B6FE8] dark:text-[#91eb78]">
+                          
+                        </p>
+                      )}
+
+                      <p className="mt-3 text-sm text-slate-600 dark:text-zinc-300 min-h-10">
+                        {plan.descripcion || 'Plan listo para configurarse en Stripe.'}
+                      </p>
+
+                      <ul className="mt-4 space-y-2 text-xs text-slate-600 dark:text-zinc-300">
+                        <li className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
+                          Facturacion segura con Stripe
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
+                          Cancelacion cuando quieras
+                        </li>
+                        <li className="flex items-center gap-2">
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
+                          Soporte por correo
+                        </li>
+                      </ul>
+
+                      <button
+                        onClick={() => handleSubscribe(plan.id)}
+                        disabled={isSubscribing || usingFallback || isFree}
+                        className={[
+                          'mt-6 w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+                          isFeatured
+                            ? 'bg-[#7B6FE8] hover:bg-[#6B5FE0] text-white dark:bg-[#91eb78] dark:hover:bg-[#83dd6a] dark:text-zinc-900'
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100',
+                        ].join(' ')}
+                      >
+                        {isFree
+                          ? 'Plan actual'
+                          : isSubscribing
+                            ? 'Redirigiendo...'
+                            : 'Suscribirme'}
+                      </button>
+                    </article>
+                  )
+                })}
+              </div>
+
+              {planCorporativo && (
+                <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 to-slate-700 dark:from-zinc-900 dark:to-zinc-800 p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                  <div>
+                    <span className="inline-block rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold tracking-wide text-white mb-3">
+                      Corporativo
+                    </span>
+                    <h2 className="text-xl font-bold text-white">{planCorporativo.nombre}</h2>
+                    {/* Hardcodeado: el plan corporativo NO muestra precio (es personalizado) */}
+                    <p className="mt-2 max-w-xl text-sm text-slate-300">
+                      Para empresas con mas de 80,000 CFDIs. Precio y condiciones a la medida
+                      segun tu volumen de facturas por mes. Un asesor te arma una cotizacion.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleContactSales}
+                    className="whitespace-nowrap rounded-xl bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:bg-slate-100 transition"
+                  >
+                    Contactar ventas
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

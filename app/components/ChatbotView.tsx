@@ -5,9 +5,17 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
-import NotificationBell from './NotificationBell'
 import MicButton from './MicButton'
+import FreemiumBanner from './FreemiumBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
+import {
+  FINDOC_CHAT_KEY,
+  loadChatMessages,
+  saveChatMessages,
+  setChatGenerating,
+  isChatGenerating,
+} from '@/lib/chat-persistence'
+import { pushLocalNotification } from '@/lib/local-notifications'
 
 interface RfcOption { id: string; rfc: string; alias: string | null }
 
@@ -122,6 +130,8 @@ export default function ChatbotView({ session, accountType }: Props) {
   const [selectedRfc, setSelectedRfc] = useState<string>('')
 
   const [messages,    setMessages]    = useState<Message[]>([])
+  const [hydrated,    setHydrated]    = useState(false)
+  const [bgGenerating, setBgGenerating] = useState(false)
   const [input,       setInput]       = useState('')
   const [sending,     setSending]     = useState(false)
   const [showChatPulse, setShowChatPulse] = useState(false)
@@ -173,9 +183,38 @@ export default function ChatbotView({ session, accountType }: Props) {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // Restaurar la conversación guardada (sobrevive al navegar entre páginas).
+  // Si una respuesta sigue generándose en segundo plano, se va leyendo del
+  // almacenamiento hasta que termina, para que se actualice sola al volver.
+  useEffect(() => {
+    // Hidratación desde localStorage (almacén externo) al montar: intencional.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMessages(loadChatMessages(FINDOC_CHAT_KEY))
+    setHydrated(true)
+
+    if (!isChatGenerating(FINDOC_CHAT_KEY)) return
+    setBgGenerating(true)
+    const startedAt = Date.now()
+    const interval = setInterval(() => {
+      setMessages(loadChatMessages(FINDOC_CHAT_KEY))
+      if (!isChatGenerating(FINDOC_CHAT_KEY) || Date.now() - startedAt > 180_000) {
+        setBgGenerating(false)
+        clearInterval(interval)
+      }
+    }, 400)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Guardar la conversación en cada cambio (solo después de restaurar y mientras
+  // no esté siguiendo una generación de fondo, que escribe ella misma).
+  useEffect(() => {
+    if (!hydrated || bgGenerating) return
+    saveChatMessages(FINDOC_CHAT_KEY, messages)
+  }, [messages, hydrated, bgGenerating])
+
   async function sendMessage() {
     const text = input.trim()
-    if (!text || sending || !selectedRfc) return
+    if (!text || sending || bgGenerating || !selectedRfc) return
 
     dismissChatPulse()
 
@@ -184,6 +223,10 @@ export default function ChatbotView({ session, accountType }: Props) {
     setMessages([...history, { role: 'assistant', content: '' }])
     setInput('')
     setSending(true)
+    // Marca la generación y guarda la pregunta de inmediato, por si el usuario
+    // navega antes de que llegue el primer fragmento de respuesta.
+    setChatGenerating(FINDOC_CHAT_KEY, true)
+    saveChatMessages(FINDOC_CHAT_KEY, history)
 
     try {
       const res = await fetch('/api/chat', {
@@ -199,10 +242,9 @@ export default function ChatbotView({ session, accountType }: Props) {
 
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: 'Error desconocido' }))
-        setMessages(prev => [
-          ...prev.slice(0, -1),
-          { role: 'assistant', content: `⚠️ ${err.error ?? 'Error al conectar con el asistente.'}` },
-        ])
+        const next: Message[] = [...history, { role: 'assistant', content: `⚠️ ${err.error ?? 'Error al conectar con el asistente.'}` }]
+        setMessages(next)
+        saveChatMessages(FINDOC_CHAT_KEY, next)
         return
       }
 
@@ -214,14 +256,29 @@ export default function ChatbotView({ session, accountType }: Props) {
         const { done, value } = await reader.read()
         if (done) break
         acc += decoder.decode(value, { stream: true })
-        setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: acc }])
+        // Se calcula desde `history` (no desde `prev`) para escribir también en
+        // almacenamiento: así la respuesta sigue guardándose aunque el usuario
+        // haya navegado a otra página y este componente ya esté desmontado.
+        const next: Message[] = [...history, { role: 'assistant', content: acc }]
+        setMessages(next)
+        saveChatMessages(FINDOC_CHAT_KEY, next)
       }
-    } catch (err) {
-      setMessages(prev => [
-        ...prev.slice(0, -1),
-        { role: 'assistant', content: '⚠️ Error de conexión. Intenta de nuevo.' },
-      ])
+
+      // Si el usuario ya navegó a otra página, avísale que la respuesta está lista.
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard/chat') {
+        pushLocalNotification({
+          title: 'FinDoc terminó de responder',
+          body: 'Tu respuesta ya está lista. Toca para verla.',
+          type: 'success',
+          link: '/dashboard/chat',
+        })
+      }
+    } catch {
+      const next: Message[] = [...history, { role: 'assistant', content: '⚠️ Error de conexión. Intenta de nuevo.' }]
+      setMessages(next)
+      saveChatMessages(FINDOC_CHAT_KEY, next)
     } finally {
+      setChatGenerating(FINDOC_CHAT_KEY, false)
       setSending(false)
       textareaRef.current?.focus()
     }
@@ -237,13 +294,23 @@ export default function ChatbotView({ session, accountType }: Props) {
   const selectedRfcObj = rfcs.find(r => r.rfc === selectedRfc)
   const rfcDisplay = selectedRfcObj?.alias ?? selectedRfc
 
-  const canSend = !!selectedRfc && !!input.trim() && !sending
+  // `busy` cubre tanto el envío activo como seguir una respuesta que se está
+  // generando en segundo plano (al volver a la página).
+  const busy = sending || bgGenerating
+  const waitingForReply =
+    busy &&
+    (messages.length === 0 ||
+      messages[messages.length - 1].role === 'user' ||
+      messages[messages.length - 1].content === '')
+
+  const canSend = !!selectedRfc && !!input.trim() && !busy
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
     <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
         <div className="lg:hidden h-14" />
+        <FreemiumBanner message="Plan gratis: FinDoc esta disponible solo en planes de pago. Usa FiscalGPT para preguntas fiscales generales." />
 
         {/* ── Header ── */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
@@ -274,8 +341,6 @@ export default function ChatbotView({ session, accountType }: Props) {
                   {rfcDisplay}
                 </span>
               ) : null}
-
-              <NotificationBell />
             </div>
           </div>
         </div>
@@ -322,7 +387,7 @@ export default function ChatbotView({ session, accountType }: Props) {
           ))}
 
           {/* Indicador de escritura */}
-          {sending && messages[messages.length - 1]?.content === '' && (
+          {waitingForReply && (
             <div className="flex gap-3 justify-start">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#7b6fe8] dark:bg-[#91EB78] text-white dark:text-zinc-900 text-xs font-bold">AI</div>
               <div className="flex items-center gap-1.5 rounded-2xl rounded-bl-sm bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 px-4 py-3 shadow-sm">
@@ -349,7 +414,7 @@ export default function ChatbotView({ session, accountType }: Props) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!selectedRfc || sending}
+              disabled={!selectedRfc || busy}
               placeholder={
                 !selectedRfc
                   ? 'Selecciona un RFC primero…'
@@ -360,7 +425,7 @@ export default function ChatbotView({ session, accountType }: Props) {
             />
             <MicButton
               variant="indigo"
-              disabled={!selectedRfc || sending}
+              disabled={!selectedRfc || busy}
               onTranscript={(text) => {
                 dismissChatPulse()
                 setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
@@ -372,7 +437,7 @@ export default function ChatbotView({ session, accountType }: Props) {
               disabled={!canSend}
               className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl bg-[#7b6fe8] hover:bg-[#6a5fd4] dark:bg-[#91EB78] dark:hover:bg-[#7dd66a] text-white dark:text-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              {sending ? (
+              {busy ? (
                 <Spinner />
               ) : (
                 <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

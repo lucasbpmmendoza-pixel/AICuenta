@@ -24,3 +24,11 @@ export function getAppBaseUrl(): string {
   }
   return url.replace(/\/$/, "");
 }
+
+export function getStripeWebhookSecret(): string {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error("STRIPE_WEBHOOK_SECRET is required");
+  }
+  return secret;
+}

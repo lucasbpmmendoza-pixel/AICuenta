@@ -11,16 +11,20 @@ export default async function ComprobantesPage() {
 
   const effectiveId = session.ownerId ?? session.sub
 
-  let accountType: string | null = null
-  try {
-    const db = await getDb()
-    const result = await db
-      .request()
-      .input('id', effectiveId)
-      .query<{ account_type: string | null }>('SELECT account_type FROM users WHERE id = @id')
-    accountType = result.recordset[0]?.account_type ?? null
-  } catch (err) {
-    console.error('[comprobantes] Error al leer account_type:', (err as Error).message)
+  // En modo demo el id de sesión no es un GUID (p. ej. "demo-user"), así que no
+  // se consulta la base (provocaría un error de conversión a uniqueidentifier).
+  let accountType: string | null = session.isDemo ? 'multi' : null
+  if (!session.isDemo) {
+    try {
+      const db = await getDb()
+      const result = await db
+        .request()
+        .input('id', effectiveId)
+        .query<{ account_type: string | null }>('SELECT account_type FROM users WHERE id = @id')
+      accountType = result.recordset[0]?.account_type ?? null
+    } catch (err) {
+      console.error('[comprobantes] Error al leer account_type:', (err as Error).message)
+    }
   }
   if (!accountType) redirect('/upload-fiel')
 
