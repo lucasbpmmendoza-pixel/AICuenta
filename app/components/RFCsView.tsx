@@ -5,6 +5,8 @@ import DropZone from './DropZone'
 import { uploadRfc } from '@/app/api/actions/uploadRfc'
 import { rfcAlias } from '@/lib/rfc-aliases'
 import { saveRegimenForRfc } from '@/lib/rfc-regimen-preference'
+import { useAuth } from './AuthProvider'
+import FreemiumUpsellModal from './FreemiumUpsellModal'
 
 interface Rfc {
   id: string
@@ -169,6 +171,9 @@ function RfcForm({
 
 // ── Main view ──────────────────────────────────────────────────
 export default function RFCsView({ readOnly = false }: Props) {
+  const { user } = useAuth()
+  const isFreemium = Boolean(user?.isFreemium)
+  const [showUpsell, setShowUpsell] = useState(false)
   const [rfcs,    setRfcs]    = useState<Rfc[]>([])
   const [loading, setLoading] = useState(true)
   const [banner,  setBanner]  = useState<{ ok: boolean; text: string } | null>(null)
@@ -245,12 +250,21 @@ export default function RFCsView({ readOnly = false }: Props) {
           </div>
           {!readOnly && (
             <button
-              onClick={() => { setShowAdd(!showAdd); setEditingRfc(null); setBanner(null) }}
+              onClick={() => {
+                if (isFreemium) { setShowUpsell(true); return }
+                setShowAdd(!showAdd); setEditingRfc(null); setBanner(null)
+              }}
               className="flex items-center gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2.5 transition-colors"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
+              {isFreemium ? (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              )}
               Agregar RFC
             </button>
           )}
@@ -438,6 +452,8 @@ export default function RFCsView({ readOnly = false }: Props) {
 
         </div>
       </div>
+
+      <FreemiumUpsellModal open={showUpsell} onClose={() => setShowUpsell(false)} featureName="Agregar RFC" />
     </div>
   )
 }

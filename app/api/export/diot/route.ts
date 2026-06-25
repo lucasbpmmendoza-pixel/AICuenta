@@ -3,6 +3,7 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 
 type DiotRow = {
@@ -156,6 +157,9 @@ export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return new Response("No autorizado", { status: 401 });
   const demoMode = isDemoSession(session);
+  if (!demoMode && (await isFreemiumOwner(session))) {
+    return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
+  }
 
   const { searchParams } = new URL(req.url);
   const rfc = searchParams.get("rfc")?.trim().toUpperCase() ?? "";

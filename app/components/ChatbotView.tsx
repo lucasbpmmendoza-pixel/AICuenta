@@ -6,6 +6,8 @@ import Sidebar from './Sidebar'
 import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import MicButton from './MicButton'
+import FreemiumOverlayScreen from './FreemiumOverlayScreen'
+import { useAuth } from './AuthProvider'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 import {
   FINDOC_CHAT_KEY,
@@ -121,6 +123,8 @@ function MessageBubble({ msg }: { msg: Message }) {
 const CHAT_HINT_KEY = 'aicuenta_chat_first_visit'
 
 export default function ChatbotView({ session, accountType }: Props) {
+  const { user } = useAuth()
+  const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const now = startOfDay(new Date())
   const fixedDateFrom = new Date(now.getFullYear(), 0, 1)
   const fixedDateTo = addDays(now, 1)
@@ -303,6 +307,15 @@ export default function ChatbotView({ session, accountType }: Props) {
       messages[messages.length - 1].content === '')
 
   const canSend = !!selectedRfc && !!input.trim() && !busy
+
+  if (isFreemium) {
+    return (
+      <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
+        <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
+        <FreemiumOverlayScreen featureName="FinDoc" description="Pregunta cualquier cosa sobre tus CFDIs con IA. Disponible en planes de pago." />
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">

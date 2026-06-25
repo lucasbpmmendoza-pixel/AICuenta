@@ -7,8 +7,24 @@ import { logAction } from '@/lib/logs'
 import OnboardingBeacon from './OnboardingBeacon'
 import OnboardingModal from './OnboardingModal'
 import NotificationBell from './NotificationBell'
+import FreemiumUpsellModal from './FreemiumUpsellModal'
+import { useAuth } from './AuthProvider'
 import { FINDOC_CHAT_KEY, FISCALGPT_CHAT_KEY, clearChatMessages } from '@/lib/chat-persistence'
 import { clearLocalNotifications } from '@/lib/local-notifications'
+
+// Rutas bloqueadas para freemium (FinDoc, Scan Bot, AIChikenelo).
+// FiscalGPT (/dashboard/chat-docs) queda permitido.
+const FREEMIUM_BLOCKED_HREFS = new Set<string>([
+  '/dashboard/chat',
+  '/dashboard/comprobantes',
+  '/dashboard/unete',
+])
+
+const FREEMIUM_LABELS: Record<string, string> = {
+  '/dashboard/chat': 'FinDoc',
+  '/dashboard/comprobantes': 'Scan Bot',
+  '/dashboard/unete': 'AIChikenelo',
+}
 
 export type AccountType = 'single' | 'multi'
 
@@ -185,6 +201,9 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
   const { dark, toggle } = useTheme()
+  const { user } = useAuth()
+  const isFreemium = !isDemo && Boolean(user?.isFreemium)
+  const [upsellFor, setUpsellFor] = useState<string | null>(null)
 
   const demoEnabled = isDemo
 
@@ -328,6 +347,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
           const isActive = pathname === item.href
           const isDisabled = demoEnabled && disabledDemoItems.has(item.href)
           const isDemoFreeItem = demoEnabled && item.href === '/dashboard/chat-docs'
+          const isFreemiumLocked = isFreemium && FREEMIUM_BLOCKED_HREFS.has(item.href)
           return (
             <a
               key={item.href}
@@ -335,6 +355,11 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
               onClick={(e) => {
                 e.preventDefault()
                 if (isDisabled) return
+                if (isFreemiumLocked) {
+                  logAction('freemium_upsell_open')
+                  setUpsellFor(item.href)
+                  return
+                }
                 handleNavClick(item.href, BEACON_HREFS_SET.has(item.href))
                 router.push(item.href)
               }}
@@ -343,6 +368,8 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
                 'relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-150',
                 isDisabled
                   ? 'bg-slate-100 text-slate-400 cursor-not-allowed dark:bg-zinc-800 dark:text-zinc-500'
+                  : isFreemiumLocked
+                  ? 'text-slate-500 dark:text-zinc-500 hover:bg-[#EBE9FB] dark:hover:bg-[#5E6957] cursor-pointer'
                   : isActive
                   ? 'bg-[#7B6FE8] text-white shadow-sm shadow-[#7B6FE8]/40 dark:shadow-[#91EB78]/40 dark:bg-[#91EB78] dark:text-zinc-900'
                   : 'text-slate-600 hover:bg-[#EBE9FB] hover:text-[#450c7d] dark:text-zinc-400 dark:hover:bg-[#5E6957]  dark:hover:text-[#6BDA4D]',
@@ -350,7 +377,13 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
               ].join(' ')}
             >
               {item.icon}
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {isFreemiumLocked && (
+                <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-label="Bloqueado">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+              )}
               {beaconsEnabled && BEACON_HREFS_SET.has(item.href) && !visitedBeacons.has(item.href) && (
                 <OnboardingBeacon
                   position="top-right"
@@ -448,6 +481,13 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
         forceOpen={showHelpModal}
         onClose={() => setShowHelpModal(false)}
         onDone={() => setShowHelpModal(false)}
+      />
+
+      {/* Modal de upsell para rutas bloqueadas en freemium */}
+      <FreemiumUpsellModal
+        open={upsellFor !== null}
+        onClose={() => setUpsellFor(null)}
+        featureName={upsellFor ? FREEMIUM_LABELS[upsellFor] : undefined}
       />
 
       {/* ── Menú flotante derecho (Soporte + Ayuda) ── */}

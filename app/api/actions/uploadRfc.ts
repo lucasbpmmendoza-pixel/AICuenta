@@ -5,6 +5,7 @@ import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
 import { loadOwnerPlanLimits } from '@/lib/account-plan'
 import { uploadRfcFiles } from '@/lib/rfc-storage'
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from '@/lib/freemium'
 
 const RFC_SAFE = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i
 
@@ -52,6 +53,12 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
 
     const total = countResult.recordset[0]?.total ?? 0
     const existsRfc = (countResult.recordset[0]?.exists_rfc ?? 0) > 0
+
+    // Freemium: permitir registrar el PRIMER RFC propio (onboarding), pero
+    // no agregar/modificar mas alla de eso.
+    if ((existsRfc || total >= 1) && (await isFreemiumOwner(session))) {
+      return { success: false, message: FREEMIUM_FORBIDDEN_MESSAGE }
+    }
 
     if (!existsRfc && total >= limits.maxRfcs) {
       return {

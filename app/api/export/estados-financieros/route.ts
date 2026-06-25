@@ -6,6 +6,7 @@ import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoConceptos, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
@@ -203,6 +204,9 @@ export async function GET(req: NextRequest) {
     return new Response("Parámetros inválidos", { status: 400 });
 
   const demoMode = isDemoSession(session);
+  if (!demoMode && (await isFreemiumOwner(session))) {
+    return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
+  }
   if (!demoMode) {
     const effectiveUserId = session.ownerId ?? session.sub;
     if (!(await validateRfc(effectiveUserId, rfc))) {

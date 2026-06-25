@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 import { createChatExport } from "@/lib/chat-docs-export-store";
 import { loadFiscalContext, saveFiscalContext, type ContextMessage } from "@/lib/chat-fiscal-context";
 import {
@@ -507,6 +508,9 @@ async function executeTool(
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (await isFreemiumOwner(session)) {
+    return NextResponse.json({ error: FREEMIUM_FORBIDDEN_MESSAGE }, { status: 403 });
+  }
 
   let body: { rfc?: string; dateFrom?: string; dateTo?: string; messages?: unknown[] };
   try {
