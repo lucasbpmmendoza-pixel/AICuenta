@@ -5,6 +5,7 @@ import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 
 import DashboardFooter from './DashboardFooter'
+import EstadosFinancierosBenchmarkModal from './EstadosFinancierosBenchmarkModal'
 import type { ConceptoRow } from '@/lib/facturas-query'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 import { logAction } from '@/lib/logs'
@@ -149,6 +150,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   const [loading,     setLoading]     = useState(false)
   const [exporting,   setExporting]   = useState(false)
   const [showDownloadPulse, setShowDownloadPulse] = useState(false)
+  const [showBenchmark, setShowBenchmark] = useState(false)
   const EF_HINT_KEY = 'aicuenta_ef_first_visit'
 
   // Check if first visit to Estados Financieros and enable download button pulse
@@ -295,6 +297,24 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                 </button>
               </div>
 
+              {/* Comparar vs mercado (IA) */}
+              {selectedRfc && !session.isDemo && (
+                <button
+                  onClick={() => {
+                    logAction('btn_benchmark_estados_financieros')
+                    setShowBenchmark(true)
+                  }}
+                  disabled={loading}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition shadow-sm"
+                  title="Compara los gastos del RFC contra el estándar de mercado de su industria"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
+                  </svg>
+                  Comparar vs mercado
+                </button>
+              )}
+
               {/* Descargar Excel */}
               {selectedRfc && (
                 <button
@@ -407,6 +427,16 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
 
         <DashboardFooter />
       </main>
+
+      {showBenchmark && selectedRfc && (
+        <EstadosFinancierosBenchmarkModal
+          rfc={selectedRfc}
+          year={year}
+          month={month}
+          rfcAlias={rfcs.find(r => r.rfc === selectedRfc)?.alias ?? null}
+          onClose={() => setShowBenchmark(false)}
+        />
+      )}
     </div>
   )
 }
