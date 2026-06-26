@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
-import TopBar from './TopBar'
 import DashboardFooter from './DashboardFooter'
 import MicButton from './MicButton'
 import FreemiumOverlayScreen from './FreemiumOverlayScreen'

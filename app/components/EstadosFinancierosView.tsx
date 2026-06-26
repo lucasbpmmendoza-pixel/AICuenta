@@ -307,7 +307,6 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                 )}
               </div>
 
-<<<<<<< HEAD
               {/* Comparar vs mercado (IA) */}
               {selectedRfc && !session.isDemo && (
                 <button
@@ -326,12 +325,8 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                 </button>
               )}
 
-              {/* Descargar Excel */}
-              {selectedRfc && (
-=======
               {/* Descargar Excel — oculto en freemium */}
               {selectedRfc && !isFreemium && (
->>>>>>> 701de118c522cb6b4578c40e5249290e1d328ad4
                 <button
                   onClick={handleExport}
                   disabled={exporting || loading}
