@@ -11,6 +11,7 @@ import { rfcDisplay } from '@/lib/rfc-aliases'
 import { logAction } from '@/lib/logs'
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
+import FreemiumUpsellModal from './FreemiumUpsellModal'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -155,6 +156,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   const [exporting,   setExporting]   = useState(false)
   const [showDownloadPulse, setShowDownloadPulse] = useState(false)
   const [showBenchmark, setShowBenchmark] = useState(false)
+  const [showUpsell, setShowUpsell] = useState(false)
   const EF_HINT_KEY = 'aicuenta_ef_first_visit'
 
   // Check if first visit to Estados Financieros and enable download button pulse
@@ -311,16 +313,23 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
               {selectedRfc && !session.isDemo && (
                 <button
                   onClick={() => {
+                    if (isFreemium) { setShowUpsell(true); return }
                     logAction('btn_benchmark_estados_financieros')
                     setShowBenchmark(true)
                   }}
                   disabled={loading}
                   className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition shadow-sm"
-                  title="Compara los gastos del RFC contra el estándar de mercado de su industria"
+                  title={isFreemium ? 'Disponible solo en planes de pago' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
-                  </svg>
+                  {isFreemium ? (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  ) : (
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
+                    </svg>
+                  )}
                   Comparar vs mercado
                 </button>
               )}
@@ -447,6 +456,12 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
           onClose={() => setShowBenchmark(false)}
         />
       )}
+
+      <FreemiumUpsellModal
+        open={showUpsell}
+        onClose={() => setShowUpsell(false)}
+        featureName="Comparar vs mercado"
+      />
     </div>
   )
 }
