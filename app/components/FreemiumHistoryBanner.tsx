@@ -16,7 +16,7 @@ export default function FreemiumHistoryBanner() {
             Solo puedes ver el mes actual
           </p>
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
-            Para acceder a los ultimos 5 anos de tu historial y descargar reportes,
+            Para acceder a los ultimos 5 años de tu historial y descargar reportes,
             necesitas un plan de pago.
           </p>
         </div>

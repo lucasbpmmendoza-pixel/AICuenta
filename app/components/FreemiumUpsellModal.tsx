@@ -39,7 +39,7 @@ export default function FreemiumUpsellModal({ open, onClose, featureName }: Prop
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-zinc-400">
           Esta funcion esta disponible solo en planes de pago. Mejora tu plan para
-          desbloquearla, acceder a tu historial de los ultimos 5 anos y aprovechar
+          desbloquearla, acceder a tu historial de los ultimos 5 aos y aprovechar
           todo AIcuenta.
         </p>
 
