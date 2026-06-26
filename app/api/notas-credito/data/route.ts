@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { fetchNotasCreditoData } from "@/lib/facturas-query";
 import { buildDemoNotasCredito } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner, currentMonthPeriod } from "@/lib/freemium";
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -35,7 +36,14 @@ export async function GET(req: NextRequest) {
   let dateFrom: Date;
   let dateTo: Date;
 
-  if (dateFromP && dateToP) {
+  // Freemium: ignora el periodo pedido y fuerza el mes actual.
+  const freemium = !demoMode && (await isFreemiumOwner(session));
+
+  if (freemium) {
+    const cm = currentMonthPeriod();
+    dateFrom = new Date(Date.UTC(cm.year, cm.month - 1, 1));
+    dateTo   = new Date(Date.UTC(cm.year, cm.month, 1));
+  } else if (dateFromP && dateToP) {
     const df = new Date(dateFromP);
     const dt = new Date(dateToP);
     if (isNaN(df.getTime()) || isNaN(dt.getTime()))

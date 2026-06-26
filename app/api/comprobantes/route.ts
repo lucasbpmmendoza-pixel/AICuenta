@@ -5,6 +5,7 @@
  */
 import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from '@/lib/freemium'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,9 @@ export async function GET(request: Request) {
   const session = await getSession()
   if (!session) {
     return new Response('Unauthorized', { status: 401 })
+  }
+  if (await isFreemiumOwner(session)) {
+    return Response.json({ error: FREEMIUM_FORBIDDEN_MESSAGE }, { status: 403 })
   }
 
   const ownerId = session.ownerId ?? session.sub

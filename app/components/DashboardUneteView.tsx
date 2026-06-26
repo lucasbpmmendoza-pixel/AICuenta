@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
+import FreemiumOverlayScreen from './FreemiumOverlayScreen'
+import { useAuth } from './AuthProvider'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 
 const UNETE_HINT_KEY = 'aicuenta_unete_first_visit'
@@ -18,6 +20,8 @@ interface Props {
 }
 
 export default function DashboardUneteView({ session, accountType, rfcFromDb, ownerRfc, allRfcs, readOnly = false }: Props) {
+  const { user } = useAuth()
+  const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const [nombre, setNombre] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
@@ -78,6 +82,15 @@ export default function DashboardUneteView({ session, accountType, rfcFromDb, ow
     } finally {
       setSending(false)
     }
+  }
+
+  if (isFreemium) {
+    return (
+      <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
+        <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
+        <FreemiumOverlayScreen featureName="AIChikenelo" description="Unete a nuestro equipo de afiliados. Disponible en planes de pago." />
+      </div>
+    )
   }
 
   return (

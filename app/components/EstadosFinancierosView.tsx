@@ -9,6 +9,8 @@ import EstadosFinancierosBenchmarkModal from './EstadosFinancierosBenchmarkModal
 import type { ConceptoRow } from '@/lib/facturas-query'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 import { logAction } from '@/lib/logs'
+import { useAuth } from './AuthProvider'
+import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
@@ -140,6 +142,8 @@ function TablaConceptos({
 // ─── Vista principal ────────────────────────────────────────────────────────────
 
 export default function EstadosFinancierosView({ session, accountType }: Props) {
+  const { user } = useAuth()
+  const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const now = new Date()
   const [rfcs,        setRfcs]        = useState<RfcOption[]>([])
   const [selectedRfc, setSelectedRfc] = useState<string>('')
@@ -261,6 +265,8 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
     <main className="flex-1 min-w-0 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
 
+          {isFreemium && <FreemiumHistoryBanner />}
+
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
@@ -284,19 +290,24 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                 </span>
               ) : null}
 
-              {/* Navegador de mes */}
+              {/* Navegador de mes — freemium queda fijo al mes actual */}
               <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
-                <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-                </button>
+                {!isFreemium && (
+                  <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+                  </button>
+                )}
                 <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[130px] text-center">
                   {MESES[month - 1]} {year}
                 </span>
-                <button onClick={nextMonth} disabled={isCurrentMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
+                {!isFreemium && (
+                  <button onClick={nextMonth} disabled={isCurrentMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
+                  </button>
+                )}
               </div>
 
+<<<<<<< HEAD
               {/* Comparar vs mercado (IA) */}
               {selectedRfc && !session.isDemo && (
                 <button
@@ -317,6 +328,10 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
 
               {/* Descargar Excel */}
               {selectedRfc && (
+=======
+              {/* Descargar Excel — oculto en freemium */}
+              {selectedRfc && !isFreemium && (
+>>>>>>> 701de118c522cb6b4578c40e5249290e1d328ad4
                 <button
                   onClick={handleExport}
                   disabled={exporting || loading}

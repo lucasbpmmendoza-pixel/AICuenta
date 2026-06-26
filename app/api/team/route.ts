@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { loadOwnerPlanLimits } from "@/lib/account-plan";
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 
 const memberSchema = z.object({
   name:     z.string().trim().min(2, "El nombre es muy corto").max(120),
@@ -41,6 +42,10 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (session.role && session.role !== "owner") return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
   if (session.sub === undefined) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+
+  if (await isFreemiumOwner(session)) {
+    return NextResponse.json({ error: FREEMIUM_FORBIDDEN_MESSAGE }, { status: 403 });
+  }
 
   let body: unknown;
   try { body = await req.json(); } catch {

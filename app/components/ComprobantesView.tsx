@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { useAuth } from './AuthProvider'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,9 @@ function fmtDate(iso: string): string {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function ComprobantesView() {
+  const { user } = useAuth()
+  const router = useRouter()
+  const isFreemium = Boolean(user?.isFreemium)
   const [status, setStatus]         = useState<ConnectionStatus>('disconnected')
   const [qrDataUrl, setQrDataUrl]   = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
@@ -184,6 +189,31 @@ export default function ComprobantesView() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const isActive = status === 'connected' || status === 'qr' || status === 'connecting'
+
+  if (isFreemium) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-md w-full rounded-2xl border border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#EBE9FB] dark:bg-[#5E6957]">
+            <svg className="h-8 w-8 text-[#7B6FE8] dark:text-[#91EB78]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Scan Bot esta bloqueado</h1>
+          <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+            Registra comprobantes de pago automaticamente desde WhatsApp. Disponible en planes de pago.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/suscripcion')}
+            className="mt-6 w-full rounded-xl bg-[#7B6FE8] hover:bg-[#6B5FE0] dark:bg-[#91eb78] dark:hover:bg-[#83dd6a] px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-900 transition"
+          >
+            Ver planes
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 p-4 sm:p-6 space-y-6 text-zinc-900 dark:text-zinc-100">

@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { getNominaDeduccionesColumn } from "@/lib/facturas-query";
 import { buildDemoDashboardData } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner, currentMonthPeriod } from "@/lib/freemium";
 
 type IsrRegimenOption = {
   code: string;
@@ -123,8 +124,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "year/month inválidos" }, { status: 400 });
   }
 
-  const dateFrom = new Date(Date.UTC(year, month - 1, 1))
-  const dateTo   = new Date(Date.UTC(year, month, 1))
+  // Freemium: fuerza el mes actual (ignora year/month entrantes).
+  let effYear = year;
+  let effMonth = month;
+  if (!demoMode && (await isFreemiumOwner(session))) {
+    const cm = currentMonthPeriod();
+    effYear = cm.year;
+    effMonth = cm.month;
+  }
+
+  const dateFrom = new Date(Date.UTC(effYear, effMonth - 1, 1))
+  const dateTo   = new Date(Date.UTC(effYear, effMonth, 1))
 
   if (demoMode) {
     return NextResponse.json(buildDemoDashboardData(rfc, dateFrom, dateTo));
@@ -287,8 +297,8 @@ export async function GET(req: NextRequest) {
       //     Fuente independiente de facturalo_cfdis. Alimenta la tarjeta "CFDIs del SAT".
       db.request()
         .input("rfc",  sql.NVarChar, rfc)
-        .input("anio", sql.SmallInt, year)
-        .input("mes",  sql.TinyInt,  month)
+        .input("anio", sql.SmallInt, effYear)
+        .input("mes",  sql.TinyInt,  effMonth)
         .query(`
           SELECT TOP 1 emitidos, recibidos, total
           FROM conteo_cfdi WITH (NOLOCK)

@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoFlujo, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay, rfcAlias } from "@/lib/rfc-aliases";
 import type { flujoRow } from "@/lib/facturas-query";
@@ -92,6 +93,9 @@ export async function GET(req: NextRequest) {
   }
 
   const demoMode = isDemoSession(session);
+  if (!demoMode && (await isFreemiumOwner(session))) {
+    return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
+  }
   if (!demoMode) {
     const effectiveUserId = session.ownerId ?? session.sub;
     if (!(await validateRfc(effectiveUserId, rfc))) {

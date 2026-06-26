@@ -4,6 +4,7 @@ import { getDb } from "@/lib/db";
 import { fetchEstadosFinancieros } from "@/lib/facturas-query";
 import { buildDemoConceptos } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner, currentMonthPeriod } from "@/lib/freemium";
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -31,8 +32,17 @@ export async function GET(req: NextRequest) {
   if (isNaN(year) || isNaN(month) || month < 1 || month > 12)
     return NextResponse.json({ error: "year/month inválidos" }, { status: 400 });
 
-  const dateFrom = new Date(Date.UTC(year, month - 1, 1));
-  const dateTo   = new Date(Date.UTC(year, month, 1));
+  // Freemium: fuerza el mes actual (ignora year/month entrantes).
+  let effYear = year;
+  let effMonth = month;
+  if (!demoMode && (await isFreemiumOwner(session))) {
+    const cm = currentMonthPeriod();
+    effYear = cm.year;
+    effMonth = cm.month;
+  }
+
+  const dateFrom = new Date(Date.UTC(effYear, effMonth - 1, 1));
+  const dateTo   = new Date(Date.UTC(effYear, effMonth, 1));
 
   try {
     if (demoMode) {
