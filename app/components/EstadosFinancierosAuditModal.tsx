@@ -23,6 +23,7 @@ interface AuditData {
   totalRevisados: number
   resumen: { ok: number; sospechoso: number; incorrecto: number; sin_catalogo: number }
   items: AuditItem[]
+  giro: string[] | null
 }
 
 interface Props {
@@ -171,7 +172,7 @@ export default function EstadosFinancierosAuditModal({ rfc, year, month, rfcAlia
           {state.kind === 'loading' && (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Spinner className="h-8 w-8" />
-              <p className="text-sm text-slate-500 dark:text-zinc-400">Analizando conceptos con IA…</p>
+              <p className="text-sm text-slate-500 dark:text-zinc-400">Cargando auditoría con Chikenelo…</p>
               <p className="text-xs text-slate-400 dark:text-zinc-500">Puede tardar 10-30 segundos.</p>
             </div>
           )}
@@ -191,6 +192,19 @@ export default function EstadosFinancierosAuditModal({ rfc, year, month, rfcAlia
 
           {state.kind === 'ready' && state.data.items.length > 0 && (
             <>
+              {/* Giro detectado de la cédula */}
+              {state.data.giro && state.data.giro.length > 0 && (
+                <div className="mb-4 rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-2">
+                  <p className="text-[10px] uppercase tracking-wider font-bold text-indigo-700 dark:text-indigo-300">Giro detectado (cédula fiscal)</p>
+                  <p className="text-xs text-indigo-800 dark:text-indigo-200 mt-0.5 leading-snug">
+                    {state.data.giro.join(' · ')}
+                  </p>
+                  <p className="text-[10px] text-indigo-600 dark:text-indigo-400 mt-1">
+                    La IA usa este giro para evaluar si un concepto sospechoso es razonable para tu negocio.
+                  </p>
+                </div>
+              )}
+
               {/* Resumen */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
                 {(['ok','sospechoso','incorrecto','sin_catalogo'] as Veredicto[]).map((v) => {

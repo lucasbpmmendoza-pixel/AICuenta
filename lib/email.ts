@@ -84,7 +84,10 @@ export async function sendSupportEmail(opts: {
 
   return resend.emails.send({
     from: FROM,
-    to: process.env.SUPPORT_EMAIL ?? "soporte@aicuenta.mx",
+    to: (process.env.SUPPORT_EMAIL ?? "lucasbp.mmendoza@gmail.com")
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean),
     replyTo: opts.fromEmail,
     subject: `[Soporte] ${opts.subject}`,
     attachments,

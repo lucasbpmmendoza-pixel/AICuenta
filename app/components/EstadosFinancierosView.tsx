@@ -314,53 +314,53 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
               {/* Acciones compactas: IA + Descarga */}
               {selectedRfc && (
                 <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-0.5 shadow-sm">
-                  {!session.isDemo && (
-                    <button
-                      onClick={() => {
-                        if (isFreemium) { setShowUpsell(true); return }
-                        logAction('btn_benchmark_estados_financieros')
-                        setShowBenchmark(true)
-                      }}
-                      disabled={loading}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                      title={isFreemium ? 'Disponible solo en planes de pago' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
-                    >
-                      {isFreemium ? (
-                        <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                      ) : (
-                        <svg className="h-4 w-4 text-indigo-500 dark:text-indigo-400" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                          <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
-                        </svg>
-                      )}
-                      <span className="hidden sm:inline">Comparar</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      if (session.isDemo) return
+                      if (isFreemium) { setShowUpsell(true); return }
+                      logAction('btn_benchmark_estados_financieros')
+                      setShowBenchmark(true)
+                    }}
+                    disabled={loading}
+                    aria-disabled={session.isDemo}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    title={session.isDemo ? 'Disponible solo al registrarte' : isFreemium ? 'Disponible solo en planes de pago' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
+                  >
+                    {isFreemium ? (
+                      <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4 text-indigo-500 dark:text-indigo-400" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                        <path d="M12 2 L13.5 8.5 L20 10 L13.5 11.5 L12 18 L10.5 11.5 L4 10 L10.5 8.5 Z" />
+                      </svg>
+                    )}
+                    <span className="hidden sm:inline">Comparar</span>
+                  </button>
 
-                  {!session.isDemo && (
-                    <button
-                      onClick={() => {
-                        if (isFreemium) { setShowUpsell(true); return }
-                        logAction('btn_audit_conceptos_estados_financieros')
-                        setShowAudit(true)
-                      }}
-                      disabled={loading}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                      title={isFreemium ? 'Disponible solo en planes de pago' : 'Revisa con IA si la descripción del emisor concuerda con su clave SAT'}
-                    >
-                      {isFreemium ? (
-                        <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                      ) : (
-                        <svg className="h-4 w-4 text-rose-500 dark:text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                      )}
-                      <span className="hidden sm:inline">Auditar</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={() => {
+                      if (session.isDemo) return
+                      if (isFreemium) { setShowUpsell(true); return }
+                      logAction('btn_audit_conceptos_estados_financieros')
+                      setShowAudit(true)
+                    }}
+                    disabled={loading}
+                    aria-disabled={session.isDemo}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    title={session.isDemo ? 'Disponible solo al registrarte' : isFreemium ? 'Disponible solo en planes de pago' : 'Revisa con IA si la descripción del emisor concuerda con su clave SAT'}
+                  >
+                    {isFreemium ? (
+                      <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4 text-rose-500 dark:text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                      </svg>
+                    )}
+                    <span className="hidden sm:inline">Auditar</span>
+                  </button>
                 </div>
               )}
 

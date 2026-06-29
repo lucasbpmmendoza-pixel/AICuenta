@@ -19,6 +19,46 @@ interface ConceptoAuditRaw {
   importe: number;
 }
 
+interface CedulaContext {
+  razonSocial: string | null;
+  actividades: string[];
+  regimenes: string[];
+}
+
+function safeJsonParse<T>(value: unknown, fallback: T): T {
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  try { return JSON.parse(value) as T; } catch { return fallback; }
+}
+
+async function loadCedula(rfc: string): Promise<CedulaContext | null> {
+  const db = await getDb();
+  const r = await db
+    .request()
+    .input("rfc", rfc)
+    .query<{
+      razon_social: string | null;
+      nombre: string | null;
+      actividades_economicas: string | null;
+      regimenes: string | null;
+    }>(`
+      SELECT TOP 1 razon_social, nombre, actividades_economicas, regimenes
+      FROM cedulas_fiscales WITH (NOLOCK)
+      WHERE rfc = @rfc AND activo = 1
+      ORDER BY id DESC
+    `);
+  const row = r.recordset[0];
+  if (!row) return null;
+  const acts = safeJsonParse<Array<{ actividad?: string; porcentaje?: string }>>(
+    row.actividades_economicas, [],
+  );
+  const regs = safeJsonParse<Array<{ regimen?: string }>>(row.regimenes, []);
+  return {
+    razonSocial: row.razon_social ?? row.nombre,
+    actividades: acts.map((a) => a.actividad ?? "").filter(Boolean),
+    regimenes: regs.map((r) => r.regimen ?? "").filter(Boolean),
+  };
+}
+
 interface VeredictoGPT {
   i: number;
   v: "ok" | "sospechoso" | "incorrecto";
@@ -121,59 +161,93 @@ function buildToonTable(rows: ConceptoAuditRaw[]): string {
   return [header, ...lines].join("\n");
 }
 
-function buildPrompt(toon: string, periodo: string, rfc: string): string {
-  return `Eres un auditor fiscal mexicano experto en CFDIs. Tabla compacta (separador '|') con conceptos del RFC ${rfc}, periodo ${periodo}.
+function buildPrompt(toon: string, periodo: string, rfc: string, cedula: CedulaContext | null): string {
+  const giroBlock = cedula && (cedula.actividades.length > 0 || cedula.razonSocial)
+    ? `
+CONTEXTO DEL NEGOCIO (cédula fiscal del RFC ${rfc}) — usar SÓLO en PASO 2/3 como desempate, NUNCA en PASO 1:
+${cedula.razonSocial ? `- Razón social: ${cedula.razonSocial}` : ""}
+${cedula.actividades.length > 0 ? `- Actividades económicas SAT:\n  · ${cedula.actividades.slice(0, 6).join("\n  · ")}` : ""}
+${cedula.regimenes.length > 0 ? `- Regímenes: ${cedula.regimenes.slice(0, 3).join(", ")}` : ""}
 
+`
+    : "";
+
+  return `Eres un auditor fiscal mexicano experto en CFDIs. Tabla compacta (separador '|') con conceptos del RFC ${rfc}, periodo ${periodo}.
+${giroBlock}
 Columnas: i (índice) | clave (ClaveProdServ SAT) | sat (descripción oficial SAT) | emisor (descripción capturada).
 
 ═══════════════════════════════════════════════════════
-TAREA: para cada línea, ejecuta este ÁRBOL DE DECISIÓN en orden estricto.
+DOS CHEQUEOS QUE COEXISTEN:
+  CHEQUEO A (descripción ↔ clave SAT): ¿la descripción del emisor encaja con la descripción oficial del SAT? Este es el chequeo PRINCIPAL.
+  CHEQUEO B (negocio): ¿este gasto/ingreso tiene sentido para el giro del RFC? Sólo se usa para DESEMPATAR cuando A es ambiguo.
+Los dos se aplican SIEMPRE en este orden — B nunca baja un veredicto que A ya marcó como ok.
 ═══════════════════════════════════════════════════════
 
-PASO 1 — ¿Es uno de estos casos? Si SÍ → v="ok" (NO sigas evaluando):
-  0) **REGLA DEL SUSTANTIVO CENTRAL** (la más importante): si el producto principal de la clave SAT aparece en la descripción del emisor (o viceversa), es OK SIEMPRE, sin importar diferencias de subtipo, procesamiento, marca, presentación, parte del animal, formato o aditivos.
-     - "Pollo, mínimamente procesado con aditivos" + CUALQUIER cosa con "pollo", "pechuga", "alita", "muslo", "pierna" → ok. El pollo es pollo.
-     - "Agua" + "PAQUETE DE 30 BOTELLAS PET DE AGUA" → ok. Es agua.
+GLOSARIO DE EQUIVALENCIAS MEXICANAS (estas combinaciones SIEMPRE son OK, no las marques sospechoso):
+  - MAGNA / MAGNA SIN / MAGNA SIN PLOMO ≡ Gasolina regular menor a 91 octanos.
+  - PREMIUM ≡ Gasolina mayor o igual a 91 octanos.
+  - DIESEL / DIÉSEL ≡ Diésel.
+  - PEMEX + cualquier combustible ≡ combustible.
+  - LINEAGE / WORLD OF WARCRAFT / FORTNITE / nombre de un videojuego conocido ≡ Juegos / Software de juegos.
+  - VINIL / VINYL / CALCOMANIA / etiqueta adhesiva ≡ Película de impresión / Película plástica.
+  - SPOTIFY / NETFLIX / YOUTUBE PREMIUM ≡ Suscripción de software/entretenimiento.
+  - UBER / DIDI / RAPPI ≡ Servicios de transporte / Servicios de mensajería.
+
+PASO 1 — APLICA CHEQUEO A. ¿Cae en alguno de estos casos? Si SÍ → v="ok" (NO sigas evaluando, NO uses el giro):
+  0) **REGLA DEL SUSTANTIVO CENTRAL** (la más importante): si el sustantivo/producto principal de la clave SAT aparece literalmente o como sinónimo en la descripción del emisor (o viceversa), es OK SIEMPRE, sin importar diferencias de subtipo, procesamiento, marca, presentación, parte del animal, formato o aditivos. Y SIN IMPORTAR EL GIRO DEL NEGOCIO.
+     - "Servicios contables" + "Servicios Contables por el mes de Mayo 2026" → ok. Es literalmente lo mismo.
+     - "Zanahoria" + "Zanahoria" / "ZANAHORIA FRESCA" / "Zanahoria orgánica" → ok.
+     - "Pollo, mínimamente procesado con aditivos" + CUALQUIER cosa con "pollo", "pechuga", "alita", "muslo", "pierna" → ok.
+     - "Agua" + "PAQUETE DE 30 BOTELLAS PET DE AGUA" → ok.
      - "Queso" + cualquier tipo de queso (manchego, rallado, en barra, mezcla) → ok.
      - "Cerveza" + cualquier marca o presentación de cerveza → ok.
      - "Carne procesada" + bistec / molida / hamburguesa / arrachera → ok.
      - "Refrescos" + cualquier marca de refresco → ok.
-     Esta regla cubre el 90% de los casos. ÚSALA antes que cualquier otra.
+     - "Gasolina regular menor a 91 octanos" + "MAGNA SIN" → ok (ver glosario).
+     IMPORTANTE: la palabra compartida debe ser el SUSTANTIVO PRINCIPAL del concepto. NO cuenta compartir palabras genéricas como "Servicios", "Productos", "Bienes", "Equipo", "Insumos", "Material" — esas no son sustantivos centrales, son categorías.
+       · "Servicios contables" + "Servicios de limpieza" → NO es ok (sólo comparten "Servicios" que es genérico). Evaluar en PASO 2.
+       · "Equipo de cómputo" + "Equipo de refrigeración" → NO es ok (sólo "Equipo"). Evaluar en PASO 2.
   a) La descripción del emisor es una versión más específica, técnica o con marca de lo que dice la clave SAT.
      Ej: "OREO TROCEADA" bajo "Galletas de dulce"; "Aceite Cristal Canola" bajo "Grasa saturada animal".
   b) La descripción cae dentro del paraguas amplio de la clave, aunque no sea literal:
-     - "CUOTA DE MANTENIMIENTO" / "SEGUROS" / "energía del local" bajo "Administración de propiedades" → ok (todos son cargos accesorios al inmueble).
+     - "CUOTA DE MANTENIMIENTO" / "SEGUROS" / "energía del local" bajo "Administración de propiedades" → ok.
      - "Consumo de alimentos" bajo "Restaurantes" → ok.
      - "Honorarios legales" / "Honorarios laborales" / cualquier subespecialidad legal bajo "Servicios de derecho comercial" o cualquier servicio legal → ok.
      - "EXHIBICION EN ESPECTACULARES" / "lonas" / cualquier vehículo publicitario bajo "Servicios de campañas publicitarias" o "Publicidad impresa" → ok.
-  c) La clave es de "Instituciones bancarias" (84121500) o procesamiento de pagos: TODO lo financiero entra → intereses gravables, intereses exentos, intereses sujetos a IVA, tasas de descuento (débito, crédito, internacional, nacional), comisiones, cobros, Optblue, renta de TPV, administración de terminal. SIEMPRE ok.
+  c) La clave es de "Instituciones bancarias" (84121500) o procesamiento de pagos: TODO lo financiero entra → intereses, tasas de descuento, comisiones, Optblue, renta de TPV. SIEMPRE ok.
   d) Descripción genérica de servicio ("HONORARIOS", "ENVIO", "FLETE", "RENTA", "MANTENIMIENTO", "ANTICIPO", "CONSUMO", "COBRO", "SERVICIO", "ASESORIA", "MENSUALIDAD") que cae en el rubro amplio de la clave:
      - "Servicios contables" + "HONORARIOS" → ok.
      - "Servicios de transporte" + "Envío" → ok.
-     - "Servicios de facturación" + "ANTICIPO DEL BIEN O SERVICIO" → ok (el anticipo se factura con esta clave por norma SAT).
+     - "Servicios de facturación" + "ANTICIPO DEL BIEN O SERVICIO" → ok.
      - "Procesamiento de datos" + "Cobro por TASA DE DESCUENTO" → ok.
   e) Producto compuesto bajo su ingrediente o categoría dominante:
      - "Productos de leche y mantequilla" + "ADEREZO PARA NACHOS" (queso es lácteo) → ok.
-     - "Harina y productos de molinos" + "TORTILLA" (es producto de molino) → ok.
+     - "Harina y productos de molinos" + "TORTILLA" → ok.
 
-PASO 2 — Si NO cae en PASO 1: ¿hay AL MENOS UNA palabra, raíz o concepto compartido entre clave y descripción? (mismo rubro amplio, terminología relacionada, producto/servicio que el negocio del RFC razonablemente usaría)
-  → SÍ → v="sospechoso" (con razón corta).
+PASO 2 — Si CHEQUEO A NO marcó ok: ¿hay AL MENOS UNA palabra, raíz o concepto compartido entre clave y descripción?
+  → SÍ → tentativamente v="sospechoso".
+  → NO → tentativamente v="incorrecto".
   Ej: "Servicios de mantenimiento de equipo" + "ARRENDAMIENTO DE EQUIPOS DE PURIFICACION" (comparten "equipos") → sospechoso.
-  Ej: "Desodorantes" + "Difusor de Aceite" (relación aroma/ambiente) → sospechoso.
-  Ej: "Desodorantes" + "Desodorante para calzado" si el RFC es boliche (renta zapatos) → sospechoso.
+  Ej: "Desodorantes" + "Difusor de Aceite" → sospechoso.
 
-PASO 3 — Sólo si NO hay NINGUNA conexión posible: v="incorrecto".
-  Ej: "Software educativo" + "Mensualidad de boliches" → incorrecto.
-  Ej: "Servicios de facturación" + "TYSON MEGA D" (pollo) → incorrecto.
-  Ej: "Arroz" + "Servicios de consultoría" → incorrecto.
+PASO 3 — APLICA CHEQUEO B (giro del negocio) SÓLO si el resultado de PASO 2 fue "sospechoso" o "incorrecto":
+  - Si el concepto es un insumo razonable para el giro registrado en cédula → sube un nivel (incorrecto → sospechoso, sospechoso → ok).
+  - Si no encaja con el giro → deja el veredicto como está.
+  - Ejemplos con giro "boliche / centro de entretenimiento":
+    · "Desodorante para calzado" (zapatos rentados) → de sospechoso a ok.
+    · "BOLAS DE BOLICHE", "ZAPATOS DE BOLICHE" → ok.
+    · "Software educativo" + "Mensualidad de boliches" → de incorrecto a sospechoso (paga membresía).
+  - Ejemplos con giro "restaurante": insumos cocina/limpieza/desechables → sube un nivel.
+  - Ejemplos con giro "construcción": herramientas, materiales, renta de maquinaria → sube un nivel.
+  IMPORTANTE: PASO 3 NUNCA BAJA un veredicto. Si PASO 1 dijo ok, queda ok. Si algo no encaja con el giro, NO se vuelve "incorrecto" por eso — sólo se queda como estaba.
 
 ═══════════════════════════════════════════════════════
 PRINCIPIO FINAL:
-- NO ERES UN INSPECTOR QUE BUSCA ERRORES. Tu trabajo NO es encontrar diferencias entre la clave y la descripción — es identificar SÓLO los casos donde no hay forma humana razonable de relacionarlas.
-- Si el producto/servicio central coincide aunque sea en una palabra → ok.
-- El SAT acepta clasificaciones laxas. Una factura con clave "Pollo procesado" y descripción "Pechuga" NO se rechaza nunca.
+- NO ERES UN INSPECTOR QUE BUSCA ERRORES. Tu trabajo es identificar SÓLO los casos donde clave y descripción no tienen ninguna relación razonable.
+- Si el producto/servicio central coincide aunque sea en una palabra → ok, sin importar nada más.
+- El SAT acepta clasificaciones laxas.
 - Ante la duda: "ok". Si dudas entre "ok" y "sospechoso", elige "ok". Si dudas entre "sospechoso" e "incorrecto", elige "sospechoso".
-- Si más del 60% de tus respuestas en una corrida no son "ok", estás siendo demasiado estricto — revisa de nuevo.
+- Si más del 60% de tus respuestas no son "ok", estás siendo demasiado estricto — revisa de nuevo.
 ═══════════════════════════════════════════════════════
 
 DATOS:
@@ -235,8 +309,12 @@ export async function GET(req: NextRequest) {
   const periodoLabel = `${String(month).padStart(2, "0")}/${year}`;
 
   let rows: ConceptoAuditRaw[];
+  let cedula: CedulaContext | null = null;
   try {
-    rows = await loadConceptos(rfc, dateFrom, dateTo);
+    [rows, cedula] = await Promise.all([
+      loadConceptos(rfc, dateFrom, dateTo),
+      loadCedula(rfc).catch(() => null),
+    ]);
   } catch (err) {
     console.error(`[audit][${reqId}] db_error:`, (err as Error).message);
     return NextResponse.json({ error: "Error al consultar conceptos" }, { status: 503 });
@@ -273,7 +351,7 @@ export async function GET(req: NextRequest) {
 
   if (toGpt.length > 0) {
     const toon = buildToonTable(toGpt);
-    const prompt = buildPrompt(toon, periodoLabel, rfc);
+    const prompt = buildPrompt(toon, periodoLabel, rfc, cedula);
 
     try {
       const t0 = Date.now();
@@ -322,5 +400,6 @@ export async function GET(req: NextRequest) {
     totalRevisados: results.length,
     resumen,
     items: results,
+    giro: cedula?.actividades.length ? cedula.actividades.slice(0, 3) : null,
   });
 }

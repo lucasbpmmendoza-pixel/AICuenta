@@ -205,7 +205,7 @@ export default function EstadosFinancierosBenchmarkModal({ rfc, year, month, rfc
           {state.kind === 'loading' && (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <Spinner className="h-8 w-8" />
-              <p className="text-sm font-semibold text-slate-700 dark:text-zinc-200">Analizando con IA…</p>
+              <p className="text-sm font-semibold text-slate-700 dark:text-zinc-200">Cargando auditoría con Chikenelo…</p>
               <p className="text-xs text-slate-500 dark:text-zinc-400 max-w-xs text-center">
                 Cruzando cédula fiscal, nómina y egresos del periodo contra el estándar de tu industria.
               </p>
