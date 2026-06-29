@@ -10,6 +10,15 @@ const AUDIT_MODEL = process.env.AUDIT_MODEL ?? "gpt-4o";
 
 const MAX_ROWS = 200;
 
+interface AuditCfdi {
+  uuid: string;
+  serie: string;
+  folio: string;
+  fecha: string; // YYYY-MM-DD
+  importe: number;
+  contraparte: string;
+}
+
 interface ConceptoAuditRaw {
   tipo: "ingreso" | "egreso";
   clave: string;
@@ -17,6 +26,35 @@ interface ConceptoAuditRaw {
   emisorDesc: string;
   numConceptos: number;
   importe: number;
+  cfdis: AuditCfdi[];
+}
+
+// La columna `cfdis` viene del SQL como registros separados por salto de linea
+// (CHAR(10)) y campos por tab (CHAR(9)). Deduplica por UUID (un CFDI puede tener
+// 2 conceptos con la misma clave/descripcion) sumando el importe de sus partidas.
+function parseCfdis(raw: string | null | undefined): AuditCfdi[] {
+  if (!raw) return [];
+  const byUuid = new Map<string, AuditCfdi>();
+  for (const rec of raw.split("\n")) {
+    if (!rec) continue;
+    const [uuid, serie, folio, fecha, importe, contraparte] = rec.split("\t");
+    if (!uuid) continue;
+    const imp = Number(importe) || 0;
+    const existing = byUuid.get(uuid);
+    if (existing) {
+      existing.importe += imp;
+      continue;
+    }
+    byUuid.set(uuid, {
+      uuid,
+      serie: serie ?? "",
+      folio: folio ?? "",
+      fecha: fecha ?? "",
+      importe: imp,
+      contraparte: contraparte ?? "",
+    });
+  }
+  return [...byUuid.values()];
 }
 
 interface CedulaContext {
@@ -102,6 +140,7 @@ async function loadConceptos(
       emisorDesc: string;
       numConceptos: number;
       importe: number;
+      cfdis: string | null;
     }>(`
       WITH base AS (
         SELECT
@@ -111,7 +150,15 @@ async function loadConceptos(
           END AS tipo,
           ISNULL(NULLIF(c.ClaveProductoServicio,''), '') AS clave,
           ISNULL(NULLIF(LTRIM(RTRIM(c.Descripcion)),''), '(sin descripcion)') AS emisorDesc,
-          ISNULL(c.Importe, 0) AS importe
+          ISNULL(c.Importe, 0) AS importe,
+          f.UUID AS uuid,
+          ISNULL(f.Serie,'') AS serie,
+          ISNULL(f.Folio,'') AS folio,
+          f.Fecha AS fecha,
+          CASE
+            WHEN f.RFC_Emisor = @rfc THEN ISNULL(f.RazonSocialReceptor,'')
+            ELSE ISNULL(f.RazonSocialEmisor,'')
+          END AS contraparte
         FROM facturalo_cfdis f WITH (NOLOCK)
         INNER JOIN facturalo_conceptos c WITH (NOLOCK, INDEX(IX_conceptos_UUID))
           ON c.UUID = f.UUID AND c.rfc_cliente = @rfc
@@ -122,20 +169,50 @@ async function loadConceptos(
                 (f.RFC_Emisor   = @rfc AND f.Movimiento = 'Ingreso')
              OR (f.RFC_Receptor = @rfc AND f.Movimiento = 'Egreso')
               )
+      ),
+      ranked AS (
+        SELECT *,
+          ROW_NUMBER() OVER (
+            PARTITION BY tipo, clave, emisorDesc ORDER BY importe DESC
+          ) AS rn
+        FROM base
+        WHERE clave <> ''
+      ),
+      grp AS (
+        SELECT
+          tipo,
+          clave,
+          emisorDesc,
+          COUNT(*) AS numConceptos,
+          SUM(importe) AS importe,
+          -- Hasta 25 CFDIs por grupo (los de mayor importe). Campos con TAB,
+          -- registros con salto de linea. Se sanea la contraparte por si trae
+          -- esos caracteres. CONVERT a varchar(max) evita el limite de 8000.
+          STRING_AGG(
+            CASE WHEN rn <= 25 THEN
+              CONVERT(varchar(max), uuid) + CHAR(9)
+              + serie + CHAR(9)
+              + folio + CHAR(9)
+              + CONVERT(varchar(10), fecha, 23) + CHAR(9)
+              + CONVERT(varchar(20), CONVERT(decimal(18,2), importe)) + CHAR(9)
+              + REPLACE(REPLACE(REPLACE(contraparte, CHAR(9), ' '), CHAR(10), ' '), CHAR(13), ' ')
+            END, CHAR(10)
+          ) AS cfdis
+        FROM ranked
+        GROUP BY tipo, clave, emisorDesc
       )
       SELECT TOP ${MAX_ROWS}
-        b.tipo,
-        b.clave,
+        g.tipo,
+        g.clave,
         cat.descripcion AS satDesc,
-        b.emisorDesc,
-        COUNT(*) AS numConceptos,
-        SUM(b.importe) AS importe
-      FROM base b
-      LEFT JOIN tb_catprodserv cat WITH (NOLOCK) ON cat.clave = b.clave
-      WHERE b.clave <> ''
-      GROUP BY b.tipo, b.clave, cat.descripcion, b.emisorDesc
-      ORDER BY SUM(b.importe) DESC
-      OPTION (HASH GROUP, RECOMPILE)
+        g.emisorDesc,
+        g.numConceptos,
+        g.importe,
+        g.cfdis
+      FROM grp g
+      LEFT JOIN tb_catprodserv cat WITH (NOLOCK) ON cat.clave = g.clave
+      ORDER BY g.importe DESC
+      OPTION (RECOMPILE)
     `);
 
   return r.recordset.map((row) => ({
@@ -145,6 +222,7 @@ async function loadConceptos(
     emisorDesc: row.emisorDesc,
     numConceptos: Number(row.numConceptos ?? 0),
     importe: Number(row.importe ?? 0),
+    cfdis: parseCfdis(row.cfdis),
   }));
 }
 
@@ -393,13 +471,20 @@ export async function GET(req: NextRequest) {
     { ok: 0, sospechoso: 0, incorrecto: 0, sin_catalogo: 0 },
   );
 
+  // Los CFDIs solo se mandan al cliente para las filas que el usuario querra
+  // revisar (alerta / incorrecto / sin catalogo). Las "ok" no los necesitan y
+  // arrastrarlos infla el JSON.
+  const items = results.map((r) =>
+    r.veredicto === "ok" ? { ...r, cfdis: [] } : r,
+  );
+
   return NextResponse.json({
     ok: true,
     rfc,
     periodo: periodoLabel,
     totalRevisados: results.length,
     resumen,
-    items: results,
+    items,
     giro: cedula?.actividades.length ? cedula.actividades.slice(0, 3) : null,
   });
 }

@@ -49,7 +49,7 @@ export default function TopBar({ initialDemoMode, isDemo }: { initialDemoMode?: 
   if (!demoMode || isRegistered || hideOnAuthRoutes) return null
 
   return (
-    <div className="fixed top-[90px] right-4 z-50 flex flex-col gap-2">
+    <div className="fixed top-[68px] right-4 z-50 flex flex-row gap-2">
       <button
         onClick={() => router.push('/register')}
         className="flex items-center gap-2 rounded-xl bg-[#7B6FE8] hover:bg-[#6955d4] text-white font-semibold py-2.5 px-6 transition-all shadow-lg dark:bg-[#91EB78] dark:text-zinc-900 dark:hover:bg-[#7ed65a]"
