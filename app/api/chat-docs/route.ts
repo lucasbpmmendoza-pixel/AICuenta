@@ -166,6 +166,25 @@ const CHAT_TOOLS = [
   {
     type: "function",
     function: {
+      name: "fetch_url",
+      description:
+        "Descarga una página web (http o https) y devuelve su contenido principal como texto plano. Úsala cuando el usuario pegue una URL o pida explícitamente leer, resumir o extraer información de un sitio público (SAT, DOF, IMSS, etc.). No la uses para búsquedas generales en internet sin una URL específica.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "URL completa con protocolo http:// o https:// a descargar",
+          },
+        },
+        required: ["url"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "create_excel",
       description:
         "Genera un archivo Excel (.xlsx) a partir de columnas y filas estructuradas. Usa esta herramienta cuando el usuario pida descargar, exportar o generar un Excel.",
