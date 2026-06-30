@@ -15,9 +15,9 @@ const updateSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .email("Correo invalido")
+    .email("Correo inválido")
     .max(254, "El correo no puede exceder 254 caracteres"),
-  currentPassword: z.string().min(1, "Ingresa tu contrasena actual"),
+  currentPassword: z.string().min(1, "Ingresa tu contraseña actual"),
   newPassword: z
     .string()
     .max(128)
@@ -31,7 +31,7 @@ export async function PATCH(req: NextRequest) {
 
   let body: unknown;
   try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
 
   const parsed = updateSchema.safeParse(body);
@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest) {
 
   let db;
   try { db = await getDb(); } catch {
-    return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
+    return NextResponse.json({ error: "Error de conexión" }, { status: 503 });
   }
 
   // Verificar contraseña actual
@@ -56,7 +56,7 @@ export async function PATCH(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
 
   const valid = await bcrypt.compare(currentPassword, user.password_hash);
-  if (!valid) return NextResponse.json({ error: "La contrasena actual es incorrecta" }, { status: 401 });
+  if (!valid) return NextResponse.json({ error: "La contraseña actual es incorrecta" }, { status: 401 });
 
   // Verificar email único si cambió
   if (email !== session.email) {
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest) {
       .input("id", session.sub)
       .query<{ cnt: number }>("SELECT COUNT(1) AS cnt FROM users WHERE email = @email AND id <> @id");
     if ((emailCheck.recordset[0]?.cnt ?? 0) > 0) {
-      return NextResponse.json({ error: "Ese correo ya esta en uso" }, { status: 409 });
+      return NextResponse.json({ error: "Ese correo ya está en uso" }, { status: 409 });
     }
   }
 
@@ -95,13 +95,13 @@ export async function DELETE(req: NextRequest) {
 
   let body: { password?: string };
   try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Cuerpo invalido" }, { status: 400 });
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
-  if (!body.password) return NextResponse.json({ error: "Contrasena requerida" }, { status: 400 });
+  if (!body.password) return NextResponse.json({ error: "Contraseña requerida" }, { status: 400 });
 
   let db;
   try { db = await getDb(); } catch {
-    return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
+    return NextResponse.json({ error: "Error de conexión" }, { status: 503 });
   }
 
   const userRes = await db.request()
@@ -111,7 +111,7 @@ export async function DELETE(req: NextRequest) {
   if (!user) return NextResponse.json({ error: "Usuario no encontrado" }, { status: 404 });
 
   const valid = await bcrypt.compare(body.password, user.password_hash);
-  if (!valid) return NextResponse.json({ error: "Contrasena incorrecta" }, { status: 403 });
+  if (!valid) return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 403 });
 
   await db.request().input("id", session.sub).query("DELETE FROM users WHERE id = @id");
   await clearAuthCookie();

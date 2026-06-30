@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   try {
     ({ email } = schema.parse(await req.json()));
   } catch {
-    return NextResponse.json({ error: "Correo invalido." }, { status: 400 });
+    return NextResponse.json({ error: "Correo inválido." }, { status: 400 });
   }
 
   // ── 2. Buscar usuario ──────────────────────────────────

@@ -114,7 +114,7 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: 'Configuracion',
+    label: 'Configuración',
     href: '/dashboard/configuracion',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
@@ -125,7 +125,7 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
-    label: 'Suscripcion',
+    label: 'Suscripción',
     href: '/dashboard/suscripcion',
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -466,7 +466,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
               <polyline points="16 17 21 12 16 7" />
               <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
-            Cerrar sesion
+            Cerrar sesión
           </button>
         )}
       </div>
@@ -597,7 +597,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
           <button
             onClick={() => setMobileOpen(true)}
             className="rounded-lg p-1.5 text-slate-500 dark:text-zinc-400 hover:bg-[#EBE9FB] dark:hover:bg-zinc-800 transition"
-            aria-label="Abrir menu"
+            aria-label="Abrir menú"
           >
             <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
@@ -619,7 +619,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute top-3 right-3 rounded-lg p-1.5 text-slate-400 dark:text-zinc-400 hover:bg-[#EBE9FB] dark:hover:bg-zinc-800 transition"
-              aria-label="Cerrar menu"
+              aria-label="Cerrar menú"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                 <line x1="18" y1="6" x2="6" y2="18" />

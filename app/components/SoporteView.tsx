@@ -23,7 +23,7 @@ export default function SoporteView() {
     setImages(prev => {
       let next = [...prev]
       for (const file of list) {
-        if (next.length >= MAX_IMAGES) { errors.push(`Maximo ${MAX_IMAGES} imagenes.`); break }
+        if (next.length >= MAX_IMAGES) { errors.push(`Máximo ${MAX_IMAGES} imágenes.`); break }
         if (file.size > MAX_BYTES)     { errors.push(`"${file.name}" supera 2 MB.`); continue }
         const reader = new FileReader()
         reader.onload = () => setImages(p => p.length < MAX_IMAGES
@@ -99,7 +99,7 @@ export default function SoporteView() {
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
         <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Soporte</h1>
         <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
-          Envianos un mensaje y te responderemos a la brevedad.
+          Envíanos un mensaje y te responderemos a la brevedad.
         </p>
       </div>
 
@@ -143,7 +143,7 @@ export default function SoporteView() {
                   required
                   rows={6}
                   maxLength={4000}
-                  placeholder="Describe tu situacion con detalle..."
+                  placeholder="Describe tu situación con detalle..."
                   className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition resize-none"
                 />
                 <p className="text-right text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
@@ -241,7 +241,7 @@ export default function SoporteView() {
                 <line x1="12" y1="16" x2="12.01" y2="16" />
               </svg>
               <p className="text-sm text-blue-700 dark:text-blue-300 leading-relaxed">
-                Nuestro equipo suele responder en menos de 24 horas en dias habiles.
+                Nuestro equipo suele responder en menos de 24 horas en días hábiles.
                 Recibirás la respuesta en el correo de tu cuenta.
               </p>
             </div>

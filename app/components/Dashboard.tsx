@@ -85,7 +85,7 @@ export default function Dashboard() {
             type="text"
             value={efiel}
             onChange={(e) => setEfiel(e.target.value)}
-            placeholder="Contrasena de la e.firma"
+            placeholder="Contraseña de la e.firma"
             required
             className="rounded-lg border border-zinc-300 dark:border-zinc-600 bg-zinc-50 dark:bg-zinc-800 px-4 py-2.5 text-zinc-900 dark:text-zinc-50 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-brand-deep transition text-sm"
           />
@@ -190,13 +190,13 @@ export default function Dashboard() {
             {/* Header */}
             <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5">
               <h1 className="text-xl font-bold text-white tracking-tight">Bienvenido, Contador</h1>
-              <p className="text-sm text-white/70 mt-0.5">Gestionas multiples RFCs. Accede al dashboard o registra tu propia FIEL.</p>
+              <p className="text-sm text-white/70 mt-0.5">Gestionas múltiples RFCs. Accede al dashboard o registra tu propia FIEL.</p>
             </div>
 
             {/* Dashboard CTA */}
             <div className="px-8 py-8 flex flex-col items-center gap-3 border-b border-zinc-200 dark:border-zinc-700">
               <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
-                Tu panel principal esta listo. Desde ahi podras administrar los RFCs de tus clientes.
+                Tu panel principal está listo. Desde ahí podrás administrar los RFCs de tus clientes.
               </p>
               <button
                 type="button"
@@ -218,7 +218,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-3 mb-4">
                 <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Opcional</span>
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  Tambien puedes registrar tu propia e.firma personal aqui.
+                  También puedes registrar tu propia e.firma personal aquí.
                 </p>
               </div>
               {uploadForm}
@@ -229,7 +229,7 @@ export default function Dashboard() {
             {/* Header */}
             <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5" >
               <h1 className="text-xl font-bold text-white tracking-tight" >Dashboard de Certificados</h1>
-              <p className="text-sm text-white/70 mt-0.5">Ingresa los datos y sube los archivos de firma electronica.</p>
+              <p className="text-sm text-white/70 mt-0.5">Ingresa los datos y sube los archivos de firma electrónica.</p>
             </div>
             {uploadForm}
           </>

@@ -17,7 +17,7 @@ export async function GET() {
   try {
     db = await getDb();
   } catch {
-    return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
+    return NextResponse.json({ error: "Error de conexión" }, { status: 503 });
   }
 
   let accountType: string | null = null;
@@ -56,13 +56,13 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
 
   const parsed = accountTypeSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Tipo de cuenta invalido" },
+      { error: "Tipo de cuenta inválido" },
       { status: 422 }
     );
   }
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
   try {
     db = await getDb();
   } catch {
-    return NextResponse.json({ error: "Error de conexion" }, { status: 503 });
+    return NextResponse.json({ error: "Error de conexión" }, { status: 503 });
   }
 
   try {

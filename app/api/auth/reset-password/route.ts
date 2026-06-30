@@ -8,9 +8,9 @@ const schema = z.object({
   token: z.string().min(1),
   password: z
     .string()
-    .min(8, "Minimo 8 caracteres")
-    .regex(/[A-Z]/, "Debe contener al menos una mayuscula")
-    .regex(/[0-9]/, "Debe contener al menos un numero"),
+    .min(8, "Mínimo 8 caracteres")
+    .regex(/[A-Z]/, "Debe contener al menos una mayúscula")
+    .regex(/[0-9]/, "Debe contener al menos un número"),
 });
 
 export async function POST(req: NextRequest) {
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   try {
     ({ token, password } = schema.parse(await req.json()));
   } catch (err) {
-    const msg = err instanceof z.ZodError ? err.issues[0].message : "Datos invalidos.";
+    const msg = err instanceof z.ZodError ? err.issues[0].message : "Datos inválidos.";
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     payload = await verifyResetToken(token);
   } catch {
     return NextResponse.json(
-      { error: "El enlace no es valido o ya expiro." },
+      { error: "El enlace no es válido o ya expiró." },
       { status: 400 },
     );
   }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[reset-password] DB error:", (err as Error).message);
     return NextResponse.json(
-      { error: "No se pudo actualizar la contrasena. Intenta mas tarde." },
+      { error: "No se pudo actualizar la contraseña. Intenta más tarde." },
       { status: 500 },
     );
   }

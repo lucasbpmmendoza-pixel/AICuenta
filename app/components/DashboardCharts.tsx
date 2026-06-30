@@ -387,7 +387,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
 
           <div className="mt-3">
             <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-zinc-500 mb-1">
-              Regimen fiscal para ISR
+              Régimen fiscal para ISR
             </label>
             <select
               value={regimenSeleccionado}
@@ -444,7 +444,7 @@ export default function DashboardCharts({ data, loading, mes, anio, selectedRfc 
         <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-900/60 bg-emerald-50/70 dark:bg-emerald-950/30 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center rounded-full bg-emerald-600 text-white px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider">
-              Nomina emitida
+              Nómina emitida
             </span>
             <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
               Retenciones del periodo:

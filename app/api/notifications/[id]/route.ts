@@ -23,8 +23,8 @@ export async function PATCH(
 
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id requerido" }, { status: 400 });
-  if (!isGuid(id)) return NextResponse.json({ error: "id invalido" }, { status: 400 });
-  if (!isGuid(session.sub)) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+  if (!isGuid(id)) return NextResponse.json({ error: "id inválido" }, { status: 400 });
+  if (!isGuid(session.sub)) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
 
   const db = await getDb();
   await db.request()

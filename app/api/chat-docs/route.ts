@@ -546,7 +546,7 @@ export async function POST(req: Request) {
     if (!quotaResult.allowed) {
       return NextResponse.json(
         {
-          error: "Has alcanzado el limite diario del modo publico. Inicia sesion para continuar en modo premium.",
+          error: "Has alcanzado el límite diario del modo público. Inicia sesión para continuar en modo premium.",
           code: "PUBLIC_LIMIT_REACHED",
           limit: quotaResult.limit,
           resetAt: quotaResult.resetAt,

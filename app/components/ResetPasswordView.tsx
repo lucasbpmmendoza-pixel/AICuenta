@@ -21,7 +21,7 @@ export default function ResetPasswordView() {
     setError("");
 
     if (password !== confirm) {
-      setError("Las contrasenas no coinciden.");
+      setError("Las contraseñas no coinciden.");
       return;
     }
 
@@ -37,14 +37,14 @@ export default function ResetPasswordView() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error ?? "No se pudo restablecer la contrasena.");
+        setError(data.error ?? "No se pudo restablecer la contraseña.");
         return;
       }
 
       setDone(true);
       setTimeout(() => router.push("/login"), 3000);
     } catch {
-      setError("Error de red. Verifica tu conexion e intenta de nuevo.");
+      setError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function ResetPasswordView() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-white px-6">
         <div className="w-full max-w-[400px] text-center">
-          <p className="text-sm text-slate-500">Enlace no valido.</p>
+          <p className="text-sm text-slate-500">Enlace no válido.</p>
           <a
             href="/login"
             className="mt-4 inline-block text-sm font-bold transition hover:underline"
@@ -62,7 +62,7 @@ export default function ResetPasswordView() {
             onMouseEnter={e => (e.currentTarget.style.color = '#7B6FE8')}
             onMouseLeave={e => (e.currentTarget.style.color = '#450c7d')}
           >
-            Volver al inicio de sesion
+            Volver al inicio de sesión
           </a>
         </div>
       </div>
@@ -78,11 +78,11 @@ export default function ResetPasswordView() {
             ✅
           </div>
           <h1 className="text-2xl font-black tracking-tight" style={{ color: '#450c7d' }}>
-            Contrasena actualizada
+            Contraseña actualizada
           </h1>
           <p className="mt-3 text-sm leading-6" style={{ color: '#7B6FE8' }}>
             Tu contrasena fue restablecida correctamente.<br />
-            Redirigiendo al inicio de sesion...
+            Redirigiendo al inicio de sesión...
           </p>
         </div>
       </div>
@@ -128,10 +128,10 @@ export default function ResetPasswordView() {
 
         <div className="w-full max-w-[400px]">
           <h1 className="text-3xl font-black tracking-tight" style={{ color: '#450c7d' }}>
-            Nueva contrasena
+            Nueva contraseña
           </h1>
           <p className="mt-2 text-sm" style={{ color: '#7B6FE8' }}>
-            Elige una contrasena segura para tu cuenta.
+            Elige una contraseña segura para tu cuenta.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-9 space-y-5">
@@ -141,7 +141,7 @@ export default function ResetPasswordView() {
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
                 style={{ color: '#450c7d' }}
               >
-                Nueva contrasena
+                Nueva contraseña
               </label>
               <div className="relative">
                 <input
@@ -158,7 +158,7 @@ export default function ResetPasswordView() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
-                  aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -168,7 +168,7 @@ export default function ResetPasswordView() {
                 </button>
               </div>
               <p className="mt-1.5 text-xs text-slate-400">
-                Min. 8 caracteres, una mayuscula y un numero
+                Min. 8 caracteres, una mayúscula y un número
               </p>
             </div>
 
@@ -178,7 +178,7 @@ export default function ResetPasswordView() {
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
                 style={{ color: '#450c7d' }}
               >
-                Confirmar contrasena
+                Confirmar contraseña
               </label>
               <input
                 id="confirm"
@@ -209,7 +209,7 @@ export default function ResetPasswordView() {
               {loading ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               ) : (
-                "Restablecer contrasena"
+                "Restablecer contraseña"
               )}
             </button>
           </form>
@@ -222,7 +222,7 @@ export default function ResetPasswordView() {
               onMouseEnter={e => (e.currentTarget.style.color = '#7B6FE8')}
               onMouseLeave={e => (e.currentTarget.style.color = '#450c7d')}
             >
-              Volver al inicio de sesion
+              Volver al inicio de sesión
             </a>
           </p>
         </div>

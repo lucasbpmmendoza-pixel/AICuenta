@@ -8,8 +8,8 @@ import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 
 const memberSchema = z.object({
   name:     z.string().trim().min(2, "El nombre es muy corto").max(120),
-  email:    z.string().trim().toLowerCase().email("Correo invalido"),
-  password: z.string().min(8, "La contrasena debe tener al menos 8 caracteres").max(72),
+  email:    z.string().trim().toLowerCase().email("Correo inválido"),
+  password: z.string().min(8, "La contraseña debe tener al menos 8 caracteres").max(72),
 });
 
 // GET /api/team — Lista los miembros del equipo del owner actual
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
   if (session.role && session.role !== "owner") return NextResponse.json({ error: "Acceso denegado" }, { status: 403 });
-  if (session.sub === undefined) return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+  if (session.sub === undefined) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
 
   if (await isFreemiumOwner(session)) {
     return NextResponse.json({ error: FREEMIUM_FORBIDDEN_MESSAGE }, { status: 403 });
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
   let body: unknown;
   try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
 
   const parsed = memberSchema.safeParse(body);
@@ -85,14 +85,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ese correo ya esta registrado" }, { status: 409 });
   }
 
-  // Limite de miembros segun plan
+  // Límite de miembros segun plan
   const count = await db
     .request()
     .input("ownerId", session.sub)
     .query<{ cnt: number }>("SELECT COUNT(1) AS cnt FROM users WHERE owner_id = @ownerId");
   if ((count.recordset[0]?.cnt ?? 0) >= limits.maxMembers) {
     return NextResponse.json(
-      { error: `Limite de ${limits.maxMembers} usuarios por cuenta alcanzado para tu plan ${limits.planType}.` },
+      { error: `Límite de ${limits.maxMembers} usuarios por cuenta alcanzado para tu plan ${limits.planType}.` },
       { status: 422 },
     );
   }

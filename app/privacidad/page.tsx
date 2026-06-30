@@ -8,35 +8,35 @@ export const metadata: Metadata = {
 const sections = [
   {
     title: "1. Responsable del tratamiento",
-    body: "AIcuenta es responsable del tratamiento de los datos personales recabados a traves de la plataforma, conforme a la legislacion aplicable en Mexico.",
+    body: "AIcuenta es responsable del tratamiento de los datos personales recabados a través de la plataforma, conforme a la legislación aplicable en México.",
   },
   {
     title: "2. Datos que recabamos",
-    body: "Podemos recabar datos de identificacion y contacto, datos de cuenta, informacion fiscal y documentos que el usuario cargue para el uso de las funcionalidades del servicio.",
+    body: "Podemos recabar datos de identificación y contacto, datos de cuenta, información fiscal y documentos que el usuario cargue para el uso de las funcionalidades del servicio.",
   },
   {
     title: "3. Finalidades del tratamiento",
-    body: "Usamos los datos para habilitar el acceso a la plataforma, procesar documentos, generar analisis contables/fiscales, brindar soporte tecnico y mejorar el producto.",
+    body: "Usamos los datos para habilitar el acceso a la plataforma, procesar documentos, generar análisis contables/fiscales, brindar soporte técnico y mejorar el producto.",
   },
   {
     title: "4. Transferencias",
-    body: "No compartimos datos personales con terceros salvo cuando sea necesario para prestar el servicio, por requerimiento legal o con autorizacion del titular.",
+    body: "No compartimos datos personales con terceros salvo cuando sea necesario para prestar el servicio, por requerimiento legal o con autorización del titular.",
   },
   {
-    title: "5. Conservacion y seguridad",
-    body: "Implementamos medidas razonables administrativas, tecnicas y fisicas para proteger la informacion contra acceso no autorizado, perdida, alteracion o destruccion.",
+    title: "5. Conservación y seguridad",
+    body: "Implementamos medidas razonables administrativas, técnicas y físicas para proteger la información contra acceso no autorizado, pérdida, alteración o destrucción.",
   },
   {
     title: "6. Derechos ARCO",
-    body: "El titular puede ejercer sus derechos de acceso, rectificacion, cancelacion y oposicion, asi como revocar su consentimiento, mediante solicitud al correo de contacto.",
+    body: "El titular puede ejercer sus derechos de acceso, rectificación, cancelación y oposición, así como revocar su consentimiento, mediante solicitud al correo de contacto.",
   },
   {
-    title: "7. Uso de cookies y tecnologias similares",
-    body: "Podemos utilizar cookies y tecnologias similares para mantener sesion, mejorar la experiencia y obtener metricas de uso. Puedes administrar su uso desde tu navegador.",
+    title: "7. Uso de cookies y tecnologías similares",
+    body: "Podemos utilizar cookies y tecnologías similares para mantener sesión, mejorar la experiencia y obtener métricas de uso. Puedes administrar su uso desde tu navegador.",
   },
   {
     title: "8. Cambios al aviso",
-    body: "Podemos actualizar este aviso de privacidad en cualquier momento. La version vigente estara disponible en esta misma pagina.",
+    body: "Podemos actualizar este aviso de privacidad en cualquier momento. La versión vigente estará disponible en esta misma página.",
   },
   {
     title: "9. Contacto",
@@ -55,11 +55,11 @@ export default function PrivacidadPage() {
           Aviso de Privacidad
         </h1>
         <p className="mt-3 text-sm text-slate-500">
-          Ultima actualizacion: 22 de mayo de 2026
+          Última actualización: 22 de mayo de 2026
         </p>
 
         <p className="mt-8 text-sm leading-7 text-slate-600">
-          Este aviso describe como recopilamos, usamos y protegemos los datos personales de los usuarios de AIcuenta.
+          Este aviso describe cómo recopilamos, usamos y protegemos los datos personales de los usuarios de AIcuenta.
         </p>
 
         <div className="mt-10 space-y-7">

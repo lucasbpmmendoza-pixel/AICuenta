@@ -12,7 +12,7 @@ const STEPS: Step[] = [
   {
     title: 'Bienvenido a AIcuenta',
     description:
-      'Tu plataforma de inteligencia fiscal. En menos de un minuto te mostramos como sacarle el maximo provecho.',
+      'Tu plataforma de inteligencia fiscal. En menos de un minuto te mostramos como sacarle el máximo provecho.',
     icon: (
       <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -24,7 +24,7 @@ const STEPS: Step[] = [
   {
     title: 'Dashboard',
     description:
-      'Aqui ves de un vistazo tus ingresos, egresos, IVA e ISR del mes. Usa las flechas para navegar entre meses.',
+      'Aquí ves de un vistazo tus ingresos, egresos, IVA e ISR del mes. Usa las flechas para navegar entre meses.',
     icon: (
       <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1.5" />
@@ -37,7 +37,7 @@ const STEPS: Step[] = [
   {
     title: 'Facturas',
     description:
-      'Descarga tus CFDIs en Excel por mes, trimestre o año. Filtra por RFC, tipo de comprobante y mas.',
+      'Descarga tus CFDIs en Excel por mes, trimestre o año. Filtra por RFC, tipo de comprobante y más.',
     icon: (
       <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -50,7 +50,7 @@ const STEPS: Step[] = [
   {
     title: 'Estados Financieros',
     description:
-      'Consulta resumenes como estado de resultados, balance y flujo para entender la salud financiera de tu negocio en periodos concretos.',
+      'Consulta resúmenes como estado de resultados, balance y flujo para entender la salud financiera de tu negocio en periodos concretos.',
     icon: (
       <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <line x1="18" y1="20" x2="18" y2="10" />
@@ -228,7 +228,7 @@ export default function OnboardingModal({ userName, onDone, forceOpen = false, o
                 onClick={prev}
                 className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
               >
-                Atras
+                Atrás
               </button>
             ) : (
               <button

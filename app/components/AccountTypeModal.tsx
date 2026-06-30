@@ -80,13 +80,13 @@ export default function AccountTypeModal({ show, onComplete }: Props) {
         <div className="px-7 py-7">
           {/* Header */}
           <p className="text-xs font-black uppercase tracking-[0.3em] text-zinc-400 dark:text-zinc-500" style={{ color: "#7B6FE8" }}>
-            Configuracion inicial
+            Configuración inicial
           </p>
           <h2 className="mt-2 text-xl font-black text-zinc-900 dark:text-zinc-50 leading-snug" style={{ color: "#450c7d" }}>
             Usaras esta herramienta como…
           </h2>
           <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400" style={{ color: "#7B6FE8" }}>
-            Elige el perfil que mejor describe tu uso. Podras cambiarlo despues desde tu cuenta.
+            Elige el perfil que mejor describe tu uso. Podrás cambiarlo después desde tu cuenta.
           </p>
 
           {/* Options */}

@@ -30,7 +30,7 @@ export async function GET() {
 
   const userId = session.sub;
   if (!isGuid(userId)) {
-    return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+    return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
   }
 
   const db = await getDb();
@@ -77,7 +77,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (!isGuid(session.sub)) {
-    return NextResponse.json({ error: "Sesion invalida" }, { status: 401 });
+    return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));

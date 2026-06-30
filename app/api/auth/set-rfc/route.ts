@@ -10,7 +10,7 @@ export async function PATCH(req: NextRequest) {
 
   const { rfc } = await req.json()
   if (!rfc || !RFC_SAFE.test(rfc)) {
-    return NextResponse.json({ error: 'RFC invalido' }, { status: 400 })
+    return NextResponse.json({ error: 'RFC inválido' }, { status: 400 })
   }
 
   try {

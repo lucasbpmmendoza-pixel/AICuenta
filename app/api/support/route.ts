@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
   let body: unknown;
   try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
 
   const parsed = supportSchema.safeParse(body);

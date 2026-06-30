@@ -76,17 +76,17 @@ function parsePeriod(req: NextRequest): { dateFrom: Date; dateTo: Date; label: s
     const df = new Date(dateFromP);
     const dt = new Date(dateToP);
     if (isNaN(df.getTime()) || isNaN(dt.getTime())) {
-      throw new Error("fechas invalidas");
+      throw new Error("fechas inválidas");
     }
     const nextDay = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() + 1));
     return { dateFrom: df, dateTo: nextDay, label: `${dateFromP}_${dateToP}` };
   }
 
-  if (isNaN(year)) throw new Error("year invalido");
+  if (isNaN(year)) throw new Error("year inválido");
 
   if (quarterP !== null) {
     const q = parseInt(quarterP, 10);
-    if (isNaN(q) || q < 1 || q > 4) throw new Error("quarter invalido");
+    if (isNaN(q) || q < 1 || q > 4) throw new Error("quarter inválido");
     return {
       dateFrom: new Date(Date.UTC(year, (q - 1) * 3, 1)),
       dateTo: new Date(Date.UTC(year, q * 3, 1)),
@@ -96,7 +96,7 @@ function parsePeriod(req: NextRequest): { dateFrom: Date; dateTo: Date; label: s
 
   if (monthP !== null) {
     const month = parseInt(monthP, 10);
-    if (isNaN(month) || month < 1 || month > 12) throw new Error("month invalido");
+    if (isNaN(month) || month < 1 || month > 12) throw new Error("month inválido");
     return {
       dateFrom: new Date(Date.UTC(year, month - 1, 1)),
       dateTo: new Date(Date.UTC(year, month, 1)),
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
     demoDownloadLimit = consumeDemoDownloadSlot(req);
     if (!demoDownloadLimit.allowed) {
       return new Response(
-        `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
+        `Límite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
         {
           status: 429,
           headers: {

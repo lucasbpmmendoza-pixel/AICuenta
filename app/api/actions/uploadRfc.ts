@@ -11,10 +11,10 @@ const RFC_SAFE = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i
 
 export async function uploadRfc(formData: FormData): Promise<{ success: boolean; message: string }> {
   const session = await getSession()
-  if (!session) return { success: false, message: 'Sesion expirada. Vuelve a iniciar sesion.' }
+  if (!session) return { success: false, message: 'Sesión expirada. Vuelve a iniciar sesión.' }
 
   // Miembros no pueden modificar RFCs
-  if (session.role === 'member') return { success: false, message: 'No tienes permisos para realizar esta accion.' }
+  if (session.role === 'member') return { success: false, message: 'No tienes permisos para realizar esta acción.' }
 
   // Para multi-cuenta, usar el owner_id como propietario de los datos
   const effectiveUserId = session.ownerId ?? session.sub
@@ -25,14 +25,14 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
   const keyFile = formData.get('key')  as File | null
 
   if (!rfc || !efiel) return { success: false, message: 'RFC y contraseña EFIEL son obligatorios.' }
-  if (!RFC_SAFE.test(rfc)) return { success: false, message: 'RFC con formato invalido.' }
+  if (!RFC_SAFE.test(rfc)) return { success: false, message: 'RFC con formato inválido.' }
   if (!cerFile || cerFile.size === 0) return { success: false, message: 'Debes subir un archivo .CER.' }
   if (!keyFile || keyFile.size === 0) return { success: false, message: 'Debes subir un archivo .KEY.' }
 
   const cerExt = path.extname(cerFile.name).toLowerCase()
   const keyExt = path.extname(keyFile.name).toLowerCase()
-  if (cerExt !== '.cer') return { success: false, message: 'El archivo CER debe tener extension .cer' }
-  if (keyExt !== '.key') return { success: false, message: 'El archivo KEY debe tener extension .key' }
+  if (cerExt !== '.cer') return { success: false, message: 'El archivo CER debe tener extensión .cer' }
+  if (keyExt !== '.key') return { success: false, message: 'El archivo KEY debe tener extensión .key' }
 
   // Validar limites por plan antes de subir archivos
   try {
@@ -68,7 +68,7 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
     }
   } catch (err) {
     console.error('[uploadRfc] limit check error:', (err as Error).message)
-    return { success: false, message: 'No se pudo validar el limite de RFCs. Intenta de nuevo.' }
+    return { success: false, message: 'No se pudo validar el límite de RFCs. Intenta de nuevo.' }
   }
 
   // Subir al servicio aicuenta-storage (FastAPI en Ubuntu, reemplazo de Vercel Blob)

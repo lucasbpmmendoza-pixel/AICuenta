@@ -27,19 +27,19 @@ const ISR_REGIMENES = [
   { code: '603', name: 'Personas Morales con Fines no Lucrativos', rateHint: '0%' },
   { code: '605', name: 'Sueldos y Salarios e Ingresos Asimilados', rateHint: '0%' },
   { code: '606', name: 'Arrendamiento', rateHint: '20%' },
-  { code: '608', name: 'Demas ingresos', rateHint: '30%' },
+  { code: '608', name: 'Demás ingresos', rateHint: '30%' },
   { code: '610', name: 'Residentes en el Extranjero', rateHint: '30%' },
   { code: '611', name: 'Ingresos por Dividendos', rateHint: '10%' },
-  { code: '612', name: 'Personas Fisicas con Actividades Empresariales y Profesionales', rateHint: '30%' },
+  { code: '612', name: 'Personas Físicas con Actividades Empresariales y Profesionales', rateHint: '30%' },
   { code: '614', name: 'Ingresos por intereses', rateHint: '10%' },
-  { code: '615', name: 'Regimen de los ingresos por obtencion de premios', rateHint: '10%' },
+  { code: '615', name: 'Régimen de los ingresos por obtención de premios', rateHint: '10%' },
   { code: '616', name: 'Sin obligaciones fiscales', rateHint: '0%' },
-  { code: '620', name: 'Sociedades Cooperativas de Produccion', rateHint: '30%' },
-  { code: '621', name: 'Incorporacion Fiscal', rateHint: '10%' },
+  { code: '620', name: 'Sociedades Cooperativas de Producción', rateHint: '30%' },
+  { code: '621', name: 'Incorporación Fiscal', rateHint: '10%' },
   { code: '622', name: 'Actividades Agricolas, Ganaderas, Silvicolas y Pesqueras', rateHint: '21%' },
   { code: '623', name: 'Opcional para Grupos de Sociedades', rateHint: '30%' },
   { code: '624', name: 'Coordinados', rateHint: '30%' },
-  { code: '625', name: 'RESICO Personas Fisicas', rateHint: '1% a 2.5%' },
+  { code: '625', name: 'RESICO Personas Físicas', rateHint: '1% a 2.5%' },
   { code: '626', name: 'RESICO Personas Morales', rateHint: '1%' },
 ] as const
 
@@ -103,12 +103,12 @@ function RfcForm({
       {/* EFIEL password */}
       <div className="flex flex-col gap-1">
         <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-          Contrasena e.firma
+          Contraseña e.firma
         </label>
         <div className="relative">
           <input
             type={showEfiel ? 'text' : 'password'} value={efiel} onChange={(e) => setEfiel(e.target.value)}
-            required maxLength={500} placeholder="Contrasena de tu e.firma"
+            required maxLength={500} placeholder="Contraseña de tu e.firma"
             className="w-full rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
           />
           <button type="button" onClick={() => setShowEfiel((v) => !v)}
@@ -121,7 +121,7 @@ function RfcForm({
         </div>
         {initial && (
           <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
-            Ingresa la nueva contrasena. La actual no se muestra por seguridad.
+            Ingresa la nueva contraseña. La actual no se muestra por seguridad.
           </p>
         )}
       </div>
@@ -129,7 +129,7 @@ function RfcForm({
       {/* Regimen fiscal (igual que Dashboard) */}
       <div className="flex flex-col gap-1">
         <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-          Regimen fiscal para ISR
+          Régimen fiscal para ISR
         </label>
         <select
           value={regimenFiscal}
@@ -410,7 +410,7 @@ export default function RFCsView({ readOnly = false }: Props) {
                                 : 'border-slate-200 dark:border-zinc-700 text-slate-600 dark:text-zinc-300 hover:border-blue-300 hover:text-blue-600',
                             ].join(' ')}
                           >
-                            {editingRfc?.id === r.id ? 'Cancelar edicion' : 'Editar'}
+                            {editingRfc?.id === r.id ? 'Cancelar edición' : 'Editar'}
                           </button>
 
                           {/* Toggle downloads */}

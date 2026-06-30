@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terminos y Condiciones | AIcuenta",
-  description: "Terminos y condiciones de uso de la plataforma AIcuenta.",
+  title: "Términos y Condiciones | AIcuenta",
+  description: "Términos y condiciones de uso de la plataforma AIcuenta.",
 };
 
 const sections = [
   {
-    title: "1. Aceptacion",
-    body: "Al crear una cuenta o usar AIcuenta, aceptas estos Terminos y Condiciones. Si no estas de acuerdo, no debes usar la plataforma.",
+    title: "1. Aceptación",
+    body: "Al crear una cuenta o usar AIcuenta, aceptas estos Términos y Condiciones. Si no estás de acuerdo, no debes usar la plataforma.",
   },
   {
     title: "2. Servicio",
-    body: "AIcuenta ofrece herramientas para carga, procesamiento y analisis de informacion fiscal y contable. El servicio puede evolucionar y agregar, ajustar o retirar funciones cuando sea necesario.",
+    body: "AIcuenta ofrece herramientas para carga, procesamiento y análisis de información fiscal y contable. El servicio puede evolucionar y agregar, ajustar o retirar funciones cuando sea necesario.",
   },
   {
     title: "3. Cuenta y seguridad",
@@ -20,31 +20,31 @@ const sections = [
   },
   {
     title: "4. Uso permitido",
-    body: "No esta permitido usar AIcuenta para actividades ilicitas, para vulnerar sistemas, ni para cargar contenido sin autorizacion legal. El uso debe cumplir con la normativa aplicable en Mexico.",
+    body: "No está permitido usar AIcuenta para actividades ilícitas, para vulnerar sistemas, ni para cargar contenido sin autorización legal. El uso debe cumplir con la normativa aplicable en México.",
   },
   {
     title: "5. Datos y documentos",
-    body: "Los datos que cargues (XML, PDF y otros documentos) siguen siendo tuyos o de tus representados. Nos autorizas a procesarlos unicamente para prestar el servicio solicitado y mejorar la experiencia del producto.",
+    body: "Los datos que cargues (XML, PDF y otros documentos) siguen siendo tuyos o de tus representados. Nos autorizas a procesarlos únicamente para prestar el servicio solicitado y mejorar la experiencia del producto.",
   },
   {
     title: "6. Exactitud de resultados",
-    body: "AIcuenta busca ofrecer analisis confiables, pero no sustituye asesoria fiscal o legal profesional. Eres responsable de validar la informacion antes de tomar decisiones o presentar declaraciones.",
+    body: "AIcuenta busca ofrecer análisis confiables, pero no sustituye asesoría fiscal o legal profesional. Eres responsable de validar la información antes de tomar decisiones o presentar declaraciones.",
   },
   {
     title: "7. Disponibilidad",
-    body: "Hacemos esfuerzos razonables para mantener disponibilidad continua, pero puede haber interrupciones por mantenimiento, fallas tecnicas o causas externas fuera de nuestro control.",
+    body: "Hacemos esfuerzos razonables para mantener disponibilidad continua, pero puede haber interrupciones por mantenimiento, fallas técnicas o causas externas fuera de nuestro control.",
   },
   {
     title: "8. Propiedad intelectual",
-    body: "El software, marca, diseno, codigo y contenido de AIcuenta son propiedad de sus titulares y estan protegidos por la legislacion aplicable. No se concede licencia distinta al uso normal de la plataforma.",
+    body: "El software, marca, diseño, código y contenido de AIcuenta son propiedad de sus titulares y están protegidos por la legislación aplicable. No se concede licencia distinta al uso normal de la plataforma.",
   },
   {
-    title: "9. Limitacion de responsabilidad",
-    body: "En la medida permitida por la ley, AIcuenta no sera responsable por daños indirectos, incidentales o consecuenciales derivados del uso o imposibilidad de uso del servicio.",
+    title: "9. Limitación de responsabilidad",
+    body: "En la medida permitida por la ley, AIcuenta no será responsable por daños indirectos, incidentales o consecuenciales derivados del uso o imposibilidad de uso del servicio.",
   },
   {
-    title: "10. Cambios a estos terminos",
-    body: "Podemos actualizar estos terminos en cualquier momento. Publicaremos la version vigente en esta pagina. El uso continuo del servicio implica aceptacion de los cambios.",
+    title: "10. Cambios a estos términos",
+    body: "Podemos actualizar estos términos en cualquier momento. Publicaremos la versión vigente en esta página. El uso continuo del servicio implica aceptación de los cambios.",
   },
   {
     title: "11. Contacto",
@@ -60,14 +60,14 @@ export default function TerminosPage() {
           Legal
         </p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
-          Terminos y Condiciones
+          Términos y Condiciones
         </h1>
         <p className="mt-3 text-sm text-slate-500">
-          Ultima actualizacion: 22 de mayo de 2026
+          Última actualización: 22 de mayo de 2026
         </p>
 
         <p className="mt-8 text-sm leading-7 text-slate-600">
-          Estos terminos regulan el acceso y uso de AIcuenta. Te recomendamos leerlos con atencion antes de continuar usando la plataforma.
+          Estos términos regulan el acceso y uso de AIcuenta. Te recomendamos leerlos con atención antes de continuar usando la plataforma.
         </p>
 
         <div className="mt-10 space-y-7">

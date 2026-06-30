@@ -6,12 +6,12 @@ import { useState } from "react";
 import { useRecaptcha } from "@/app/hooks/useRecaptcha";
 
 const GOOGLE_ERRORS: Record<string, string> = {
-  google_cancelled: "Inicio de sesion con Google cancelado.",
-  google_error: "Error al iniciar sesion con Google. Intenta de nuevo.",
+  google_cancelled: "Inicio de sesión con Google cancelado.",
+  google_error: "Error al iniciar sesión con Google. Intenta de nuevo.",
   google_unverified: "Tu cuenta de Google no tiene el correo verificado.",
   server_error: "Error del servidor. Intenta de nuevo.",
-  token_invalid: "El enlace no es valido o ya expiro.",
-  token_missing: "El enlace no es valido.",
+  token_invalid: "El enlace no es válido o ya expiró.",
+  token_missing: "El enlace no es válido.",
 };
 
 export default function LoginView() {
@@ -23,7 +23,7 @@ export default function LoginView() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(urlError ? (GOOGLE_ERRORS[urlError] ?? "Error al iniciar sesion.") : "");
+  const [error, setError] = useState(urlError ? (GOOGLE_ERRORS[urlError] ?? "Error al iniciar sesión.") : "");
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -43,7 +43,7 @@ export default function LoginView() {
 
       if (!res.ok) {
         if (data.code === "email_not_verified") {
-          setError("Verifica tu correo electronico antes de iniciar sesion. Revisa tu bandeja de entrada.");
+          setError("Verifica tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.");
         } else {
           setError(data.error ?? "Credenciales incorrectas.");
         }
@@ -52,7 +52,7 @@ export default function LoginView() {
 
       router.push(data.redirectTo ?? "/dashboard");
     } catch {
-      setError("Error de red. Verifica tu conexion e intenta de nuevo.");
+      setError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -130,7 +130,7 @@ export default function LoginView() {
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
                 style={{ color: "#450c7d" }}
               >
-                Correo electronico
+                Correo electrónico
               </label>
               <input
                 id="email"
@@ -151,7 +151,7 @@ export default function LoginView() {
                   className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
                   style={{ color: "#450c7d" }}
                 >
-                  Contrasena
+                  Contraseña
                 </label>
                 <a
                   href="/forgot-password"
@@ -160,7 +160,7 @@ export default function LoginView() {
                   onMouseEnter={e => (e.currentTarget.style.color = '#450c7d')}
                   onMouseLeave={e => (e.currentTarget.style.color = '#7B6FE8')}
                 >
-                  Olvide mi contrasena
+                  Olvide mi contraseña
                 </a>
               </div>
               <div className="relative">
@@ -178,7 +178,7 @@ export default function LoginView() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
-                  aria-label={showPassword ? "Ocultar contrasena" : "Mostrar contrasena"}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
                   {showPassword ? (
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -206,7 +206,7 @@ export default function LoginView() {
               {loading ? (
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
               ) : (
-                "Iniciar sesion"
+                "Iniciar sesión"
               )}
             </button>
           </form>

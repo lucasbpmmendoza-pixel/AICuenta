@@ -26,10 +26,10 @@ export default function FreemiumOverlayScreen({ featureName, description }: Prop
             </svg>
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white">
-            {featureName} esta bloqueado
+            {featureName} está bloqueado
           </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
-            {description ?? 'Esta funcion esta disponible solo en planes de pago. Mejora tu plan para desbloquearla.'}
+            {description ?? 'Esta función está disponible solo en planes de pago. Mejora tu plan para desbloquearla.'}
           </p>
           <button
             onClick={() => router.push('/dashboard/suscripcion')}

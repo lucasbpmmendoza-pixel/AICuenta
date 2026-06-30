@@ -262,7 +262,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
         })
       }
     } catch {
-      const next: Message[] = [...history, { role: 'assistant', content: 'Error de conexion. Intenta de nuevo.' }]
+      const next: Message[] = [...history, { role: 'assistant', content: 'Error de conexión. Intenta de nuevo.' }]
       setMessages(next)
       saveChatMessages(FISCALGPT_CHAT_KEY, next)
     } finally {
@@ -375,15 +375,15 @@ export default function ChatDocsView({ session, accountType }: Props) {
                   Asistente de documentos AIcuenta
                 </p>
                 <p className="text-sm text-slate-400 dark:text-zinc-500 mt-1 max-w-md">
-                  Pregunta sobre manuales, politicas, lineamientos o cualquier documento cargado en la base de conocimiento.
+                  Pregunta sobre manuales, políticas, lineamientos o cualquier documento cargado en la base de conocimiento.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center mt-2">
                 {[
-                  'Que categorias de documentos hay disponibles?',
-                  'Resumen del documento de politicas contables',
-                  'Que dice el manual sobre conciliacion bancaria?',
-                  'Muestrame los lineamientos de facturacion electronica',
+                  '¿Qué categorías de documentos hay disponibles?',
+                  'Resumen del documento de políticas contables',
+                  '¿Qué dice el manual sobre conciliación bancaria?',
+                  'Muéstrame los lineamientos de facturación electrónica',
                 ].map((s) => (
                   <button
                     key={s}
@@ -432,7 +432,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={busy}
-              placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de linea)"
+              placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de línea)"
               rows={2}
               className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-docs' : ''}`}
             />

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     body = await req.json();
   } catch {
     return NextResponse.json(
-      { error: "Cuerpo de la solicitud invalido" },
+      { error: "Cuerpo de la solicitud inválido" },
       { status: 400 },
     );
   }
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   // ── 2. Verificar reCAPTCHA ────────────────────────
   const recaptchaToken = (body as Record<string, unknown>)?.recaptchaToken;
   if (typeof recaptchaToken !== "string" || !recaptchaToken) {
-    return NextResponse.json({ error: "Verificacion de seguridad requerida." }, { status: 400 });
+    return NextResponse.json({ error: "Verificación de seguridad requerida." }, { status: 400 });
   }
   try {
     await verifyRecaptcha(recaptchaToken, "register");
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     if (msg.startsWith("RECAPTCHA_SERVER_MISCONFIG")) {
       return NextResponse.json({ error: "Servicio de seguridad no configurado correctamente." }, { status: 500 });
     }
-    return NextResponse.json({ error: "Verificacion de seguridad fallida. Intenta de nuevo." }, { status: 400 });
+    return NextResponse.json({ error: "Verificación de seguridad fallida. Intenta de nuevo." }, { status: 400 });
   }
 
   // ── 3. Validar con Zod ─────────────────────────────
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
   } catch {
     console.error("[register] DB connection error");
     return NextResponse.json(
-      { error: "Error de conexion. Intenta mas tarde." },
+      { error: "Error de conexión. Intenta más tarde." },
       { status: 503 },
     );
   }
@@ -72,14 +72,14 @@ export async function POST(req: NextRequest) {
 
     if (existing.recordset.length > 0) {
       return NextResponse.json(
-        { error: "Este correo ya esta registrado", field: "email" },
+        { error: "Este correo ya está registrado", field: "email" },
         { status: 409 },
       );
     }
   } catch (err) {
     console.error("[register] Duplicate check error:", (err as Error).message);
     return NextResponse.json(
-      { error: "Error al verificar datos. Intenta mas tarde." },
+      { error: "Error al verificar datos. Intenta más tarde." },
       { status: 503 },
     );
   }
@@ -122,13 +122,13 @@ export async function POST(req: NextRequest) {
     console.error("[register] Create/send error:", msg);
     if (msg.includes("RESEND_API_KEY") || msg.includes("You can only send testing emails") || msg.includes("domain") || msg.includes("sender")) {
       return NextResponse.json(
-        { error: "No se pudo enviar el correo de verificacion. Revisa la configuracion de correo en produccion." },
+        { error: "No se pudo enviar el correo de verificación. Revisa la configuración de correo en producción." },
         { status: 503 },
       );
     }
 
     return NextResponse.json(
-      { error: "No se pudo crear la cuenta. Intenta mas tarde." },
+      { error: "No se pudo crear la cuenta. Intenta más tarde." },
       { status: 500 },
     );
   }

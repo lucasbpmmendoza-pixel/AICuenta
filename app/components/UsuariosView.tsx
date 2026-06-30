@@ -173,7 +173,7 @@ export default function UsuariosView() {
           <div>
             <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Usuarios</h1>
             <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
-              Gestiona los miembros de tu cuenta. Maximo 10 usuarios.
+              Gestiona los miembros de tu cuenta. Máximo 10 usuarios.
             </p>
           </div>
           <button
@@ -218,7 +218,7 @@ export default function UsuariosView() {
               <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
                 <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Nuevo usuario</h2>
                 <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
-                  El usuario podra iniciar sesion con estas credenciales y tendra acceso de solo lectura a tu cuenta.
+                  El usuario podrá iniciar sesión con estas credenciales y tendrá acceso de solo lectura a tu cuenta.
                 </p>
               </div>
               <form onSubmit={handleAdd} className="px-6 py-5 space-y-4">
@@ -232,7 +232,7 @@ export default function UsuariosView() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Correo electronico</label>
+                    <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Correo electrónico</label>
                     <input
                       type="email" value={email} onChange={(e) => setEmail(e.target.value)}
                       required placeholder="ana@empresa.com"
@@ -241,7 +241,7 @@ export default function UsuariosView() {
                   </div>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Contrasena temporal</label>
+                  <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Contraseña temporal</label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
@@ -250,7 +250,7 @@ export default function UsuariosView() {
                     />
                     <button type="button" onClick={() => setShowPassword((v) => !v)}
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition"
-                      aria-label={showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}>
+                      aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                       {showPassword
                         ? <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                         : <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
@@ -358,7 +358,7 @@ export default function UsuariosView() {
               </svg>
               <p className="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
                 Los usuarios del equipo tienen acceso de <strong>solo lectura</strong> a todos los datos de tu cuenta.
-                Pueden iniciar sesion con su correo y contrasena pero no pueden realizar cambios ni eliminar informacion.
+                Pueden iniciar sesión con su correo y contraseña pero no pueden realizar cambios ni eliminar información.
               </p>
             </div>
           </div>

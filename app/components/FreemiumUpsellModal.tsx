@@ -35,11 +35,11 @@ export default function FreemiumUpsellModal({ open, onClose, featureName }: Prop
         </div>
 
         <h2 className="text-center text-lg font-bold text-slate-900 dark:text-white">
-          {featureName ? `${featureName} esta bloqueado` : 'Funcion bloqueada'}
+          {featureName ? `${featureName} está bloqueado` : 'Función bloqueada'}
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600 dark:text-zinc-400">
-          Esta funcion esta disponible solo en planes de pago. Mejora tu plan para
-          desbloquearla, acceder a tu historial de los ultimos 5 aos y aprovechar
+          Esta función está disponible solo en planes de pago. Mejora tu plan para
+          desbloquearla, acceder a tu historial de los últimos 5 años y aprovechar
           todo AIcuenta.
         </p>
 

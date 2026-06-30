@@ -157,7 +157,7 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
     } catch {
       setMessages((prev) => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: 'Error de conexion. Intenta de nuevo.' },
+        { role: 'assistant', content: 'Error de conexión. Intenta de nuevo.' },
       ])
     } finally {
       setSending(false)
@@ -193,7 +193,7 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
             ].join(' ')}
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Limite alcanzado</p>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Límite alcanzado</p>
             <h2 className="mt-2 text-xl font-bold text-slate-900">Necesitas una cuenta y un plan de pago</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Ya usaste las {dailyLimit} consultas incluidas en modo publico. Crea tu cuenta para continuar y activar un plan premium.
@@ -210,7 +210,7 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
                 href="/login"
                 className="inline-flex h-10 flex-1 items-center justify-center rounded-lg border border-slate-300 px-4 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
-                Iniciar sesion
+                Iniciar sesión
               </Link>
             </div>
 
@@ -231,14 +231,14 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold text-slate-800">Fiscal gpt</p>
-                <p className="mt-0.5 text-xs text-slate-500">Inicia sesion para acceder al modo premium.</p>
+                <p className="mt-0.5 text-xs text-slate-500">Inicia sesión para acceder al modo premium.</p>
               </div>
               <div className="flex items-center gap-2">
                 <Link
                   href="/login"
                   className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 px-3 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                 >
-                  Iniciar sesion
+                  Iniciar sesión
                 </Link>
                 <Link
                   href="/register"
@@ -264,10 +264,10 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
                 </div>
                 <div className="mt-1 flex flex-wrap justify-center gap-2">
                   {[
-                    'Que categorias de documentos tienes disponibles y cuántos hay por categoria?',
-                    'Que dice la Ley del IVA sobre actos o actividades gravadas?',
-                    'Que establece la Ley del ISR sobre ingresos acumulables?',
-                    'Que clave SAT recomiendas para servicios de consultoria administrativa?',
+                    '¿Qué categorías de documentos tienes disponibles y cuántos hay por categoría?',
+                    '¿Qué dice la Ley del IVA sobre actos o actividades gravadas?',
+                    '¿Qué establece la Ley del ISR sobre ingresos acumulables?',
+                    '¿Qué clave SAT recomiendas para servicios de consultoría administrativa?',
                   ].map((suggestion) => (
                     <button
                       key={suggestion}
@@ -301,7 +301,7 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
 
           <div className="border-t border-slate-200 bg-slate-50 px-4 py-3">
             <p className="mb-2 px-1 text-[11px] text-slate-500">
-              Modo publico con limites diarios y contexto reducido. El modo premium se habilita al iniciar sesion.
+              Modo público con límites diarios y contexto reducido. El modo premium se habilita al iniciar sesión.
             </p>
             <div className="flex items-end gap-2">
               <textarea
@@ -310,7 +310,7 @@ export default function PublicChatDocsLanding({ dailyLimit }: Props) {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 disabled={sending}
-                placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de linea)"
+                placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de línea)"
                 rows={2}
                 className="flex-1 resize-none rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50"
               />

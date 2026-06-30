@@ -8,8 +8,8 @@ import { verifyRecaptcha } from "@/lib/recaptcha";
 import { DEMO_COOKIE_NAME } from "@/lib/demo-mode";
 
 const loginSchema = z.object({
-  email: z.string().trim().toLowerCase().email("Correo invalido"),
-  password: z.string().min(1, "Contrasena requerida"),
+  email: z.string().trim().toLowerCase().email("Correo inválido"),
+  password: z.string().min(1, "Contraseña requerida"),
 });
 
 export async function POST(req: NextRequest) {
@@ -18,12 +18,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
   // ── 2. Verificar reCAPTCHA ────────────────────────
   const recaptchaToken = (body as Record<string, unknown>)?.recaptchaToken;
   if (typeof recaptchaToken !== "string" || !recaptchaToken) {
-    return NextResponse.json({ error: "Verificacion de seguridad requerida." }, { status: 400 });
+    return NextResponse.json({ error: "Verificación de seguridad requerida." }, { status: 400 });
   }
   try {
     await verifyRecaptcha(recaptchaToken, "login");
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (msg.startsWith("RECAPTCHA_SERVER_MISCONFIG")) {
       return NextResponse.json({ error: "Servicio de seguridad no configurado correctamente." }, { status: 500 });
     }
-    return NextResponse.json({ error: "Verificacion de seguridad fallida. Intenta de nuevo." }, { status: 400 });
+    return NextResponse.json({ error: "Verificación de seguridad fallida. Intenta de nuevo." }, { status: 400 });
   }
   const parsed = loginSchema.safeParse(body);
   if (!parsed.success) {
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     db = await getDb();
   } catch {
     return NextResponse.json(
-      { error: "Error de conexion. Intenta mas tarde." },
+      { error: "Error de conexión. Intenta más tarde." },
       { status: 503 },
     );
   }
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[login] Query error:", (err as Error).message);
     return NextResponse.json(
-      { error: "Error al iniciar sesion. Intenta mas tarde." },
+      { error: "Error al iniciar sesión. Intenta más tarde." },
       { status: 503 },
     );
   }
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
   // ── 5. Verificar que el correo esté confirmado ─────────
   if (!user.email_verified) {
     return NextResponse.json(
-      { error: "Debes verificar tu correo antes de iniciar sesion.", code: "email_not_verified" },
+      { error: "Debes verificar tu correo antes de iniciar sesión.", code: "email_not_verified" },
       { status: 403 },
     );
   }

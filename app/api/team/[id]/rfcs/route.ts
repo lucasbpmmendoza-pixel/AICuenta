@@ -65,7 +65,7 @@ export async function PUT(
 
   let body: unknown;
   try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Solicitud invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Solicitud inválida" }, { status: 400 });
   }
 
   const { rfcIds } = body as { rfcIds: string[] };
@@ -95,7 +95,7 @@ export async function PUT(
       const ownedSet = new Set(owned.recordset.map((r) => r.id));
       for (const rid of rfcIds) {
         if (!ownedSet.has(rid)) {
-          return NextResponse.json({ error: "RFC no valido" }, { status: 403 });
+          return NextResponse.json({ error: "RFC no válido" }, { status: 403 });
         }
       }
     }

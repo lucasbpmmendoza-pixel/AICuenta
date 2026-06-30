@@ -200,9 +200,9 @@ export default function ComprobantesView() {
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Scan Bot esta bloqueado</h1>
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Scan Bot está bloqueado</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
-            Registra comprobantes de pago automaticamente desde WhatsApp. Disponible en planes de pago.
+            Registra comprobantes de pago automáticamente desde WhatsApp. Disponible en planes de pago.
           </p>
           <button
             onClick={() => router.push('/dashboard/suscripcion')}

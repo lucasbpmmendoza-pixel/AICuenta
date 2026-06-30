@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     console.error("[billing/webhook] firma invalida:", (err as Error).message);
-    return NextResponse.json({ error: "Firma invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Firma inválida" }, { status: 400 });
   }
 
   try {

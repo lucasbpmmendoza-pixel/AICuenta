@@ -108,7 +108,7 @@ export async function GET(req: NextRequest) {
     demoDownloadLimit = consumeDemoDownloadSlot(req);
     if (!demoDownloadLimit.allowed) {
       return new Response(
-        `Limite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
+        `Límite demo alcanzado: 6 descargas cada 15 minutos. Intenta en ${formatRetryAfter(demoDownloadLimit.retryAfterSeconds)}.`,
         {
           status: 429,
           headers: {

@@ -11,7 +11,7 @@ const RFC_SAFE = /^[A-Za-z0-9_\-]{1,50}$/
 export async function uploadFiles(formData: FormData): Promise<{ success: boolean; message: string }> {
   const session = await getSession()
   if (!session) {
-    return { success: false, message: 'Sesion expirada. Vuelve a iniciar sesion.' }
+    return { success: false, message: 'Sesión expirada. Vuelve a iniciar sesión.' }
   }
 
   const rfc = (formData.get('rfc') as string | null)?.trim() ?? ''
@@ -39,11 +39,11 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
   const keyExt = path.extname(keyFile.name).toLowerCase()
 
   if (cerExt !== '.cer') {
-    return { success: false, message: 'El archivo CER debe tener extension .cer' }
+    return { success: false, message: 'El archivo CER debe tener extensión .cer' }
   }
 
   if (keyExt !== '.key') {
-    return { success: false, message: 'El archivo KEY debe tener extension .key' }
+    return { success: false, message: 'El archivo KEY debe tener extensión .key' }
   }
 
   const effectiveUserId = session.ownerId ?? session.sub
@@ -75,7 +75,7 @@ export async function uploadFiles(formData: FormData): Promise<{ success: boolea
     }
   } catch (err) {
     console.error('[uploadFiles] limit check error:', (err as Error).message)
-    return { success: false, message: 'No se pudo validar el limite de RFCs. Intenta de nuevo.' }
+    return { success: false, message: 'No se pudo validar el límite de RFCs. Intenta de nuevo.' }
   }
 
   // Subir al servicio aicuenta-storage (FastAPI en Ubuntu, reemplazo de Vercel Blob)

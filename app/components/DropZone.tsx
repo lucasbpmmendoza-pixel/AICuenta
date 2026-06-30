@@ -82,7 +82,7 @@ export default function DropZone({ label, accept, extension, file, onFile }: Dro
           <>
             <span className="text-3xl text-zinc-400 dark:text-zinc-500">&#8681;</span>
             <span className="text-sm text-zinc-500 dark:text-zinc-400 text-center">
-              Arrastra un archivo <span className="font-semibold">.{extension.toUpperCase()}</span> aqui
+              Arrastra un archivo <span className="font-semibold">.{extension.toUpperCase()}</span> aquí
               <br />
               o haz clic para seleccionar
             </span>

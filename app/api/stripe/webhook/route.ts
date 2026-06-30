@@ -41,7 +41,7 @@ async function upsertMembershipFromSubscription(subscription: StripeSubscription
 
   const planId = Number(planIdRaw);
   if (!Number.isInteger(planId) || planId <= 0) {
-    console.warn("[stripe/webhook] planId invalido en metadata", subscription.id);
+    console.warn("[stripe/webhook] planId inválido en metadata", subscription.id);
     return;
   }
 
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err) {
     console.error("[stripe/webhook] signature error", (err as Error).message);
-    return NextResponse.json({ error: "Firma invalida" }, { status: 400 });
+    return NextResponse.json({ error: "Firma inválida" }, { status: 400 });
   }
 
   try {

@@ -119,7 +119,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
   }
 
   async function handleDelete() {
-    if (!deletePassword) { setDeleteError('Ingresa tu contrasena para confirmar.'); return }
+    if (!deletePassword) { setDeleteError('Ingresa tu contraseña para confirmar.'); return }
     setDeleting(true)
     setDeleteError('')
     try {
@@ -148,7 +148,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
 
       {/* Page header */}
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
-        <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Configuracion</h1>
+        <h1 className="text-lg font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Configuración</h1>
         <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Administra tu cuenta y datos personales.</p>
       </div>
 
@@ -160,7 +160,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
             <div className="px-6 py-4 border-b border-slate-100 dark:border-zinc-800">
               <h2 className="text-sm font-bold  text-[#7B6FE8] dark:text-[#91eb78]">Datos personales</h2>
               <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
-                Ingresa tu contrasena actual para guardar cambios.
+                Ingresa tu contraseña actual para guardar cambios.
               </p>
             </div>
 
@@ -183,7 +183,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
               {/* Email */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-                  Correo electronico
+                  Correo electrónico
                 </label>
                 <input
                   type="email"
@@ -213,7 +213,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
 
               {/* Nueva contraseña (opcional) */}              <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-                  Nueva contrasena <span className="normal-case font-normal">(opcional)</span>
+                  Nueva contraseña <span className="normal-case font-normal">(opcional)</span>
                 </label>
                 <div className="relative">
                   <input
@@ -226,7 +226,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
                   />
                   <button type="button" onClick={() => setShowNewPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition"
-                    aria-label={showNewPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}>
+                    aria-label={showNewPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                     {showNewPassword
                       ? <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                       : <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
@@ -237,7 +237,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
               {/* Contrasena actual (requerida para confirmar) */}
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">
-                  Contrasena actual <span className="text-red-400">*</span>
+                  Contraseña actual <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -250,7 +250,7 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
                   />
                   <button type="button" onClick={() => setShowCurrentPassword((v) => !v)}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 transition"
-                    aria-label={showCurrentPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'}>
+                    aria-label={showCurrentPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}>
                     {showCurrentPassword
                       ? <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
                       : <svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
@@ -355,13 +355,13 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Contrasena EFIEL</label>
+                      <label className="text-xs font-semibold text-slate-500 dark:text-zinc-400 uppercase tracking-wider">Contraseña EFIEL</label>
                       <div className="relative">
                         <input
                           name="efiel"
                           type={showFielPassword ? 'text' : 'password'}
                           required
-                          placeholder="Contrasena de tu FIEL"
+                          placeholder="Contraseña de tu FIEL"
                           className="w-full rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <button type="button" onClick={() => setShowFielPassword((v) => !v)}
@@ -437,14 +437,14 @@ export default function ConfiguracionView({ session, accountType, rfcFromDb, efi
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-                    ¿Estas seguro? Esta accion no se puede deshacer.
+                    ¿Estás seguro? Esta acción no se puede deshacer.
                   </p>
                   <div className="relative">
                     <input
                       type={showDeletePassword ? 'text' : 'password'}
                       value={deletePassword}
                       onChange={(e) => setDeletePassword(e.target.value)}
-                      placeholder="Ingresa tu contrasena para confirmar"
+                      placeholder="Ingresa tu contraseña para confirmar"
                       className="w-full rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 pr-11 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition"
                     />
                     <button

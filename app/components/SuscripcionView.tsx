@@ -20,7 +20,7 @@ const FALLBACK_PLANS: Plan[] = [
     costo: 240,
     duracion_meses: 1,
     stripe_price_id: 'price_mock_1',
-    descripcion: 'Empieza con lo basico y prueba el panel.',
+    descripcion: 'Empieza con lo básico y prueba el panel.',
     cfdis_5_anios: 6000,
     requiere_contacto: false,
   },
@@ -30,7 +30,7 @@ const FALLBACK_PLANS: Plan[] = [
     costo: 450,
     duracion_meses: 1,
     stripe_price_id: 'price_mock_2',
-    descripcion: 'Ideal para llevar el control mensual de tu operacion.',
+    descripcion: 'Ideal para llevar el control mensual de tu operación.',
     cfdis_5_anios: 10000,
     requiere_contacto: false,
   },
@@ -40,7 +40,7 @@ const FALLBACK_PLANS: Plan[] = [
     costo: 800,
     duracion_meses: 1,
     stripe_price_id: 'price_mock_3',
-    descripcion: 'Para equipos que necesitan mas seguimiento y soporte.',
+    descripcion: 'Para equipos que necesitan más seguimiento y soporte.',
     cfdis_5_anios: 20000,
     requiere_contacto: false,
   },
@@ -172,7 +172,7 @@ export default function SuscripcionView() {
       const res = await fetch('/api/billing/portal', { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || !data?.url) {
-        throw new Error(data?.error ?? 'No se pudo abrir el portal de facturacion')
+        throw new Error(data?.error ?? 'No se pudo abrir el portal de facturación')
       }
 
       window.location.href = data.url
@@ -193,9 +193,9 @@ export default function SuscripcionView() {
       <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-lg font-bold text-[#7B6FE8] dark:text-[#91eb78]">Suscripcion</h1>
+            <h1 className="text-lg font-bold text-[#7B6FE8] dark:text-[#91eb78]">Suscripción</h1>
             <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">
-              Elige tu plan y despues podras activarlo con Stripe.
+              Elige tu plan y después podrás activarlo con Stripe.
             </p>
           </div>
 
@@ -266,7 +266,7 @@ export default function SuscripcionView() {
                       {/* Lazo diagonal transparente: lo mas LARGO posible (extremos fuera del wrapper) y lo mas DELGADO posible */}
                       <div className="pointer-events-none absolute top-0 right-0 h-20 w-200 overflow-hidden rounded-tr-2xl">
                         <div className="absolute top-6 -right-10 w-35 rotate-45 border-y border-amber-500/70 dark:border-amber-400/70 text-center py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-amber-500 dark:text-amber-400">
-                          30 dias gratis
+                          30 días gratis
                         </div>
                       </div>
 
@@ -292,11 +292,11 @@ export default function SuscripcionView() {
                       <ul className="mt-4 space-y-2 text-xs text-slate-600 dark:text-zinc-300">
                         <li className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                          Facturacion segura con Stripe
+                          Facturación segura con Stripe
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
-                          Cancelacion cuando quieras
+                          Cancelación cuando quieras
                         </li>
                         <li className="flex items-center gap-2">
                           <span className="h-1.5 w-1.5 rounded-full bg-[#7B6FE8] dark:bg-[#91eb78]" />
@@ -334,8 +334,8 @@ export default function SuscripcionView() {
                     <h2 className="text-xl font-bold text-white">{planCorporativo.nombre}</h2>
                     {/* Hardcodeado: el plan corporativo NO muestra precio (es personalizado) */}
                     <p className="mt-2 max-w-xl text-sm text-slate-300">
-                      Para empresas con mas de 80,000 CFDIs. Precio y condiciones a la medida
-                      segun tu volumen de facturas por mes. Un asesor te arma una cotizacion.
+                      Para empresas con más de 80,000 CFDIs. Precio y condiciones a la medida
+                      según tu volumen de facturas por mes. Un asesor te arma una cotización.
                     </p>
                   </div>
                   <button

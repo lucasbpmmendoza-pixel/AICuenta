@@ -29,7 +29,7 @@ export default function ForgotPasswordView() {
 
       setSent(true);
     } catch {
-      setError("Error de red. Verifica tu conexion e intenta de nuevo.");
+      setError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -49,7 +49,7 @@ export default function ForgotPasswordView() {
           <p className="mt-3 text-sm leading-6 text-slate-500">
             Si{" "}
             <span className="font-semibold text-slate-700">{email}</span>{" "}
-            esta registrado, recibirás un enlace para restablecer tu contrasena.
+            está registrado, recibirás un enlace para restablecer tu contraseña.
           </p>
           <p className="mt-6 text-xs text-slate-400">
             ¿No lo ves? Revisa tu carpeta de spam.<br />
@@ -59,7 +59,7 @@ export default function ForgotPasswordView() {
             href="/login"
             className="mt-8 inline-block text-sm font-semibold text-slate-600 underline-offset-2 hover:text-slate-900 hover:underline"
           >
-            Volver al inicio de sesion
+            Volver al inicio de sesión
           </a>
         </div>
       </div>
@@ -105,10 +105,10 @@ export default function ForgotPasswordView() {
 
         <div className="w-full max-w-[400px]">
           <h1 className="text-3xl font-black tracking-tight" style={{ color: '#450c7d' }}>
-            Olvide mi contrasena
+            Olvide mi contraseña
           </h1>
           <p className="mt-2 text-sm" style={{ color: '#7B6FE8' }}>
-            Ingresa tu correo y te enviaremos un enlace para restablecer tu contrasena.
+            Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-9 space-y-5">
@@ -118,7 +118,7 @@ export default function ForgotPasswordView() {
                 className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-500"
               style={{ color: '#450c7d' }}
               >
-                Correo electronico
+                Correo electrónico
               </label>
               <input
                 id="email"
@@ -162,7 +162,7 @@ export default function ForgotPasswordView() {
               onMouseEnter={e => (e.currentTarget.style.color = '#7B6FE8')}
               onMouseLeave={e => (e.currentTarget.style.color = '#450c7d')}
               >
-              Volver al inicio de sesion
+              Volver al inicio de sesión
             </a>
           </p>
         </div>

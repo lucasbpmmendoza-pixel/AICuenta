@@ -13,7 +13,7 @@ const links = [
       { label: "Acerca de", href: "#" },
       { label: "Contacto", href: "#" },
       { label: "Aviso de privacidad", href: "/privacidad" },
-      { label: "Terminos y condiciones", href: "/terminos" },
+      { label: "Términos y condiciones", href: "/terminos" },
     ],
   },
   {
@@ -70,7 +70,7 @@ export default function Footer() {
             © {year} AIcuenta. Todos los derechos reservados.
           </p>
           <p className="text-xs text-slate-400">
-            Hecho en Mexico · Datos seguros · Sin captura manual
+            Hecho en México · Datos seguros · Sin captura manual
           </p>
         </div>
       </div>

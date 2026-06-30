@@ -30,12 +30,12 @@ export async function POST(req: NextRequest) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Cuerpo invalido" }, { status: 400 });
+    return NextResponse.json({ error: "Cuerpo inválido" }, { status: 400 });
   }
 
   const planId = Number(body.planId);
   if (!Number.isInteger(planId) || planId <= 0) {
-    return NextResponse.json({ error: "planId invalido" }, { status: 422 });
+    return NextResponse.json({ error: "planId inválido" }, { status: 422 });
   }
 
   try {
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
 
     if (!checkoutSession.url) {
       return NextResponse.json(
-        { error: "No se pudo crear la sesion" },
+        { error: "No se pudo crear la sesión" },
         { status: 500 },
       );
     }
