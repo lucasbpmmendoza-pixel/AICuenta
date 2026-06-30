@@ -1,6 +1,4 @@
-const RFC_ALIASES: Record<string, string> = {
-  'BFR140708FJ9': 'Chikenelo_1',
-};
+const RFC_ALIASES: Record<string, string> = {};
 
 export function rfcAlias(rfc: string): string | null {
   return RFC_ALIASES[rfc.toUpperCase()] ?? null;

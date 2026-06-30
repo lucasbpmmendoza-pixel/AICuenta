@@ -17,6 +17,8 @@ export async function POST(req: Request) {
       'btn_descargar_flujo_facturas',
       'btn_descargar_notas_facturas',
       'btn_descargar_estados_financieros',
+      'btn_benchmark_estados_financieros',
+      'btn_audit_conceptos_estados_financieros',
       'tab_rfc',
       'tab_usuarios',
       'tab_dashboard',

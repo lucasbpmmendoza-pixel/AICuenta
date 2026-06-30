@@ -8,6 +8,8 @@ CREATE TABLE logs (
     btn_descargar_flujo_facturas INT DEFAULT 0,
     btn_descargar_notas_facturas INT DEFAULT 0,
     btn_descargar_estados_financieros INT DEFAULT 0,
+    btn_benchmark_estados_financieros INT DEFAULT 0,
+    btn_audit_conceptos_estados_financieros INT DEFAULT 0,
     tab_rfc INT DEFAULT 0,
     tab_usuarios INT DEFAULT 0,
     tab_dashboard INT DEFAULT 0,
