@@ -1975,3 +1975,97 @@ export async function chatGetTopFacturas(
     rows: res.recordset,
   };
 }
+
+// ─── Retenciones IEPS ─────────────────────────────────────────────────────────
+
+export interface RetencionIEPSRow {
+  UUID:                  string;
+  Fecha:                 Date;
+  RFC_Emisor:            string;
+  RazonSocialEmisor:     string;
+  RegimenFiscal:         string;
+  RFC_Receptor:          string;
+  RazonSocialReceptor:   string;
+  RegimenFiscalReceptor: string;
+  TipoComprobante:       string;
+  Direccion:             string; // 'Emitida' | 'Recibida'
+  Moneda:                string;
+  tipoCambio:            number;
+  Subtotal:              number;
+  TotalTrasladadoIEPS:   number;
+  TotalRetenidoIEPS:     number;
+  Total:                 number;
+  MetodoPago:            string;
+  TipoPago:              string;
+  UsoCFDI:               string;
+}
+
+export async function fetchRetencionesIEPSData(
+  rfc: string,
+  dateFrom: Date,
+  dateTo: Date,
+): Promise<RetencionIEPSRow[]> {
+  const db = await getDb();
+  const result = await db
+    .request()
+    .input("rfc",      sql.NVarChar, rfc)
+    .input("dateFrom", sql.DateTime,  dateFrom)
+    .input("dateTo",   sql.DateTime,  dateTo)
+    .query<RetencionIEPSRow>(`
+      SELECT * FROM (
+        SELECT
+          UUID,
+          Fecha,
+          ISNULL(RFC_Emisor,'')            AS RFC_Emisor,
+          ISNULL(RazonSocialEmisor,'')     AS RazonSocialEmisor,
+          ISNULL(RegimenFiscal,'')         AS RegimenFiscal,
+          ISNULL(RFC_Receptor,'')          AS RFC_Receptor,
+          ISNULL(RazonSocialReceptor,'')   AS RazonSocialReceptor,
+          ISNULL(RegimenFiscalReceptor,'') AS RegimenFiscalReceptor,
+          ISNULL(TipoComprobante,'')       AS TipoComprobante,
+          'Emitida'                        AS Direccion,
+          ISNULL(Moneda,'MXN')             AS Moneda,
+          ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1) AS tipoCambio,
+          TRY_CONVERT(decimal(18,2), ISNULL(Subtotal,0))            AS Subtotal,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalTrasladadoIEPS,0)) AS TotalTrasladadoIEPS,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoIEPS,0))   AS TotalRetenidoIEPS,
+          TRY_CONVERT(decimal(18,2), ISNULL(Total,0))               AS Total,
+          ISNULL(MetodoPago,'')            AS MetodoPago,
+          ISNULL(TipoPago,'')              AS TipoPago,
+          ISNULL(UsoCFDI,'')               AS UsoCFDI
+        FROM facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Emisor = @rfc
+          AND Status = 'Vigente'
+          AND Fecha >= @dateFrom AND Fecha < @dateTo
+          AND ISNULL(TotalRetenidoIEPS,0) > 0
+        UNION ALL
+        SELECT
+          UUID,
+          Fecha,
+          ISNULL(RFC_Emisor,'')            AS RFC_Emisor,
+          ISNULL(RazonSocialEmisor,'')     AS RazonSocialEmisor,
+          ISNULL(RegimenFiscal,'')         AS RegimenFiscal,
+          ISNULL(RFC_Receptor,'')          AS RFC_Receptor,
+          ISNULL(RazonSocialReceptor,'')   AS RazonSocialReceptor,
+          ISNULL(RegimenFiscalReceptor,'') AS RegimenFiscalReceptor,
+          ISNULL(TipoComprobante,'')       AS TipoComprobante,
+          'Recibida'                       AS Direccion,
+          ISNULL(Moneda,'MXN')             AS Moneda,
+          ISNULL(NULLIF(TRY_CONVERT(decimal(18,6),tipoCambio),0),1) AS tipoCambio,
+          TRY_CONVERT(decimal(18,2), ISNULL(Subtotal,0))            AS Subtotal,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalTrasladadoIEPS,0)) AS TotalTrasladadoIEPS,
+          TRY_CONVERT(decimal(18,2), ISNULL(TotalRetenidoIEPS,0))   AS TotalRetenidoIEPS,
+          TRY_CONVERT(decimal(18,2), ISNULL(Total,0))               AS Total,
+          ISNULL(MetodoPago,'')            AS MetodoPago,
+          ISNULL(TipoPago,'')              AS TipoPago,
+          ISNULL(UsoCFDI,'')               AS UsoCFDI
+        FROM facturalo_cfdis WITH (NOLOCK)
+        WHERE RFC_Receptor = @rfc
+          AND Status = 'Vigente'
+          AND Fecha >= @dateFrom AND Fecha < @dateTo
+          AND ISNULL(TotalRetenidoIEPS,0) > 0
+      ) r
+      ORDER BY r.Fecha
+    `);
+  return result.recordset;
+}
