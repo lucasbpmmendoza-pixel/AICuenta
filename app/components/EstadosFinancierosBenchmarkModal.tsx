@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 
-interface Categoria {
+export interface Categoria {
   nombre: string
   estandar_pct: number
   real_pct: number
@@ -11,7 +11,7 @@ interface Categoria {
   comentario: string
 }
 
-interface BenchmarkData {
+export interface BenchmarkData {
   ok: true
   industria: string
   resumen: string
@@ -35,6 +35,8 @@ interface Props {
   year: number
   month: number
   rfcAlias: string | null
+  /** Si se provee, el modal omite la llamada al API y muestra estos datos (modo demo). */
+  demoData?: BenchmarkData
   onClose: () => void
 }
 
@@ -140,12 +142,21 @@ function ComparativaBarras({ categorias }: { categorias: Categoria[] }) {
   )
 }
 
-export default function EstadosFinancierosBenchmarkModal({ rfc, year, month, rfcAlias, onClose }: Props) {
+export default function EstadosFinancierosBenchmarkModal({ rfc, year, month, rfcAlias, demoData, onClose }: Props) {
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
 
   useEffect(() => {
     let cancelled = false
     setState({ kind: 'loading' })
+
+    // Modo demo: sin llamada al API. Breve "carga" simulada para que se sienta real.
+    if (demoData) {
+      const timer = setTimeout(() => {
+        if (!cancelled) setState({ kind: 'ready', data: demoData })
+      }, 900)
+      return () => { cancelled = true; clearTimeout(timer) }
+    }
+
     const url = `/api/estados-financieros/benchmark?rfc=${encodeURIComponent(rfc)}&year=${year}&month=${month}`
     fetch(url)
       .then(async (res) => {
@@ -166,7 +177,7 @@ export default function EstadosFinancierosBenchmarkModal({ rfc, year, month, rfc
         setState({ kind: 'error', mensaje: 'Error de conexión. Intenta de nuevo.' })
       })
     return () => { cancelled = true }
-  }, [rfc, year, month])
+  }, [rfc, year, month, demoData])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

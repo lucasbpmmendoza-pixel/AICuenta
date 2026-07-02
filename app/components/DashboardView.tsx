@@ -10,6 +10,7 @@ import DashboardCharts, { type DashboardData } from "./DashboardCharts";
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
+import { readDemoClientRfc } from '@/lib/demo-cuadros'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -32,13 +33,28 @@ export default function DashboardView({ session, accountType }: Props) {
   const [data,  setData]              = useState<DashboardData | null>(null)
   const [loading, setLoading]         = useState(false)
   const [error,   setError]           = useState<string | null>(null)
+  // RFC del cliente detectado en la herramienta "Crea tus cuadros" (solo demo).
+  // Su dashboard se muestra con blur como gancho para registrarse.
+  const [demoClientRfc, setDemoClientRfc] = useState<string>('')
 
   // Cargar lista de RFCs
   useEffect(() => {
     fetch('/api/rfcs')
       .then(r => r.json())
       .then(d => {
-        const list: RfcOption[] = d.rfcs ?? []
+        let list: RfcOption[] = d.rfcs ?? []
+        // En demo: si hay RFC detectado, va primero (su dashboard se muestra con
+        // blur). Los RFCs de ejemplo siguen disponibles para explorar la demo.
+        if (session.isDemo) {
+          const detected = readDemoClientRfc()
+          if (detected) {
+            const ejemplos = list.filter(r => r.rfc !== detected.rfc)
+            list = [{ id: 'demo-client', rfc: detected.rfc, alias: detected.nombre || detected.rfc }, ...ejemplos]
+            setDemoClientRfc(detected.rfc)
+          } else {
+            setDemoClientRfc('')
+          }
+        }
         setRfcs(list)
         if (list.length === 0) return
         const storedRfc = readSelectedRfc()
@@ -47,7 +63,7 @@ export default function DashboardView({ session, accountType }: Props) {
         setSelectedRfc(nextRfc)
       })
       .catch(() => {})
-  }, [])
+  }, [session.isDemo])
 
   useEffect(() => {
     if (!selectedRfc) return
@@ -160,6 +176,26 @@ export default function DashboardView({ session, accountType }: Props) {
               <svg className="h-8 w-8 text-red-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
               <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">{error}</p>
               <button onClick={() => fetchData(selectedRfc, year, month)} className="text-xs text-blue-600 dark:text-blue-400 underline underline-offset-2">Reintentar</button>
+            </div>
+          ) : session.isDemo && demoClientRfc && selectedRfc === demoClientRfc ? (
+            <div className="relative">
+              <div className="blur-sm pointer-events-none select-none" aria-hidden>
+                <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} selectedRfc={selectedRfc} />
+              </div>
+              <div className="absolute inset-0 flex items-start justify-center pt-24">
+                <div className="max-w-sm rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-6 text-center shadow-xl">
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">Detectamos tu RFC {demoClientRfc}</h3>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                    Regístrate gratis para ver el dashboard completo de tu RFC con tus datos reales.
+                  </p>
+                  <button
+                    onClick={() => router.push('/register')}
+                    className="mt-5 w-full rounded-xl bg-[#7B6FE8] hover:bg-[#6B5FE0] dark:bg-[#91eb78] dark:hover:bg-[#83dd6a] px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-900 transition"
+                  >
+                    Crear cuenta gratis
+                  </button>
+                </div>
+              </div>
             </div>
           ) : (
             <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} selectedRfc={selectedRfc} />

@@ -1,12 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 
 import DashboardFooter from './DashboardFooter'
 import EstadosFinancierosBenchmarkModal from './EstadosFinancierosBenchmarkModal'
 import EstadosFinancierosAuditModal from './EstadosFinancierosAuditModal'
+import { buildDemoBenchmark, buildDemoAudit } from '@/lib/demo-ef-insights'
 import type { ConceptoRow } from '@/lib/facturas-query'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 import { logAction } from '@/lib/logs'
@@ -14,6 +16,7 @@ import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import FreemiumUpsellModal from './FreemiumUpsellModal'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
+import { readDemoClientRfc } from '@/lib/demo-cuadros'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -145,6 +148,7 @@ function TablaConceptos({
 
 export default function EstadosFinancierosView({ session, accountType }: Props) {
   const { user } = useAuth()
+  const router = useRouter()
   const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const now = new Date()
   const [rfcs,        setRfcs]        = useState<RfcOption[]>([])
@@ -159,6 +163,9 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   const [showBenchmark, setShowBenchmark] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
   const [showUpsell, setShowUpsell] = useState(false)
+  // RFC del cliente detectado en "Crea tus cuadros" (solo demo): sus estados
+  // financieros se muestran con blur como gancho para registrarse.
+  const [demoClientRfc, setDemoClientRfc] = useState<string>('')
   const EF_HINT_KEY = 'aicuenta_ef_first_visit'
 
   // Check if first visit to Estados Financieros and enable download button pulse
@@ -190,7 +197,19 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   // Cargar RFCs al montar
   useEffect(() => {
     fetch('/api/rfcs').then(r => r.json()).then(d => {
-      const list: RfcOption[] = d.rfcs ?? []
+      let list: RfcOption[] = d.rfcs ?? []
+      // En demo: el RFC detectado va primero (se muestra con blur); los RFCs de
+      // ejemplo siguen disponibles para explorar la demo con datos normales.
+      if (session.isDemo) {
+        const detected = readDemoClientRfc()
+        if (detected) {
+          const ejemplos = list.filter(r => r.rfc !== detected.rfc)
+          list = [{ id: 'demo-client', rfc: detected.rfc, alias: detected.nombre || detected.rfc }, ...ejemplos]
+          setDemoClientRfc(detected.rfc)
+        } else {
+          setDemoClientRfc('')
+        }
+      }
       setRfcs(list)
       if (list.length === 0) return
       const storedRfc = readSelectedRfc()
@@ -198,7 +217,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
       const nextRfc = existsInList ? storedRfc : list[0].rfc
       setSelectedRfc(nextRfc)
     }).catch(() => {})
-  }, [])
+  }, [session.isDemo])
 
   useEffect(() => {
     if (!selectedRfc) return
@@ -263,6 +282,20 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
   const totIngresos = ingresos.reduce((s, r) => s + Number(r.importe) + Number(r.iva8) + Number(r.iva16), 0)
   const totEgresos  = egresos.reduce((s, r) => s + Number(r.importe) + Number(r.iva8) + Number(r.iva16), 0)
 
+  // En demo, el RFC detectado muestra sus estados financieros con blur (gancho).
+  const efBlur = session.isDemo && !!demoClientRfc && selectedRfc === demoClientRfc
+
+  // Datos falsos para los modales Comparar/Auditar en modo demo (sin llamar a la IA).
+  // Memoizados para no re-disparar la "carga" del modal en cada render.
+  const benchmarkDemo = useMemo(
+    () => (session.isDemo && selectedRfc ? buildDemoBenchmark(selectedRfc, year, month) : undefined),
+    [session.isDemo, selectedRfc, year, month]
+  )
+  const auditDemo = useMemo(
+    () => (session.isDemo && selectedRfc ? buildDemoAudit(selectedRfc, year, month) : undefined),
+    [session.isDemo, selectedRfc, year, month]
+  )
+
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
       <Sidebar userName={session.name} accountType={accountType} role={session.role} ownerId={session.ownerId} isDemo={session.isDemo} />
@@ -316,15 +349,13 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
                 <div className="inline-flex items-center rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-0.5 shadow-sm">
                   <button
                     onClick={() => {
-                      if (session.isDemo) return
                       if (isFreemium) { setShowUpsell(true); return }
                       logAction('btn_benchmark_estados_financieros')
                       setShowBenchmark(true)
                     }}
                     disabled={loading}
-                    aria-disabled={session.isDemo}
                     className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                    title={session.isDemo ? 'Disponible solo al registrarte' : isFreemium ? 'Disponible solo en planes de pago' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
+                    title={session.isDemo ? 'Vista demo con datos de ejemplo' : isFreemium ? 'Disponible solo en planes de pago' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
                   >
                     {isFreemium ? (
                       <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -340,15 +371,13 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
 
                   <button
                     onClick={() => {
-                      if (session.isDemo) return
                       if (isFreemium) { setShowUpsell(true); return }
                       logAction('btn_audit_conceptos_estados_financieros')
                       setShowAudit(true)
                     }}
                     disabled={loading}
-                    aria-disabled={session.isDemo}
                     className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                    title={session.isDemo ? 'Disponible solo al registrarte' : isFreemium ? 'Disponible solo en planes de pago' : 'Revisa con IA si la descripción del emisor concuerda con su clave SAT'}
+                    title={session.isDemo ? 'Vista demo con datos de ejemplo' : isFreemium ? 'Disponible solo en planes de pago' : 'Revisa con IA si la descripción del emisor concuerda con su clave SAT'}
                   >
                     {isFreemium ? (
                       <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -386,7 +415,8 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
         </div>
 
         {/* ── Content ─────────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-6">
+        <div className="relative flex-1 overflow-y-auto overflow-x-hidden">
+          <div className={`p-6 space-y-6 ${efBlur ? 'blur-sm pointer-events-none select-none' : ''}`}>
 
           {!selectedRfc && !loading ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -472,6 +502,23 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
               )}
             </>
           )}
+          </div>
+          {efBlur && (
+            <div className="absolute inset-0 flex items-start justify-center pt-24">
+              <div className="max-w-sm rounded-2xl border border-slate-200 dark:border-zinc-700 bg-white/95 dark:bg-zinc-900/95 p-6 text-center shadow-xl">
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Detectamos tu RFC {demoClientRfc}</h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-zinc-400">
+                  Regístrate gratis para ver los estados financieros completos de tu RFC con tus datos reales.
+                </p>
+                <button
+                  onClick={() => router.push('/register')}
+                  className="mt-5 w-full rounded-xl bg-[#7B6FE8] hover:bg-[#6B5FE0] dark:bg-[#91eb78] dark:hover:bg-[#83dd6a] px-4 py-2.5 text-sm font-semibold text-white dark:text-zinc-900 transition"
+                >
+                  Crear cuenta gratis
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <DashboardFooter />
@@ -483,6 +530,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
           year={year}
           month={month}
           rfcAlias={rfcs.find(r => r.rfc === selectedRfc)?.alias ?? null}
+          demoData={benchmarkDemo}
           onClose={() => setShowBenchmark(false)}
         />
       )}
@@ -493,6 +541,7 @@ export default function EstadosFinancierosView({ session, accountType }: Props) 
           year={year}
           month={month}
           rfcAlias={rfcs.find(r => r.rfc === selectedRfc)?.alias ?? null}
+          demoData={auditDemo}
           onClose={() => setShowAudit(false)}
         />
       )}

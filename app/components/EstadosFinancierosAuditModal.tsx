@@ -3,9 +3,9 @@
 import { Fragment, useEffect, useState } from 'react'
 import { rfcDisplay } from '@/lib/rfc-aliases'
 
-type Veredicto = 'ok' | 'sospechoso' | 'incorrecto' | 'sin_catalogo'
+export type Veredicto = 'ok' | 'sospechoso' | 'incorrecto' | 'sin_catalogo'
 
-interface AuditCfdi {
+export interface AuditCfdi {
   uuid: string
   serie: string
   folio: string
@@ -14,7 +14,7 @@ interface AuditCfdi {
   contraparte: string
 }
 
-interface AuditItem {
+export interface AuditItem {
   tipo: 'ingreso' | 'egreso'
   clave: string
   satDesc: string
@@ -26,7 +26,7 @@ interface AuditItem {
   cfdis: AuditCfdi[]
 }
 
-interface AuditData {
+export interface AuditData {
   ok: true
   rfc: string
   periodo: string
@@ -41,6 +41,8 @@ interface Props {
   year: number
   month: number
   rfcAlias: string | null
+  /** Si se provee, el modal omite la llamada al API y muestra estos datos (modo demo). */
+  demoData?: AuditData
   onClose: () => void
 }
 
@@ -130,7 +132,7 @@ function downloadCsv(data: AuditData, rfcAlias: string | null) {
   URL.revokeObjectURL(a.href)
 }
 
-export default function EstadosFinancierosAuditModal({ rfc, year, month, rfcAlias, onClose }: Props) {
+export default function EstadosFinancierosAuditModal({ rfc, year, month, rfcAlias, demoData, onClose }: Props) {
   const [state, setState] = useState<ViewState>({ kind: 'loading' })
   const [filter, setFilter] = useState<'all' | 'alertas'>('alertas')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -146,6 +148,15 @@ export default function EstadosFinancierosAuditModal({ rfc, year, month, rfcAlia
   useEffect(() => {
     let cancel = false
     setState({ kind: 'loading' })
+
+    // Modo demo: sin llamada al API. Breve "carga" simulada para que se sienta real.
+    if (demoData) {
+      const timer = setTimeout(() => {
+        if (!cancel) setState({ kind: 'ready', data: demoData })
+      }, 900)
+      return () => { cancel = true; clearTimeout(timer) }
+    }
+
     fetch(`/api/estados-financieros/audit-conceptos?rfc=${encodeURIComponent(rfc)}&year=${year}&month=${month}`)
       .then(async (r) => {
         const body = await r.json().catch(() => ({}))
@@ -160,7 +171,7 @@ export default function EstadosFinancierosAuditModal({ rfc, year, month, rfcAlia
         if (!cancel) setState({ kind: 'error', mensaje: 'Error de red al consultar la auditoría.' })
       })
     return () => { cancel = true }
-  }, [rfc, year, month])
+  }, [rfc, year, month, demoData])
 
   // Esc cierra
   useEffect(() => {

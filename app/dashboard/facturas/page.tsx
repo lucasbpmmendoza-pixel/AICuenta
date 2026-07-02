@@ -2,10 +2,17 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import FacturasView from "@/app/components/FacturasView";
+import DemoCuadrosView from "@/app/components/DemoCuadrosView";
 
 export default async function FacturasPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // En modo demo, Facturas se convierte en la herramienta "Crea tus cuadros gratis":
+  // el visitante sube sus propios XMLs y se procesan localmente (sin tocar la BD).
+  if (session.isDemo) {
+    return <DemoCuadrosView session={session} accountType="multi" />;
+  }
 
   const effectiveId = session.ownerId ?? session.sub;
 

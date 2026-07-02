@@ -346,7 +346,8 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
         {visibleItems.map((item) => {
           const isActive = pathname === item.href
           const isDisabled = demoEnabled && disabledDemoItems.has(item.href)
-          const isDemoFreeItem = demoEnabled && item.href === '/dashboard/chat-docs'
+          // En demo, la estrella gratuita/dorada es "Crea tus cuadros" (ruta de Facturas).
+          const isDemoFreeItem = demoEnabled && item.href === '/dashboard/facturas'
           const isFreemiumLocked = isFreemium && FREEMIUM_BLOCKED_HREFS.has(item.href)
           return (
             <a
