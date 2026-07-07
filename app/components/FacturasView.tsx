@@ -79,6 +79,7 @@ export default function FacturasView({ session, accountType }: Props) {
   const [loadingEfectivamente, setLoadingEfectivamente]         = useState(false)
   const [exportingEfectivamente, setExportingEfectivamente]     = useState(false)
   const [exportingDiot, setExportingDiot]                       = useState(false)
+  const [exportingIeps, setExportingIeps]                       = useState(false)
   const [showDownloadPulse, setShowDownloadPulse]               = useState(false)
   const FACTURAS_HINT_KEY = 'aicuenta_facturas_first_visit'
 
@@ -299,6 +300,25 @@ export default function FacturasView({ session, accountType }: Props) {
       URL.revokeObjectURL(a.href)
     } catch { alert('Error al descargar') }
     finally { setExporting(false) }
+  }
+
+  async function handleExportIeps() {
+    if (!selectedRfc || exportingIeps) return
+    dismissDownloadPulse()
+    setExportingIeps(true)
+    logAction('btn_descargar_ieps_facturas')
+    try {
+      const url = `/api/export/retenciones-ieps?rfc=${encodeURIComponent(selectedRfc)}&${periodParams()}`
+      const res = await fetch(url)
+      if (!res.ok) { alert('Error al generar el reporte'); return }
+      const blob = await res.blob()
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = `retenciones-ieps_${rfcDisplay(selectedRfc)}_${periodLabel()}.xlsx`
+      a.click()
+      URL.revokeObjectURL(a.href)
+    } catch { alert('Error al descargar') }
+    finally { setExportingIeps(false) }
   }
 
   async function handleExportDiot() {
@@ -674,6 +694,34 @@ export default function FacturasView({ session, accountType }: Props) {
               </div>
               <div className="overflow-x-auto w-full">
                 <TablaNotasCredito rows={notasData ?? []} loading={loadingNotas} />
+              </div>
+            </div>
+          )}
+
+          {/* ─── Retenciones IEPS (descarga sin previa) ──────────────────────── */}
+          {selectedRfc && !isFreemium && (
+            <div className="mt-6 rounded-2xl bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+              <div className="flex items-center justify-between gap-3 px-5 py-4">
+                <div>
+                  <h2 className="text-sm font-bold text-rose-700 dark:text-rose-300">Retenciones IEPS</h2>
+                  <p className="text-xs text-slate-500 dark:text-zinc-400 mt-0.5">CFDIs vigentes con IEPS retenido — descarga el reporte para consultar el detalle</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportIeps}
+                    disabled={exportingIeps}
+                    className={`inline-flex items-center gap-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white transition ${
+                      showDownloadPulse ? 'animate-wave-rose' : ''
+                    }`}
+                  >
+                    {exportingIeps ? (
+                      <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+                    ) : (
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><polyline points="9 14 12 17 15 14"/></svg>
+                    )}
+                    {exportingIeps ? 'Generando…' : 'Descargar Retenciones IEPS'}
+                  </button>
+                </div>
               </div>
             </div>
           )}

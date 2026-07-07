@@ -135,6 +135,25 @@
   animation: wave-orange 2s infinite;
 }
 
+@keyframes wave-rose {
+  0% {
+    box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7), 0 0 0 0 rgba(225, 29, 72, 0.7);
+  }
+  40% {
+    box-shadow: 0 0 0 16px rgba(225, 29, 72, 0), 0 0 0 0 rgba(225, 29, 72, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(225, 29, 72, 0), 0 0 0 8px rgba(225, 29, 72, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(225, 29, 72, 0), 0 0 0 0 rgba(225, 29, 72, 0);
+  }
+}
+
+.animate-wave-rose {
+  animation: wave-rose 2s infinite;
+}
+
 @keyframes wave-chat-light {
   0% {
     box-shadow: 0 0 0 0 rgba(123, 111, 232, 0.6), inset 0 0 0 0 rgba(123, 111, 232, 0.1);
