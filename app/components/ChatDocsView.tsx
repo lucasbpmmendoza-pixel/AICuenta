@@ -96,6 +96,7 @@ interface RfcOption {
 const CHAT_DOCS_RFC_KEY = 'aicuenta_chat_docs_active_rfc'
 
 export default function ChatDocsView({ session, accountType }: Props) {
+  const isDemo = !!session.isDemo
   const [messages, setMessages] = useState<Message[]>([])
   const [hydrated, setHydrated] = useState(false)
   const [bgGenerating, setBgGenerating] = useState(false)
@@ -207,7 +208,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
 
   async function sendMessage() {
     const text = input.trim()
-    if (!text || sending || bgGenerating) return
+    if (!text || sending || bgGenerating || isDemo) return
 
     dismissChatPulse()
 
@@ -288,7 +289,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
       messages[messages.length - 1].role === 'user' ||
       messages[messages.length - 1].content === '')
 
-  const canSend = !!input.trim() && !busy
+  const canSend = !!input.trim() && !busy && !isDemo
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-zinc-950">
@@ -416,7 +417,13 @@ export default function ChatDocsView({ session, accountType }: Props) {
         </div>
 
         <div className="border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 backdrop-blur-sm px-4 py-3">
-          {activeRfc ? (
+          {isDemo ? (
+            <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              En modo demo puedes explorar FiscalGPT, pero no enviar mensajes.{' '}
+              <a href="/register" className="font-semibold underline hover:no-underline">Crea una cuenta gratis</a>{' '}
+              para chatear con el asistente.
+            </div>
+          ) : activeRfc ? (
             <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mb-2 px-1 font-medium">
               Contexto activo: cédula fiscal del RFC <span className="font-mono font-bold">{activeRfc}</span>.
             </p>
@@ -431,14 +438,18 @@ export default function ChatDocsView({ session, accountType }: Props) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={busy}
-              placeholder="Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de línea)"
+              disabled={busy || isDemo}
+              placeholder={
+                isDemo
+                  ? 'Inicia sesión para chatear con FiscalGPT...'
+                  : 'Escribe tu pregunta... (Enter para enviar, Shift+Enter para salto de línea)'
+              }
               rows={2}
               className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-docs' : ''}`}
             />
             <MicButton
               variant="emerald"
-              disabled={busy}
+              disabled={busy || isDemo}
               onTranscript={(text) => {
                 dismissChatPulse()
                 setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))

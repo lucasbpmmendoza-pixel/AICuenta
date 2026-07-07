@@ -10,7 +10,9 @@ import DashboardCharts, { type DashboardData } from "./DashboardCharts";
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
-import { readDemoClientRfc } from '@/lib/demo-cuadros'
+import { readDemoClientRfc, readDemoCuadroRows } from '@/lib/demo-cuadros'
+import { buildDashboardFromCfdis } from '@/lib/cfdi-to-dashboard'
+import type { CfdiRow } from '@/lib/cfdi-xml'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -19,12 +21,19 @@ interface RfcOption { id: string; rfc: string; alias: string | null }
 interface Props {
   session: JWTPayload;
   accountType: "single" | "multi";
+  // Modo XML: usuario con cuenta pero sin e.firma. El dashboard se arma con los
+  // CFDIs que subió en "Crea tus cuadros" (localStorage), no desde la BD.
+  xmlMode?: boolean;
 }
 
-export default function DashboardView({ session, accountType }: Props) {
+export default function DashboardView({ session, accountType, xmlMode = false }: Props) {
   const router = useRouter()
   const { user } = useAuth()
   const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
+  // En modo XML los datos vienen de los CFDIs que subio el propio usuario, no del
+  // SAT: no aplica el bloqueo de historial del freemium (esa restriccion existe
+  // para gatear datos descargados de pago).
+  const restrictHistory = isFreemium && !xmlMode
   const now = new Date()
   const [rfcs, setRfcs]               = useState<RfcOption[]>([])
   const [selectedRfc, setSelectedRfc] = useState<string>('')
@@ -39,6 +48,30 @@ export default function DashboardView({ session, accountType }: Props) {
 
   // Cargar lista de RFCs
   useEffect(() => {
+    // Modo XML: el único RFC es el detectado en "Crea tus cuadros" (sus XML).
+    if (xmlMode) {
+      const detected = readDemoClientRfc()
+      if (detected) {
+        setRfcs([{ id: 'xml-client', rfc: detected.rfc, alias: detected.nombre || detected.rfc }])
+        setSelectedRfc(detected.rfc)
+        // Saltar al mes mas reciente con CFDIs para que el dashboard no arranque
+        // en el mes actual si el contador cargo periodos anteriores.
+        const rows = readDemoCuadroRows<CfdiRow>()
+        let bestY = 0, bestM = 0
+        for (const r of rows) {
+          if (!r.fecha || r.fecha.length < 7) continue
+          const y = Number(r.fecha.slice(0, 4))
+          const m = Number(r.fecha.slice(5, 7))
+          if (!Number.isFinite(y) || !Number.isFinite(m)) continue
+          if (y > bestY || (y === bestY && m > bestM)) { bestY = y; bestM = m }
+        }
+        if (bestY > 0) { setYear(bestY); setMonth(bestM) }
+      } else {
+        setRfcs([])
+        setSelectedRfc('')
+      }
+      return
+    }
     fetch('/api/rfcs')
       .then(r => r.json())
       .then(d => {
@@ -63,7 +96,7 @@ export default function DashboardView({ session, accountType }: Props) {
         setSelectedRfc(nextRfc)
       })
       .catch(() => {})
-  }, [session.isDemo])
+  }, [session.isDemo, xmlMode])
 
   useEffect(() => {
     if (!selectedRfc) return
@@ -93,8 +126,17 @@ export default function DashboardView({ session, accountType }: Props) {
   }, [])
 
   useEffect(() => {
-    if (selectedRfc) fetchData(selectedRfc, year, month)
-  }, [selectedRfc, year, month, fetchData])
+    if (!selectedRfc) return
+    // Modo XML: se arma el dashboard con los CFDIs subidos (localStorage), sin API.
+    if (xmlMode) {
+      const rows = readDemoCuadroRows<CfdiRow>()
+      setData(buildDashboardFromCfdis(rows, selectedRfc, year, month))
+      setLoading(false)
+      setError(null)
+      return
+    }
+    fetchData(selectedRfc, year, month)
+  }, [selectedRfc, year, month, fetchData, xmlMode])
 
   function prevMonth() {
     if (month === 1) { setMonth(12); setYear(y => y - 1) }
@@ -118,7 +160,17 @@ export default function DashboardView({ session, accountType }: Props) {
     <main className="flex-1 flex flex-col lg:ml-60">
           <div className="lg:hidden h-14" />
 
-          {isFreemium && <FreemiumHistoryBanner />}
+          {restrictHistory && <FreemiumHistoryBanner />}
+
+          {xmlMode && (
+            <div className="mx-6 mt-4 flex items-start gap-3 rounded-xl border border-[#7B6FE8]/30 dark:border-[#91eb78]/30 bg-[#EBE9FB] dark:bg-[#5E6957]/20 px-4 py-3">
+              <svg className="mt-0.5 h-4 w-4 shrink-0 text-[#7B6FE8] dark:text-[#91eb78]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              <p className="text-xs text-[#450c7d] dark:text-[#91eb78] leading-relaxed">
+                Estás viendo tu dashboard con los <span className="font-semibold">CFDIs que subiste</span> en Facturas.
+                Configura tu <span className="font-semibold">e.firma</span> para que AICuenta descargue tus comprobantes del SAT automáticamente.
+              </p>
+            </div>
+          )}
 
         {/* Header */}
         <div className="border-b border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 px-6 py-5 backdrop-blur-sm">
@@ -143,9 +195,9 @@ export default function DashboardView({ session, accountType }: Props) {
                 </span>
               ) : null}
 
-              {/* Navegador de mes — freemium queda fijo al mes actual */}
+              {/* Navegador de mes — freemium queda fijo al mes actual salvo en modo XML */}
               <div className="flex items-center gap-1 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-1 py-1">
-                {!isFreemium && (
+                {!restrictHistory && (
                   <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400">
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>
                   </button>
@@ -153,7 +205,7 @@ export default function DashboardView({ session, accountType }: Props) {
                 <span className="px-2 text-sm font-semibold text-slate-700 dark:text-zinc-200 min-w-[130px] text-center">
                   {MESES[month - 1]} {year}
                 </span>
-                {!isFreemium && (
+                {!restrictHistory && (
                   <button onClick={nextMonth} disabled={isCurrentMonth} className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-zinc-800 transition text-slate-500 dark:text-zinc-400 disabled:opacity-30 disabled:cursor-not-allowed">
                     <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
@@ -168,8 +220,14 @@ export default function DashboardView({ session, accountType }: Props) {
         <div className="flex-1 overflow-y-auto p-6">
           {!selectedRfc && !loading ? (
             <div className="flex flex-col items-center justify-center py-24 text-center">
-              <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">Sin RFCs registrados</p>
-              <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">Agrega un RFC en la sección RFCs para ver el dashboard.</p>
+              <p className="text-sm font-semibold text-slate-600 dark:text-zinc-300">
+                {xmlMode ? 'Aún no subes tus XML' : 'Sin RFCs registrados'}
+              </p>
+              <p className="text-xs text-slate-400 dark:text-zinc-500 mt-1">
+                {xmlMode
+                  ? 'Sube tus CFDIs en Facturas para ver tu dashboard con tus datos.'
+                  : 'Agrega un RFC en la sección RFCs para ver el dashboard.'}
+              </p>
             </div>
           ) : error ? (
             <div className="flex flex-col items-center justify-center py-24 text-center gap-3">

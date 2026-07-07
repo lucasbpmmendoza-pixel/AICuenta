@@ -123,6 +123,7 @@ const CHAT_HINT_KEY = 'aicuenta_chat_first_visit'
 
 export default function ChatbotView({ session, accountType }: Props) {
   const { user } = useAuth()
+  const isDemo = !!session.isDemo
   const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const now = startOfDay(new Date())
   const fixedDateFrom = new Date(now.getFullYear(), 0, 1)
@@ -216,7 +217,7 @@ export default function ChatbotView({ session, accountType }: Props) {
 
   async function sendMessage() {
     const text = input.trim()
-    if (!text || sending || bgGenerating || !selectedRfc) return
+    if (!text || sending || bgGenerating || !selectedRfc || isDemo) return
 
     dismissChatPulse()
 
@@ -305,7 +306,7 @@ export default function ChatbotView({ session, accountType }: Props) {
       messages[messages.length - 1].role === 'user' ||
       messages[messages.length - 1].content === '')
 
-  const canSend = !!selectedRfc && !!input.trim() && !busy
+  const canSend = !!selectedRfc && !!input.trim() && !busy && !isDemo
 
   if (isFreemium) {
     return (
@@ -413,7 +414,14 @@ export default function ChatbotView({ session, accountType }: Props) {
 
         {/* ── Input ── */}
         <div className="border-t border-slate-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/60 backdrop-blur-sm px-4 py-3">
-          {selectedRfc && (
+          {isDemo && (
+            <div className="mb-3 rounded-xl border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
+              En modo demo puedes explorar la interfaz de FinDoc, pero no enviar mensajes.{' '}
+              <a href="/register" className="font-semibold underline hover:no-underline">Crea una cuenta</a>{' '}
+              para chatear con el asistente.
+            </div>
+          )}
+          {selectedRfc && !isDemo && (
             <p className="text-[11px] text-slate-400 dark:text-zinc-500 mb-2 px-1">
               Contexto: RFC <span className="font-semibold">{rfcDisplay}</span> · Acumulado del año actual
             </p>
@@ -424,18 +432,20 @@ export default function ChatbotView({ session, accountType }: Props) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!selectedRfc || busy}
+              disabled={!selectedRfc || busy || isDemo}
               placeholder={
-                !selectedRfc
-                  ? 'Selecciona un RFC primero…'
-                  : 'Escribe tu pregunta… (Enter para enviar, Shift+Enter para salto de línea)'
+                isDemo
+                  ? 'Inicia sesión para chatear con FinDoc…'
+                  : !selectedRfc
+                    ? 'Selecciona un RFC primero…'
+                    : 'Escribe tu pregunta… (Enter para enviar, Shift+Enter para salto de línea)'
               }
               rows={2}
               className={`flex-1 resize-none rounded-xl border border-slate-200 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8] dark:focus:ring-[#91EB78] transition disabled:opacity-50 ${showChatPulse ? 'textarea-wave-chat' : ''}`}
             />
             <MicButton
               variant="indigo"
-              disabled={!selectedRfc || busy}
+              disabled={!selectedRfc || busy || isDemo}
               onTranscript={(text) => {
                 dismissChatPulse()
                 setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))

@@ -11,6 +11,14 @@ import {
   getLocalNotificationsServerSnapshot,
   subscribeLocalNotifications,
 } from '@/lib/local-notifications'
+import {
+  markCalendarRead,
+  markAllCalendarRead,
+  isCalendarNotificationId,
+  getCalendarNotificationsSnapshot,
+  getCalendarNotificationsServerSnapshot,
+  subscribeCalendarNotifications,
+} from '@/lib/calendar-notifications'
 
 interface NotificationItem {
   id:         string
@@ -95,6 +103,13 @@ export default function NotificationBell({ align = 'right' }: { align?: 'left' |
     getLocalNotificationsServerSnapshot,
   )
 
+  // Recordatorios mensuales por calendario (día 5 auditoría, 16 pago, 25 cierre).
+  const calendarItems = useSyncExternalStore(
+    subscribeCalendarNotifications,
+    getCalendarNotificationsSnapshot,
+    getCalendarNotificationsServerSnapshot,
+  )
+
   const fetchServer = useCallback(async () => {
     try {
       const res = await fetch('/api/notifications', { cache: 'no-store' })
@@ -157,14 +172,18 @@ export default function NotificationBell({ align = 'right' }: { align?: 'left' |
     }
   }, [open, updatePosition])
 
-  // Notificaciones locales primero, luego las del servidor, ordenadas por fecha
-  const items: NotificationItem[] = [...localItems, ...serverItems].sort(
+  // Recordatorios de calendario + locales + servidor, todo ordenado por fecha
+  const items: NotificationItem[] = [...calendarItems, ...localItems, ...serverItems].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
   )
   const unreadCount = items.filter((n) => !n.is_read).length
   const hasUnread = unreadCount > 0
 
   async function markOne(id: string) {
+    if (isCalendarNotificationId(id)) {
+      markCalendarRead(id)
+      return
+    }
     if (isLocalNotificationId(id)) {
       markLocalRead(id)
       return
@@ -174,6 +193,7 @@ export default function NotificationBell({ align = 'right' }: { align?: 'left' |
   }
 
   async function markAll() {
+    markAllCalendarRead()
     markAllLocalRead()
     setServerItems((prev) => prev.map((n) => ({ ...n, is_read: true })))
     await fetch('/api/notifications', {

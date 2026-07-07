@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { userHasEfiel } from "@/lib/redirect";
 import EstadosFinancierosView from "@/app/components/EstadosFinancierosView";
 
 export default async function EstadosFinancierosPage() {
@@ -8,6 +9,12 @@ export default async function EstadosFinancierosPage() {
   if (!session) redirect("/login");
 
   const effectiveId = session.ownerId ?? session.sub;
+
+  // Usuario con cuenta pero SIN e.firma: sus Estados Financieros se arman con los
+  // XML que sube en "Crea tus cuadros" (modo XML), en vez de leer de la BD.
+  if (!session.isDemo && session.role !== "member" && !(await userHasEfiel(effectiveId))) {
+    return <EstadosFinancierosView session={session} accountType="multi" xmlMode />;
+  }
 
   let accountType: string | null = session.isDemo ? "multi" : null;
   if (!session.isDemo) {

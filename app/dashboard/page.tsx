@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { userHasEfiel } from "@/lib/redirect";
 import DashboardView from "../components/DashboardView";
 
 export default async function DashboardPage() {
@@ -9,6 +10,12 @@ export default async function DashboardPage() {
 
   // Para miembros, usar el ID del dueño para obtener account_type
   const effectiveId = session.ownerId ?? session.sub;
+
+  // Usuario con cuenta pero SIN e.firma: su Dashboard se arma con los XML que sube
+  // en "Crea tus cuadros" (modo XML), en vez de leer de la base de datos.
+  if (!session.isDemo && session.role !== "member" && !(await userHasEfiel(effectiveId))) {
+    return <DashboardView session={session} accountType="multi" xmlMode />;
+  }
 
   let accountType: string | null = session.isDemo ? "multi" : null;
   if (!session.isDemo) {

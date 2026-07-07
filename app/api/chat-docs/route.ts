@@ -539,6 +539,12 @@ async function generateDirectFallbackAnswer(
 // ─── POST /api/chat-docs ──────────────────────────────────────────────────────
 export async function POST(req: Request) {
   const session = await getSession();
+  if (session?.isDemo) {
+    return NextResponse.json(
+      { error: "En modo demo no puedes enviar mensajes a FiscalGPT. Crea una cuenta gratis para chatear con el asistente." },
+      { status: 403 },
+    );
+  }
   const isPublicRequest = !session;
 
   let body: { messages?: unknown[]; rfc?: unknown };

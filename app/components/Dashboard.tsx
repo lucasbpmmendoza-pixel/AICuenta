@@ -1,15 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import DropZone from './DropZone'
 import { uploadFiles } from '../api/actions/upload'
-import AccountTypeModal, { type AccountType } from './AccountTypeModal'
 
 export default function Dashboard() {
   const router = useRouter()
-  const [accountType, setAccountType] = useState<AccountType | null>(null)
-  const [accountTypeReady, setAccountTypeReady] = useState(false)
   const [rfc, setRfc] = useState('')
   const [efiel, setEfiel] = useState('')
   const [cerFile, setCerFile] = useState<File | null>(null)
@@ -22,16 +19,6 @@ export default function Dashboard() {
     const mensaje = encodeURIComponent(`${nombre.trim()} ${rfc.trim()}`)
     window.open(`https://wa.me/526563138465?text=${mensaje}`, '_blank')
   }
-
-  useEffect(() => {
-    fetch('/api/auth/account-type')
-      .then((r) => r.json())
-      .then((data) => {
-        setAccountType(data.account_type ?? null)
-        setAccountTypeReady(true)
-      })
-      .catch(() => setAccountTypeReady(true))
-  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -177,63 +164,44 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 flex items-start justify-center gap-6 py-10 px-4">
-      <AccountTypeModal
-        show={accountTypeReady && accountType === null}
-        onComplete={(type) => setAccountType(type)}
-      />
-
       {/* Main upload card */}
       <div className="w-[900px] bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5">
+          <h1 className="text-xl font-bold text-white tracking-tight">Dashboard de Certificados</h1>
+          <p className="text-sm text-white/70 mt-0.5">Accede al dashboard o registra tu FIEL cuando quieras.</p>
+        </div>
 
-        {accountType === 'multi' ? (
-          <>
-            {/* Header */}
-            <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5">
-              <h1 className="text-xl font-bold text-white tracking-tight">Bienvenido, Contador</h1>
-              <p className="text-sm text-white/70 mt-0.5">Gestionas múltiples RFCs. Accede al dashboard o registra tu propia FIEL.</p>
-            </div>
+        {/* Dashboard CTA */}
+        <div className="px-8 py-8 flex flex-col items-center gap-3 border-b border-zinc-200 dark:border-zinc-700">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
+            Tu panel principal está listo. Puedes entrar al dashboard sin configurar tu FIEL.
+          </p>
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard')}
+            className="mt-1 inline-flex items-center gap-2 rounded-xl text-white font-semibold px-8 py-3 transition-colors text-sm"
+            style={{ backgroundColor: '#450c7d' }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#7B6FE8')}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#450c7d')}
+          >
+            Ir al Dashboard
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+              <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        </div>
 
-            {/* Dashboard CTA */}
-            <div className="px-8 py-8 flex flex-col items-center gap-3 border-b border-zinc-200 dark:border-zinc-700">
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 text-center max-w-md">
-                Tu panel principal está listo. Desde ahí podrás administrar los RFCs de tus clientes.
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push('/dashboard')}
-                className="mt-1 inline-flex items-center gap-2 rounded-xl text-white font-semibold px-8 py-3 transition-colors text-sm"
-                style={{ backgroundColor: '#450c7d' }}
-                onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#7B6FE8')}
-                onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#450c7d')}
-              >
-                Ir al Dashboard
-                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                  <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Optional FIEL section */}
-            <div className="px-8 py-5">
-              <div className="flex items-center gap-3 mb-4">
-                <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Opcional</span>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                  También puedes registrar tu propia e.firma personal aquí.
-                </p>
-              </div>
-              {uploadForm}
-            </div>
-          </>
-        ) : (
-          <>
-            {/* Header */}
-            <div className="bg-gradient-to-b from-brand-deep to-brand-purple px-8 py-5" >
-              <h1 className="text-xl font-bold text-white tracking-tight" >Dashboard de Certificados</h1>
-              <p className="text-sm text-white/70 mt-0.5">Ingresa los datos y sube los archivos de firma electrónica.</p>
-            </div>
-            {uploadForm}
-          </>
-        )}
+        {/* Optional FIEL section */}
+        <div className="px-8 py-5">
+          <div className="flex items-center gap-3 mb-4">
+            <span className="rounded-full bg-zinc-100 dark:bg-zinc-800 px-3 py-1 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">Opcional</span>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              También puedes registrar tu e.firma aquí.
+            </p>
+          </div>
+          {uploadForm}
+        </div>
       </div>
 
       {/* Unete panel */}

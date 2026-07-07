@@ -6,6 +6,15 @@ import { XMLParser } from 'fast-xml-parser'
 // operaciones con el extranjero). Aparecen como receptor en muchos CFDIs de retail.
 const RFC_GENERICOS = new Set(['XAXX010101000', 'XEXX010101000'])
 
+// Concepto (partida) de un CFDI. Se usa para armar Estados Financieros y los
+// "principales ingresos/gastos" del Dashboard a partir de los XML subidos.
+export interface CfdiConcepto {
+  descripcion: string
+  claveProdServ: string
+  cantidad: number
+  importe: number
+}
+
 export interface CfdiRow {
   archivo: string
   uuid: string
@@ -29,6 +38,31 @@ export interface CfdiRow {
   total: number
   formaPago: string
   metodoPago: string
+  // Código crudo del tipo (I/E/N/P/T) para clasificar.
+  tipo: string
+  // Desglose de impuestos (nivel comprobante).
+  iva16: number
+  iva8: number
+  iva0: number
+  iepsTrasladado: number
+  retIsr: number
+  retIva: number
+  retIeps: number
+  // Retenciones del complemento de Nómina (Deducciones): ISR e IMSS.
+  nominaIsr: number
+  nominaImss: number
+  // Partidas del CFDI (para Estados Financieros y conceptos del Dashboard).
+  conceptos: CfdiConcepto[]
+  // Complemento de pago (solo tipo P).
+  pagoFecha: string
+  pagoMonto: number
+  pagoForma: string
+  pagoMoneda: string
+  pagoNumParcialidad: number
+  pagoSaldoAnterior: number
+  pagoSaldoPagado: number
+  pagoSaldoInsoluto: number
+  pagoUuidRelacionado: string
 }
 
 // Etiquetas legibles para encabezados de tabla y de Excel.
@@ -107,6 +141,157 @@ function num(v: string): number {
   return Number.isFinite(x) ? x : 0
 }
 
+// Normaliza un nodo (objeto, arreglo o ausente) a un arreglo de nodos.
+function nodeArray(v: unknown): XmlNode[] {
+  if (v == null) return []
+  const arr = Array.isArray(v) ? v : [v]
+  const out: XmlNode[] = []
+  for (const item of arr) {
+    if (item && typeof item === 'object' && !Array.isArray(item)) out.push(item as XmlNode)
+  }
+  return out
+}
+
+// Desglosa los impuestos a nivel comprobante (Traslados/Retenciones).
+function parseImpuestos(imp: XmlNode | null) {
+  let iva16 = 0, iva8 = 0, iva0 = 0, iepsTrasladado = 0, retIsr = 0, retIva = 0, retIeps = 0
+  if (imp) {
+    const traslados = asNode(imp['Traslados'])
+    for (const t of nodeArray(traslados?.['Traslado'])) {
+      const impuesto = attr(t, 'Impuesto')
+      const tasa = num(attr(t, 'TasaOCuota'))
+      const importe = num(attr(t, 'Importe'))
+      if (impuesto === '002') {
+        if (Math.abs(tasa - 0.16) < 0.0001) iva16 += importe
+        else if (Math.abs(tasa - 0.08) < 0.0001) iva8 += importe
+        else iva0 += importe
+      } else if (impuesto === '003') {
+        iepsTrasladado += importe
+      }
+    }
+    const retenciones = asNode(imp['Retenciones'])
+    for (const r of nodeArray(retenciones?.['Retencion'])) {
+      const impuesto = attr(r, 'Impuesto')
+      const importe = num(attr(r, 'Importe'))
+      if (impuesto === '001') retIsr += importe
+      else if (impuesto === '002') retIva += importe
+      else if (impuesto === '003') retIeps += importe
+    }
+  }
+  return { iva16, iva8, iva0, iepsTrasladado, retIsr, retIva, retIeps }
+}
+
+// Lee las partidas (Conceptos > Concepto) del comprobante.
+function parseConceptos(comprobante: XmlNode): CfdiConcepto[] {
+  const cont = asNode(comprobante['Conceptos'])
+  const out: CfdiConcepto[] = []
+  for (const c of nodeArray(cont?.['Concepto'])) {
+    out.push({
+      descripcion: attr(c, 'Descripcion', 'descripcion'),
+      claveProdServ: attr(c, 'ClaveProdServ', 'claveProdServ'),
+      cantidad: num(attr(c, 'Cantidad', 'cantidad')),
+      importe: num(attr(c, 'Importe', 'importe')),
+    })
+  }
+  return out
+}
+
+// Retenciones del complemento de Nómina: ISR (TipoDeduccion 002) e IMSS/seguridad
+// social (TipoDeduccion 001). En nómina el ISR no viene en Impuestos del comprobante.
+function parseNominaDeducciones(comprobante: XmlNode): { isr: number; imss: number } {
+  let isr = 0, imss = 0
+  for (const c of nodeArray(comprobante['Complemento'])) {
+    const nom = asNode(c['Nomina'])
+    if (!nom) continue
+    const ded = asNode(nom['Deducciones'])
+    for (const d of nodeArray(ded?.['Deduccion'])) {
+      const tipo = attr(d, 'TipoDeduccion', 'tipoDeduccion').replace(/^0+/, '')
+      const importe = num(attr(d, 'Importe', 'importe'))
+      if (tipo === '2') isr += importe
+      else if (tipo === '1') imss += importe
+    }
+  }
+  return { isr, imss }
+}
+
+const EMPTY_PAGO = {
+  pagoFecha: '', pagoMonto: 0, pagoForma: '', pagoMoneda: '',
+  pagoNumParcialidad: 0, pagoSaldoAnterior: 0, pagoSaldoPagado: 0,
+  pagoSaldoInsoluto: 0, pagoUuidRelacionado: '',
+}
+
+// Extrae un resumen del complemento de pago (tipo P): fecha, monto, forma y el
+// primer documento relacionado (parcialidad y saldos), como lo muestra la app.
+function parsePagoComplemento(comprobante: XmlNode) {
+  for (const c of nodeArray(comprobante['Complemento'])) {
+    const pagos = asNode(c['Pagos'])
+    if (!pagos) continue
+    const lista = nodeArray(pagos['Pago'])
+    const totales = asNode(pagos['Totales'])
+    const first = lista[0] ?? null
+    const docto = first ? nodeArray(first['DoctoRelacionado'])[0] ?? null : null
+    const monto =
+      num(attr(totales, 'MontoTotalPagos')) ||
+      lista.reduce((s, p) => s + num(attr(p, 'Monto')), 0)
+    return {
+      pagoFecha: attr(first, 'FechaPago', 'fechaPago'),
+      pagoMonto: monto,
+      pagoForma: attr(first, 'FormaDePagoP', 'formaDePagoP'),
+      pagoMoneda: attr(first, 'MonedaP', 'monedaP') || 'MXN',
+      pagoNumParcialidad: num(attr(docto, 'NumParcialidad', 'numParcialidad')),
+      pagoSaldoAnterior: num(attr(docto, 'ImpSaldoAnt', 'impSaldoAnt')),
+      pagoSaldoPagado: num(attr(docto, 'ImpPagado', 'impPagado')),
+      pagoSaldoInsoluto: num(attr(docto, 'ImpSaldoInsoluto', 'impSaldoInsoluto')),
+      pagoUuidRelacionado: attr(docto, 'IdDocumento', 'idDocumento'),
+    }
+  }
+  return { ...EMPTY_PAGO }
+}
+
+// Parsea un CFDI de Retenciones e información de pagos (raíz distinta a Comprobante).
+function parseRetencion(ret: XmlNode, archivo: string): CfdiRow {
+  const emisor = asNode(ret['Emisor'])
+  const receptorRaw = asNode(ret['Receptor'])
+  const nacional = asNode(receptorRaw?.['Nacional']) ?? receptorRaw
+  const totales = asNode(ret['Totales'])
+
+  let retIsr = 0, retIva = 0, retIeps = 0
+  for (const im of nodeArray(totales?.['ImpRetenidos'])) {
+    const impuesto = attr(im, 'ImpuestoRet', 'impuestoRet').replace(/^0+/, '')
+    const monto = num(attr(im, 'MontoRet', 'montoRet'))
+    if (impuesto === '1' || impuesto === '01') retIsr += monto
+    else if (impuesto === '2' || impuesto === '02') retIva += monto
+    else if (impuesto === '3' || impuesto === '03') retIeps += monto
+  }
+  const montoTotRet = num(attr(totales, 'MontoTotRet', 'montoTotRet')) || retIsr + retIva + retIeps
+  const total = num(attr(totales, 'MontoTotOperacion', 'montoTotOperacion')) || montoTotRet
+
+  return {
+    archivo,
+    uuid: findUuid(ret),
+    version: attr(ret, 'Version', 'version'),
+    tipoComprobante: 'Retención',
+    fecha: attr(ret, 'FechaExp', 'fechaExp', 'Fecha', 'fecha'),
+    serie: '', folio: '',
+    rfcEmisor: attr(emisor, 'RfcE', 'RFCEmisor', 'rfc').toUpperCase(),
+    nombreEmisor: attr(emisor, 'NomDenRazSocE', 'Nombre', 'nombre'),
+    regimenEmisor: '',
+    rfcReceptor: attr(nacional, 'RfcR', 'RFCRecep', 'rfc').toUpperCase(),
+    nombreReceptor: attr(nacional, 'NomDenRazSocR', 'Nombre', 'nombre'),
+    usoCFDI: '',
+    moneda: 'MXN', tipoCambio: 1,
+    subtotal: 0, descuento: 0, totalTraslados: 0, totalRetenciones: montoTotRet,
+    total,
+    formaPago: '', metodoPago: '',
+    tipo: 'R',
+    iva16: 0, iva8: 0, iva0: 0, iepsTrasladado: 0,
+    retIsr, retIva, retIeps,
+    nominaIsr: 0, nominaImss: 0,
+    conceptos: [],
+    ...EMPTY_PAGO,
+  }
+}
+
 // Busca el TimbreFiscalDigital dentro de Complemento (puede ser objeto o arreglo,
 // y contener varios complementos hermanos).
 function findUuid(comprobante: XmlNode): string {
@@ -138,14 +323,21 @@ export function parseCfdiXml(xml: string, archivo: string): CfdiRow | null {
   }
   const root = asNode(doc)
   const comprobante = asNode(root?.['Comprobante'])
-  if (!comprobante) return null
+  if (!comprobante) {
+    // CFDI de Retenciones e información de pagos (raíz distinta a Comprobante).
+    const ret = asNode(root?.['Retenciones'])
+    return ret ? parseRetencion(ret, archivo) : null
+  }
 
   const emisor = asNode(comprobante['Emisor'])
   const receptor = asNode(comprobante['Receptor'])
   const impuestos = asNode(comprobante['Impuestos'])
 
-  const tipo = attr(comprobante, 'TipoDeComprobante', 'tipoDeComprobante')
+  const tipo = attr(comprobante, 'TipoDeComprobante', 'tipoDeComprobante').toUpperCase()
   const tipoCambio = num(attr(comprobante, 'TipoCambio', 'tipoCambio')) || 1
+  const imp = parseImpuestos(impuestos)
+  const pago = tipo === 'P' ? parsePagoComplemento(comprobante) : EMPTY_PAGO
+  const nomina = tipo === 'N' ? parseNominaDeducciones(comprobante) : { isr: 0, imss: 0 }
 
   return {
     archivo,
@@ -170,6 +362,18 @@ export function parseCfdiXml(xml: string, archivo: string): CfdiRow | null {
     total: num(attr(comprobante, 'Total', 'total')),
     formaPago: attr(comprobante, 'FormaPago', 'formaPago'),
     metodoPago: attr(comprobante, 'MetodoPago', 'metodoPago'),
+    tipo,
+    iva16: imp.iva16,
+    iva8: imp.iva8,
+    iva0: imp.iva0,
+    iepsTrasladado: imp.iepsTrasladado,
+    retIsr: imp.retIsr,
+    retIva: imp.retIva,
+    retIeps: imp.retIeps,
+    nominaIsr: nomina.isr,
+    nominaImss: nomina.imss,
+    conceptos: parseConceptos(comprobante),
+    ...pago,
   }
 }
 

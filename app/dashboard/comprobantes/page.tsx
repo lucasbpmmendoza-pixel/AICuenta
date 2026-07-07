@@ -37,7 +37,7 @@ export default async function ComprobantesPage() {
         ownerId={session.ownerId}
       />
       <div className="flex-1 flex flex-col lg:ml-60">
-        <ComprobantesView />
+        <ComprobantesView isDemo={!!session.isDemo} />
         <DashboardFooter />
       </div>
     </div>

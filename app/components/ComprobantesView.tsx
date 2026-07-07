@@ -61,10 +61,14 @@ function fmtDate(iso: string): string {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export default function ComprobantesView() {
+interface ComprobantesViewProps {
+  isDemo?: boolean
+}
+
+export default function ComprobantesView({ isDemo = false }: ComprobantesViewProps) {
   const { user } = useAuth()
   const router = useRouter()
-  const isFreemium = Boolean(user?.isFreemium)
+  const isFreemium = !isDemo && Boolean(user?.isFreemium)
   const [status, setStatus]         = useState<ConnectionStatus>('disconnected')
   const [qrDataUrl, setQrDataUrl]   = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
@@ -81,6 +85,7 @@ export default function ComprobantesView() {
   // ── Load status on mount ──────────────────────────────────────────────────
 
   useEffect(() => {
+    if (isDemo) return
     fetch('/api/whatsapp/status')
       .then(r => r.json())
       .then(d => {
@@ -88,7 +93,7 @@ export default function ComprobantesView() {
         if (d.qrDataUrl) setQrDataUrl(d.qrDataUrl)
       })
       .catch(() => {})
-  }, [])
+  }, [isDemo])
 
   // ── Load comprobantes ─────────────────────────────────────────────────────
 
@@ -147,6 +152,7 @@ export default function ComprobantesView() {
   }
 
   function handleConnect() {
+    if (isDemo) return
     setConnecting(true)
     openSSE()
   }
@@ -274,10 +280,16 @@ export default function ComprobantesView() {
                 Vincula un número de WhatsApp para recibir comprobantes de pago automáticamente.
                 Los usuarios envían una foto del comprobante y el bot lo registra en el sistema.
               </p>
+              {isDemo && (
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-3 max-w-sm mx-auto rounded-lg border border-amber-200 dark:border-amber-800/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+                  En modo demo no puedes conectar WhatsApp. Crea una cuenta para vincular tu número.
+                </p>
+              )}
             </div>
             <button
-              onClick={handleConnect}
-              disabled={connecting}
+              onClick={isDemo ? () => router.push('/register') : handleConnect}
+              disabled={!isDemo && connecting}
+              title={isDemo ? 'Regístrate para conectar WhatsApp' : undefined}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {connecting ? (
@@ -291,7 +303,7 @@ export default function ComprobantesView() {
                   <path d="M12 0C5.373 0 0 5.373 0 12c0 2.125.558 4.122 1.529 5.853L.057 23.5l5.797-1.519A11.934 11.934 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.847 0-3.574-.5-5.063-1.371l-.363-.215-3.44.902.918-3.355-.236-.374A9.96 9.96 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z" />
                 </svg>
               )}
-              {connecting ? 'Generando QR...' : 'Conectar WhatsApp'}
+              {isDemo ? 'Crear cuenta' : connecting ? 'Generando QR...' : 'Conectar WhatsApp'}
             </button>
           </div>
         )}

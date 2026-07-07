@@ -508,6 +508,12 @@ async function executeTool(
 export async function POST(req: Request) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.isDemo) {
+    return NextResponse.json(
+      { error: "En modo demo no puedes enviar mensajes a FinDoc. Crea una cuenta para chatear con el asistente." },
+      { status: 403 },
+    );
+  }
   if (await isFreemiumOwner(session)) {
     return NextResponse.json({ error: FREEMIUM_FORBIDDEN_MESSAGE }, { status: 403 });
   }

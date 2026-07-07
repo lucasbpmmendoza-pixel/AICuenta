@@ -18,6 +18,10 @@ export async function GET() {
   if (!session) {
     return new Response('Unauthorized', { status: 401 })
   }
+  if (session.isDemo) {
+    // En demo siempre reportamos desconectado para que la UI muestre el CTA de registro.
+    return Response.json({ status: 'disconnected', qrDataUrl: null })
+  }
 
   const ownerId = session.ownerId ?? session.sub
 

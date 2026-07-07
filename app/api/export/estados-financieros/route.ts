@@ -4,7 +4,7 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
-import { buildDemoConceptos, getDemoNombreEmpresa } from "@/lib/demo-data";
+import { buildDemoConceptos, getDemoNombreEmpresa, getDemoRfcs } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
@@ -207,7 +207,18 @@ export async function GET(req: NextRequest) {
   if (!demoMode && (await isFreemiumOwner(session))) {
     return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
   }
-  if (!demoMode) {
+  if (demoMode) {
+    // En demo solo se permiten los RFCs de ejemplo. El RFC "detectado" que un
+    // demo genera al subir XMLs en "Crea tus cuadros" no puede exportar EF: la
+    // clasificación exportable es función de pago.
+    const allowedDemoRfcs = new Set(getDemoRfcs().map((r) => r.rfc));
+    if (!allowedDemoRfcs.has(rfc)) {
+      return new Response(
+        "En modo demo no puedes descargar el Excel de los XMLs que subiste. Crea una cuenta para exportar tus estados financieros.",
+        { status: 403 },
+      );
+    }
+  } else {
     const effectiveUserId = session.ownerId ?? session.sub;
     if (!(await validateRfc(effectiveUserId, rfc))) {
       return new Response("RFC no encontrado", { status: 403 });

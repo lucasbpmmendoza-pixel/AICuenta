@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
+import { userHasEfiel } from "@/lib/redirect";
 import FacturasView from "@/app/components/FacturasView";
 import DemoCuadrosView from "@/app/components/DemoCuadrosView";
 
@@ -15,6 +16,13 @@ export default async function FacturasPage() {
   }
 
   const effectiveId = session.ownerId ?? session.sub;
+
+  // Usuario con cuenta pero SIN e.firma: como todavía no tiene CFDIs del SAT,
+  // Facturas es la misma herramienta "Crea tus cuadros" para que suba sus XML,
+  // que alimentan su Dashboard y Estados Financieros reales (sin blur).
+  if (session.role !== "member" && !(await userHasEfiel(effectiveId))) {
+    return <DemoCuadrosView session={session} accountType="multi" />;
+  }
 
   let accountType: string | null = session.isDemo ? "multi" : null;
   if (!session.isDemo) {

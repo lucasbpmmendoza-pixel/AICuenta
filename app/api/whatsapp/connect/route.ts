@@ -19,6 +19,12 @@ export async function GET() {
   if (!session) {
     return new Response('Unauthorized', { status: 401 })
   }
+  if (session.isDemo) {
+    return Response.json(
+      { error: 'En modo demo no puedes conectar WhatsApp. Crea una cuenta para usar Scan Bot.' },
+      { status: 403 },
+    )
+  }
 
   // Owner key: owners use their own ID, members use their owner's ID
   const ownerId = session.ownerId ?? session.sub
