@@ -22,6 +22,7 @@ import {
   TablaIngresos, TablaEgresos, TablaNomina, TablaRetenciones,
   TablaPagos, Tablaflujo, TablaNotasCredito,
 } from './facturas-tables'
+import FreemiumUpsellModal from './FreemiumUpsellModal'
 
 interface Props {
   session: JWTPayload
@@ -81,6 +82,8 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
   // Solo demo y freemium tienen limite en las descargas client-side. Los de pago
   // sin e.firma que caen aqui mientras la configuran no se limitan.
   const isRateLimited = session.isDemo || Boolean(user?.isFreemium)
+  const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
+  const [showUpsell, setShowUpsell] = useState(false)
   const now = new Date()
   const [rows, setRows] = useState<CfdiRow[]>([])
   const [invalidCount, setInvalidCount] = useState(0)
@@ -340,23 +343,27 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
                 </button>
               )}
               {/* Cuadro AIcuenta: Excel clasificado por pestañas (nuestro formato).
-                  El demo NO puede descargarlo — es el formato de pago; se le
-                  manda a /register en el clic. Se usa siempre <button> para no
-                  cambiar el tag entre server y cliente (evita mismatch). */}
+                  Demo → /register. Freemium → upsell modal (misma razón: es
+                  formato de pago). Pago sin e.firma sí puede descargarlo.
+                  Se usa siempre <button> para no cambiar el tag entre server
+                  y cliente (evita mismatch). */}
               <button
                 onClick={() => {
                   if (session.isDemo) { window.location.assign('/register'); return }
+                  if (isFreemium) { setShowUpsell(true); return }
                   handleExportClassified()
                 }}
-                disabled={!session.isDemo && (rows.length === 0 || exportingClassified)}
+                disabled={!session.isDemo && !isFreemium && (rows.length === 0 || exportingClassified)}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#7B6FE8] hover:bg-[#6B5FE0] dark:bg-[#91eb78] dark:hover:bg-[#83dd6a] disabled:opacity-50 disabled:cursor-not-allowed px-4 py-2 text-sm font-semibold text-white dark:text-zinc-900 transition"
                 title={session.isDemo
                   ? 'El cuadro clasificado por pestañas está disponible al crear tu cuenta'
-                  : 'Descarga el cuadro clasificado por pestañas (Ingresos, Egresos, Nómina, Retenciones, Pagos, Flujo, Notas)'}
+                  : isFreemium
+                    ? 'El cuadro clasificado por pestañas está disponible solo en planes de pago'
+                    : 'Descarga el cuadro clasificado por pestañas (Ingresos, Egresos, Nómina, Retenciones, Pagos, Flujo, Notas)'}
               >
                 {exportingClassified ? (
                   <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" strokeOpacity=".25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
-                ) : session.isDemo ? (
+                ) : (session.isDemo || isFreemium) ? (
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
                 ) : (
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
@@ -547,6 +554,12 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
         </div>
         <DashboardFooter />
       </main>
+
+      <FreemiumUpsellModal
+        open={showUpsell}
+        onClose={() => setShowUpsell(false)}
+        featureName="Descargar cuadro AIcuenta"
+      />
     </div>
   )
 }
