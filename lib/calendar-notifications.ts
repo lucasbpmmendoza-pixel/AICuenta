@@ -18,7 +18,7 @@ export interface CalendarNotification {
 // ── MODO TEST ─────────────────────────────────────────────────────────────────
 // Cuando está en true, las tres notificaciones se muestran hoy sin importar el
 // día del mes. Poner en false para que cada una salga solo en su día real.
-const TEST_MODE_ALL_TODAY = true
+const TEST_MODE_ALL_TODAY = false
 
 type ReminderDef = {
   day: number
