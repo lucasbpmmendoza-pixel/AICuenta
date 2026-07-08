@@ -42,7 +42,6 @@ interface NavItem {
   label: string
   href: string
   icon: React.ReactNode
-  onlyMulti?: boolean
   ownerOnly?: boolean
 }
 
@@ -88,7 +87,6 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'RFCs',
     href: '/dashboard/rfcs',
-    onlyMulti: true,
     ownerOnly: true,
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
@@ -101,7 +99,6 @@ const NAV_ITEMS: NavItem[] = [
   {
     label: 'Usuarios',
     href: '/dashboard/usuarios',
-    onlyMulti: true,
     ownerOnly: true,
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
@@ -264,7 +261,6 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
   }, [pathname, beaconsEnabled])
 
   const visibleItems = NAV_ITEMS.filter((item) => {
-    if (item.onlyMulti && accountType !== 'multi') return false
     if (item.ownerOnly && !isOwner) return false
     return true
   })
@@ -332,11 +328,6 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
         </div>
         <span className="  text-sm font-black tracking-tight text-[#7b6fe8] dark:text-[#91EB78]">AIcuenta</span>
         <div className="ml-auto flex items-center gap-1.5">
-          {accountType === 'multi' && (
-            <span className="rounded-full bg-[#ebe9fb] dark:bg-[#5E6957] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#7b6fe8] dark:text-[#6BDA4D] font-bold">
-              Multi
-            </span>
-          )}
           <NotificationBell align="left" />
         </div>
       </div>

@@ -29,9 +29,6 @@ export default async function RFCsPage() {
   // Bloquear acceso para usuarios chikenelo y member
   if (!session.isDemo && (session.role === 'chikenelo' || session.role === 'member')) redirect("/dashboard");
 
-  // Esta sección solo aplica para cuentas multi
-  if (!session.isDemo && accountType !== "multi") redirect("/dashboard");
-
   const readOnly = !!session.isDemo;
 
   return (

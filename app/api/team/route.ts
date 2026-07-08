@@ -62,13 +62,6 @@ export async function POST(req: NextRequest) {
   const db = await getDb();
 
   const limits = await loadOwnerPlanLimits(db, session.sub);
-  if (limits.accountType !== "multi") {
-    return NextResponse.json(
-      { error: "Solo las cuentas empresariales pueden agregar miembros." },
-      { status: 422 },
-    );
-  }
-
   if (limits.maxMembers <= 0) {
     return NextResponse.json(
       { error: "Tu plan actual no incluye miembros de equipo. Actualiza a un plan empresarial superior." },
