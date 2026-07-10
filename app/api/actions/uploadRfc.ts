@@ -94,8 +94,8 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
         WHEN MATCHED THEN
           UPDATE SET fiel = @fiel, last_update = SYSUTCDATETIME()
         WHEN NOT MATCHED THEN
-          INSERT (user_id, rfc, fiel)
-          VALUES (@user_id, @rfc, @fiel);
+          INSERT (user_id, rfc, fiel, last_update)
+          VALUES (@user_id, @rfc, @fiel, DATEFROMPARTS(YEAR(SYSUTCDATETIME()), 1, 1));
       `)
   } catch (err) {
     console.error('[uploadRfc] DB error:', (err as Error).message)
