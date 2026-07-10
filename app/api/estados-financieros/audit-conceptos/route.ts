@@ -4,6 +4,8 @@ import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb, getDbLong } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isFreemiumOwner } from "@/lib/freemium";
+import { currentPeriod, hasComparAudUnlock } from "@/lib/one-time-purchases";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const AUDIT_MODEL = process.env.AUDIT_MODEL ?? "gpt-4o";
@@ -361,6 +363,28 @@ export async function GET(req: NextRequest) {
       { error: "La auditoría con IA no está disponible en modo demo." },
       { status: 403 },
     );
+  }
+
+  // Freemium sigue bloqueado (upsell a plan). Pagados requieren el add-on
+  // "comparar_auditar_mes" del mes calendario actual.
+  if (await isFreemiumOwner(session)) {
+    return NextResponse.json(
+      { error: "La auditoría está disponible solo en planes de pago." },
+      { status: 403 },
+    );
+  }
+  try {
+    const db = await getDb();
+    const cur = currentPeriod();
+    const ok = await hasComparAudUnlock(db, session.sub, cur.year, cur.month);
+    if (!ok) {
+      return NextResponse.json(
+        { error: "add_on_requerido", mensaje: "Desbloquea Comparar y Auditar por $100 MXN (mes calendario actual)." },
+        { status: 402 },
+      );
+    }
+  } catch {
+    // fail-open: si la consulta falla no bloqueamos a un pagado
   }
 
   if (!process.env.OPENAI_API_KEY) {

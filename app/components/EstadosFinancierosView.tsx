@@ -15,6 +15,7 @@ import { logAction } from '@/lib/logs'
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import FreemiumUpsellModal from './FreemiumUpsellModal'
+import OneTimePurchaseModal from './OneTimePurchaseModal'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
 import { readDemoClientRfc, readDemoCuadroRows } from '@/lib/demo-cuadros'
 import { buildEfFromCfdis } from '@/lib/cfdi-to-ef'
@@ -172,6 +173,10 @@ export default function EstadosFinancierosView({ session, accountType, xmlMode =
   const [showBenchmark, setShowBenchmark] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
   const [showUpsell, setShowUpsell] = useState(false)
+  // Add-on Comparar+Auditar ($100 MXN mes calendario actual). Solo aplica a
+  // usuarios con plan (freemium sigue con el upsell). null = aun no consultado.
+  const [hasComparAud, setHasComparAud] = useState<boolean | null>(null)
+  const [showBuyComparAud, setShowBuyComparAud] = useState(false)
   // RFC del cliente detectado en "Crea tus cuadros" (solo demo): sus estados
   // financieros se muestran con blur como gancho para registrarse.
   const [demoClientRfc, setDemoClientRfc] = useState<string>('')
@@ -184,6 +189,47 @@ export default function EstadosFinancierosView({ session, accountType, xmlMode =
     if (!visited) {
       setShowDownloadPulse(true)
     }
+  }, [])
+
+  // Add-on Comparar+Auditar: consulta si el usuario con plan tiene el unlock
+  // del mes calendario actual. Demo y freemium NO lo consultan (a freemium se
+  // le sigue mostrando el upsell para suscripcion).
+  useEffect(() => {
+    if (session.isDemo) { setHasComparAud(true); return }
+    if (isFreemium) { setHasComparAud(false); return }
+    let cancel = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/billing/one-time?tipo=comparar_auditar_mes', {
+          cache: 'no-store',
+        })
+        const body = (await res.json().catch(() => ({}))) as { available?: boolean }
+        if (!cancel) setHasComparAud(res.ok && !!body.available)
+      } catch {
+        if (!cancel) setHasComparAud(false)
+      }
+    })()
+    return () => { cancel = true }
+  }, [session.isDemo, isFreemium])
+
+  // Al regresar del Stripe Checkout (?onetime=comparar_auditar) refrescamos
+  // la disponibilidad; el webhook ya lo marco como pagado.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('onetime') !== 'comparar_auditar') return
+    params.delete('onetime')
+    const clean = window.location.pathname + (params.toString() ? `?${params.toString()}` : '')
+    window.history.replaceState({}, '', clean)
+    ;(async () => {
+      try {
+        const res = await fetch('/api/billing/one-time?tipo=comparar_auditar_mes', {
+          cache: 'no-store',
+        })
+        const body = (await res.json().catch(() => ({}))) as { available?: boolean }
+        setHasComparAud(res.ok && !!body.available)
+      } catch { /* noop */ }
+    })()
   }, [])
 
   // Dismiss pulse when user makes download or leaves after 30s
@@ -403,14 +449,20 @@ export default function EstadosFinancierosView({ session, accountType, xmlMode =
                   <button
                     onClick={() => {
                       if (isFreemium) { setShowUpsell(true); return }
+                      // Paid sin add-on del mes actual: abrir compra ($100 MXN).
+                      // Demo pasa directo (usa datos de ejemplo, no consume IA).
+                      if (!session.isDemo && hasComparAud === false) {
+                        setShowBuyComparAud(true)
+                        return
+                      }
                       logAction('btn_benchmark_estados_financieros')
                       setShowBenchmark(true)
                     }}
                     disabled={loading}
                     className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                    title={session.isDemo ? 'Vista demo con datos de ejemplo' : isFreemium ? 'Disponible solo en planes de pago' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
+                    title={session.isDemo ? 'Vista demo con datos de ejemplo' : isFreemium ? 'Disponible solo en planes de pago' : hasComparAud === false ? 'Desbloquea Comparar y Auditar para este mes ($100 MXN)' : 'Compara los gastos del RFC contra el estándar de mercado de su industria'}
                   >
-                    {isFreemium ? (
+                    {isFreemium || (!session.isDemo && hasComparAud === false) ? (
                       <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
@@ -425,14 +477,18 @@ export default function EstadosFinancierosView({ session, accountType, xmlMode =
                   <button
                     onClick={() => {
                       if (isFreemium) { setShowUpsell(true); return }
+                      if (!session.isDemo && hasComparAud === false) {
+                        setShowBuyComparAud(true)
+                        return
+                      }
                       logAction('btn_audit_conceptos_estados_financieros')
                       setShowAudit(true)
                     }}
                     disabled={loading}
                     className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-zinc-200 hover:bg-slate-100 dark:hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed transition"
-                    title={session.isDemo ? 'Vista demo con datos de ejemplo' : isFreemium ? 'Disponible solo en planes de pago' : 'Revisa con IA si la descripción del emisor concuerda con su clave SAT'}
+                    title={session.isDemo ? 'Vista demo con datos de ejemplo' : isFreemium ? 'Disponible solo en planes de pago' : hasComparAud === false ? 'Desbloquea Comparar y Auditar para este mes ($100 MXN)' : 'Revisa con IA si la descripción del emisor concuerda con su clave SAT'}
                   >
-                    {isFreemium ? (
+                    {isFreemium || (!session.isDemo && hasComparAud === false) ? (
                       <svg className="h-4 w-4 text-slate-400 dark:text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                         <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                       </svg>
@@ -608,6 +664,16 @@ export default function EstadosFinancierosView({ session, accountType, xmlMode =
         open={showUpsell}
         onClose={() => setShowUpsell(false)}
         featureName="Comparar vs mercado"
+      />
+
+      <OneTimePurchaseModal
+        open={showBuyComparAud}
+        onClose={() => setShowBuyComparAud(false)}
+        tipo="comparar_auditar_mes"
+        title="Desbloquea Comparar y Auditar"
+        description="Compara los gastos del RFC contra el estándar de mercado de su industria y revisa con IA si la descripción del emisor concuerda con su clave SAT. El pago te desbloquea las dos funciones para todo el mes calendario actual."
+        priceLabel="$100 MXN"
+        ctaLabel="Pagar $100 y desbloquear"
       />
     </div>
   )

@@ -102,6 +102,68 @@ export async function POST(req: NextRequest) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.metadata?.userId;
+
+        // Rama one-time (mode=payment): descarga de cuadro / desbloqueo mensual
+        // de Comparar+Auditar. No hay subscription; el trigger es solo el pago.
+        if (session.mode === "payment") {
+          const tipo = session.metadata?.tipo;
+          if (
+            !userId ||
+            (tipo !== "cuadro_download" && tipo !== "comparar_auditar_mes")
+          ) {
+            console.error("[billing/webhook] payment sin metadata util", session.id);
+            break;
+          }
+
+          const paymentIntentId = toId(session.payment_intent);
+          const monto = session.amount_total ?? 0;
+          const y = Number(session.metadata?.periodoYear);
+          const m = Number(session.metadata?.periodoMonth);
+          const isComparAud = tipo === "comparar_auditar_mes";
+
+          // Upsert por stripe_session_id (idempotente ante reentregas).
+          const existing = await db
+            .request()
+            .input("sess", session.id)
+            .query<{ id: number }>(
+              `SELECT id FROM AIC_compras_unicas WHERE stripe_session_id = @sess`,
+            );
+
+          if (existing.recordset.length === 0) {
+            await db
+              .request()
+              .input("user_id", userId)
+              .input("tipo", tipo)
+              .input("sess", session.id)
+              .input("pi", paymentIntentId)
+              .input("monto", monto)
+              .input("y", isComparAud && Number.isInteger(y) ? y : null)
+              .input("m", isComparAud && Number.isInteger(m) ? m : null)
+              .query(`
+                INSERT INTO AIC_compras_unicas
+                  (user_id, tipo, stripe_session_id, stripe_payment_intent_id,
+                   monto_centavos, estado, periodo_year, periodo_month, fecha_pago)
+                VALUES
+                  (@user_id, @tipo, @sess, @pi,
+                   @monto, 'pagada', @y, @m, GETDATE())
+              `);
+          } else {
+            await db
+              .request()
+              .input("sess", session.id)
+              .input("pi", paymentIntentId)
+              .query(`
+                UPDATE AIC_compras_unicas
+                SET estado = 'pagada',
+                    stripe_payment_intent_id = COALESCE(stripe_payment_intent_id, @pi),
+                    fecha_pago = COALESCE(fecha_pago, GETDATE())
+                WHERE stripe_session_id = @sess
+                  AND estado = 'pendiente'
+              `);
+          }
+          break;
+        }
+
         const planId = Number(session.metadata?.planId);
         const subscriptionId = toId(session.subscription);
         const customerId = toId(session.customer);

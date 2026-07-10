@@ -93,7 +93,8 @@ export function buildDashboardFromCfdis(
       if (r.regimenEmisor) regimenCount.set(r.regimenEmisor, (regimenCount.get(r.regimenEmisor) ?? 0) + 1)
       const cliente = r.nombreReceptor || r.rfcReceptor || 'Sin nombre'
       clientes.set(cliente, (clientes.get(cliente) ?? 0) + totalMXN)
-      for (const c of r.conceptos) {
+      // `conceptos` puede venir undefined si la fila fue cacheada por una versión previa del parser.
+      for (const c of (Array.isArray(r.conceptos) ? r.conceptos : [])) {
         const key = c.descripcion || '(Sin concepto)'
         conceptosIngresos.set(key, (conceptosIngresos.get(key) ?? 0) + c.importe * tc)
       }
@@ -102,7 +103,7 @@ export function buildDashboardFromCfdis(
       egresosCount++
       const prov = r.nombreEmisor || r.rfcEmisor || 'Sin nombre'
       proveedores.set(prov, (proveedores.get(prov) ?? 0) + totalMXN)
-      for (const c of r.conceptos) {
+      for (const c of (Array.isArray(r.conceptos) ? r.conceptos : [])) {
         const key = c.descripcion || '(Sin concepto)'
         conceptosEgresos.set(key, (conceptosEgresos.get(key) ?? 0) + c.importe * tc)
       }

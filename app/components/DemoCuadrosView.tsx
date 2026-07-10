@@ -23,6 +23,7 @@ import {
   TablaPagos, Tablaflujo, TablaNotasCredito,
 } from './facturas-tables'
 import FreemiumUpsellModal from './FreemiumUpsellModal'
+import OneTimePurchaseModal from './OneTimePurchaseModal'
 
 interface Props {
   session: JWTPayload
@@ -84,6 +85,10 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
   const isRateLimited = session.isDemo || Boolean(user?.isFreemium)
   const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const [showUpsell, setShowUpsell] = useState(false)
+  // Freemium ya no ve el upsell de suscripcion para descargar el cuadro:
+  // ahora paga $50 MXN por descarga suelta (compra one-time). El modal de
+  // suscripcion queda como fallback para otras funciones bloqueadas.
+  const [showBuyCuadro, setShowBuyCuadro] = useState(false)
   const now = new Date()
   const [rows, setRows] = useState<CfdiRow[]>([])
   const [invalidCount, setInvalidCount] = useState(0)
@@ -263,6 +268,61 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
     }
   }
 
+  // Freemium: cada descarga del cuadro clasificado cuesta $50 MXN (one-time).
+  // Si ya tienen una compra 'pagada' sin consumir la consumimos y descargamos;
+  // si no, abrimos el modal de compra que lleva a Stripe Checkout.
+  // (El Excel plano queda gratis: es el respaldo de bajo valor para engancharse.)
+  const consumeAndExportRef = useRef(false)
+  async function attemptFreemiumClassifiedExport() {
+    if (rows.length === 0 || exportingClassified) return
+    if (consumeAndExportRef.current) return
+    consumeAndExportRef.current = true
+    try {
+      const check = await fetch('/api/billing/one-time?tipo=cuadro_download', {
+        cache: 'no-store',
+      })
+      const body = (await check.json().catch(() => ({}))) as { available?: boolean }
+      if (!check.ok || !body.available) {
+        setShowBuyCuadro(true)
+        return
+      }
+      const consume = await fetch('/api/billing/one-time/consume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tipo: 'cuadro_download' }),
+      })
+      if (!consume.ok) {
+        // 402 => otra pestaña la consumio; volver a ofrecer compra.
+        setShowBuyCuadro(true)
+        return
+      }
+      await handleExportClassified()
+    } catch {
+      alert('No se pudo verificar tu compra. Intenta de nuevo.')
+    } finally {
+      consumeAndExportRef.current = false
+    }
+  }
+
+  // Al regresar del Stripe Checkout (?onetime=cuadro) intentamos consumir + descargar
+  // automaticamente. Solo aplica para freemium; corre una vez tras cargar las filas.
+  const autoDownloadDoneRef = useRef(false)
+  useEffect(() => {
+    if (!isFreemium) return
+    if (autoDownloadDoneRef.current) return
+    if (rows.length === 0) return
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('onetime') !== 'cuadro') return
+    autoDownloadDoneRef.current = true
+    // Limpia el query param para no reintentar en un refresh.
+    params.delete('onetime')
+    const clean = window.location.pathname + (params.toString() ? `?${params.toString()}` : '')
+    window.history.replaceState({}, '', clean)
+    attemptFreemiumClassifiedExport()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFreemium, rows.length])
+
   // La DESCARGA junta todos los CFDIs en un solo Excel plano (una hoja, sin
   // clasificar). La clasificación exportable es la función de pago.
   async function handleExport() {
@@ -350,7 +410,7 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
               <button
                 onClick={() => {
                   if (session.isDemo) { window.location.assign('/register'); return }
-                  if (isFreemium) { setShowUpsell(true); return }
+                  if (isFreemium) { attemptFreemiumClassifiedExport(); return }
                   handleExportClassified()
                 }}
                 disabled={!session.isDemo && !isFreemium && (rows.length === 0 || exportingClassified)}
@@ -559,6 +619,16 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
         open={showUpsell}
         onClose={() => setShowUpsell(false)}
         featureName="Descargar cuadro AIcuenta"
+      />
+
+      <OneTimePurchaseModal
+        open={showBuyCuadro}
+        onClose={() => setShowBuyCuadro(false)}
+        tipo="cuadro_download"
+        title="Descargar cuadro AICuenta"
+        description="Descarga el Excel con una pestaña por sección clasificada (Ingresos, Egresos, Nómina, Retenciones, Pagos, Flujo, Notas). El pago es único, por esta descarga."
+        priceLabel="$50 MXN"
+        ctaLabel="Pagar $50 y descargar"
       />
     </div>
   )

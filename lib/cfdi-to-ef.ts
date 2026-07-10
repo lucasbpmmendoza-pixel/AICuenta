@@ -27,7 +27,8 @@ function accumulate(map: Map<string, Acc>, r: CfdiRow): void {
   const tc = r.tipoCambio || 1
   const subtotal = r.subtotal || 0
   // Si el CFDI no trae partidas, se usa una sintética con el subtotal completo.
-  const conceptos = r.conceptos.length > 0
+  // `conceptos` puede venir undefined si la fila fue cacheada por una versión previa del parser.
+  const conceptos = Array.isArray(r.conceptos) && r.conceptos.length > 0
     ? r.conceptos
     : [{ descripcion: '(Sin concepto registrado)', claveProdServ: '', cantidad: 0, importe: subtotal }]
 
