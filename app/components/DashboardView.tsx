@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import DashboardFooter from "./DashboardFooter";
 import DashboardCharts, { type DashboardData } from "./DashboardCharts";
+import FiscalHealthScore from "./FiscalHealthScore";
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
@@ -256,7 +257,14 @@ export default function DashboardView({ session, accountType, xmlMode = false }:
               </div>
             </div>
           ) : (
-            <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} selectedRfc={selectedRfc} />
+            <>
+              <DashboardCharts data={data} loading={loading} mes={MESES[month - 1]} anio={year} selectedRfc={selectedRfc} />
+              <FiscalHealthScore
+                ingresos={data?.ingresos.total ?? 0}
+                egresos={data?.egresos.total ?? 0}
+                loading={loading}
+              />
+            </>
           )}
         </div>
         <DashboardFooter />
