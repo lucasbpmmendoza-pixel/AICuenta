@@ -16,6 +16,11 @@ interface Rfc {
   downloads_enabled: boolean
   created_at: string
   last_update: string
+  cfdis_5a: number
+}
+
+function formatCfdis(n: number) {
+  return new Intl.NumberFormat('es-MX').format(n)
 }
 
 interface Props {
@@ -394,6 +399,10 @@ export default function RFCsView({ readOnly = false }: Props) {
                         </div>
                         <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                           Actualizado: {formatDate(r.last_update)} · Registrado: {formatDate(r.created_at)}
+                        </p>
+                        <p className="text-xs mt-1 text-slate-600 dark:text-zinc-300">
+                          <span className="font-semibold">{formatCfdis(r.cfdis_5a ?? 0)}</span>
+                          <span className="text-slate-400 dark:text-zinc-500"> CFDIs en los últimos 5 años</span>
                         </p>
                       </div>
 
