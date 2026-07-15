@@ -5,7 +5,7 @@ import { getDb } from "@/lib/db";
 import { signToken, setAuthCookie } from "@/lib/auth";
 import { getPostLoginRedirect } from "@/lib/redirect";
 import { verifyRecaptcha } from "@/lib/recaptcha";
-import { DEMO_COOKIE_NAME } from "@/lib/demo-mode";
+import { DEMO_COOKIE_NAME, isDemoEmail } from "@/lib/demo-mode";
 
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email("Correo inválido"),
@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
     name: user.name,
     role,
     ...(user.owner_id ? { ownerId: user.owner_id } : {}),
+    ...(isDemoEmail(user.email) ? { isDemo: true } : {}),
   });
   await setAuthCookie(token);
 

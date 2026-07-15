@@ -2,12 +2,19 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { userHasEfiel } from "@/lib/redirect";
+import { isDemoEmail } from "@/lib/demo-mode";
 import FacturasView from "@/app/components/FacturasView";
 import DemoCuadrosView from "@/app/components/DemoCuadrosView";
 
 export default async function FacturasPage() {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // Cuenta demo dedicada (p. ej. marketing): ve las facturas demo ya cargadas,
+  // con sus cuadros descargables — NO la herramienta de subir XMLs.
+  if (session.isDemo && isDemoEmail(session.email)) {
+    return <FacturasView session={session} accountType="multi" />;
+  }
 
   // En modo demo, Facturas se convierte en la herramienta "Crea tus cuadros gratis":
   // el visitante sube sus propios XMLs y se procesan localmente (sin tocar la BD).

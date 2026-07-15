@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo, DragEvent, ChangeEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import DashboardFooter from './DashboardFooter'
@@ -80,6 +81,7 @@ async function collectFilesFromEntries(entries: FileSystemEntry[]): Promise<File
 
 export default function DemoCuadrosView({ session, accountType }: Props) {
   const { user } = useAuth()
+  const router = useRouter()
   // Solo demo y freemium tienen limite en las descargas client-side. Los de pago
   // sin e.firma que caen aqui mientras la configuran no se limitan.
   const isRateLimited = session.isDemo || Boolean(user?.isFreemium)
@@ -373,6 +375,13 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Volver a Facturas / demos — simétrico a la opción "Sube tus XMLs" del selector de Facturas. */}
+              <button
+                onClick={() => router.push('/dashboard/facturas')}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 px-4 py-2 text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
+              >
+                ← Volver a Facturas
+              </button>
               {/* Selector de mes: solo salen los periodos que traen CFDIs cargados,
                   más "Todos los meses" para ver el cuadro completo. */}
               {availablePeriods.length > 0 && (

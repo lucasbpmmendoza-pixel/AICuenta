@@ -9,6 +9,7 @@ import OnboardingModal from './OnboardingModal'
 import NotificationBell from './NotificationBell'
 import FreemiumUpsellModal from './FreemiumUpsellModal'
 import { useAuth } from './AuthProvider'
+import { isDemoEmail } from '@/lib/demo-mode'
 import { FINDOC_CHAT_KEY, FISCALGPT_CHAT_KEY, clearChatMessages } from '@/lib/chat-persistence'
 import { clearLocalNotifications } from '@/lib/local-notifications'
 
@@ -200,6 +201,9 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
   const { dark, toggle } = useTheme()
   const { user } = useAuth()
   const isFreemium = !isDemo && Boolean(user?.isFreemium)
+  // El botón de salir se oculta solo para el visitante demo anónimo (demo@aicuenta.local).
+  // Las cuentas reales en modo demo (p. ej. Martin, marketing) sí pueden cerrar sesión.
+  const canLogout = !isDemo || isDemoEmail(user?.email)
   const [upsellFor, setUpsellFor] = useState<string | null>(null)
 
   const demoEnabled = isDemo
@@ -446,7 +450,7 @@ export default function Sidebar({ userName, accountType, role, ownerId, isDemo =
           </button>
         </div>
 
-        {!demoEnabled && (
+        {canLogout && (
           <button
             onClick={() => {
               void handleLogout()

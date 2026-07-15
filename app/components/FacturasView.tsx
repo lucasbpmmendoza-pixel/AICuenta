@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import type { JWTPayload } from '@/lib/auth'
 import Sidebar from './Sidebar'
 import TopBar from './TopBar'
@@ -53,8 +54,12 @@ interface Props {
   accountType: 'single' | 'multi'
 }
 
+// Valor centinela del selector de empresa: manda a la herramienta de subir XMLs.
+const UPLOAD_XML_OPTION = '__upload_xml__'
+
 export default function FacturasView({ session, accountType }: Props) {
   const { user } = useAuth()
+  const router = useRouter()
   const isFreemium = !session.isDemo && Boolean(user?.isFreemium)
   const now = new Date()
   const [rfcs, setRfcs]               = useState<RfcOption[]>([])
@@ -393,19 +398,23 @@ export default function FacturasView({ session, accountType }: Props) {
               <p className="text-sm text-slate-500 dark:text-zinc-400 mt-0.5">Listado y exportación de CFDIs</p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {/* RFC selector */}
-              {rfcs.length > 1 ? (
+              {/* RFC selector — incluye una opción para ir a subir XMLs (todos los usuarios) */}
+              {selectedRfc ? (
                 <select
                   value={selectedRfc}
-                  onChange={e => setSelectedRfc(e.target.value)}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (v === UPLOAD_XML_OPTION) {
+                      router.push('/dashboard/facturas/xml')
+                      return
+                    }
+                    setSelectedRfc(v)
+                  }}
                   className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ?? r.rfc}</option>)}
+                  <option value={UPLOAD_XML_OPTION}>Sube tus XMLs para la descarga</option>
                 </select>
-              ) : selectedRfc ? (
-                <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">
-                  {rfcs[0]?.alias ?? selectedRfc}
-                </span>
               ) : null}
 
               {/* Period type selector — oculto en freemium (forzado a "month") */}

@@ -4,7 +4,7 @@ import sql from "mssql";
 import { getDb } from "@/lib/db";
 import { signToken, setAuthCookie } from "@/lib/auth";
 import { getPostLoginRedirect } from "@/lib/redirect";
-import { DEMO_COOKIE_NAME } from "@/lib/demo-mode";
+import { DEMO_COOKIE_NAME, isDemoEmail } from "@/lib/demo-mode";
 
 interface GoogleTokenResponse {
   access_token: string;
@@ -162,6 +162,7 @@ export async function GET(req: NextRequest) {
     name: user.name,
     role,
     ...(user.owner_id ? { ownerId: user.owner_id } : {}),
+    ...(isDemoEmail(user.email) ? { isDemo: true } : {}),
   });
   await setAuthCookie(token);
 
