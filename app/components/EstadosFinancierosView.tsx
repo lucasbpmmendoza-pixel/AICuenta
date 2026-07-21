@@ -416,9 +416,9 @@ export default function EstadosFinancierosView({ session, accountType, xmlMode =
                 <select
                   value={selectedRfc}
                   onChange={e => setSelectedRfc(e.target.value)}
-                  className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-auto [field-sizing:content] rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  {rfcs.map(r => <option key={r.rfc} value={r.rfc}>{r.alias ?? r.rfc}</option>)}
+                  {[...rfcs].sort((a, b) => (a.alias ?? a.rfc).localeCompare(b.alias ?? b.rfc, 'es', { sensitivity: 'base', numeric: true })).map(r => <option key={r.rfc} value={r.rfc}>{r.rfc === selectedRfc ? r.rfc : (r.alias ? `${r.alias} — ${r.rfc}` : r.rfc)}</option>)}
                 </select>
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">

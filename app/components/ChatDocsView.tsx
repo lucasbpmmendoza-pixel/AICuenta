@@ -326,7 +326,7 @@ export default function ChatDocsView({ session, accountType }: Props) {
                   <option value="">
                     {rfcsLoading ? 'Cargando...' : rfcs.length === 0 ? 'Sin RFCs' : 'Sin contexto'}
                   </option>
-                  {rfcs.map((r) => (
+                  {[...rfcs].sort((a, b) => a.rfc.localeCompare(b.rfc, 'es', { sensitivity: 'base', numeric: true })).map((r) => (
                     <option key={r.id} value={r.rfc.toUpperCase()}>
                       {r.rfc.toUpperCase()}
                       {r.alias ? ` — ${r.alias}` : ''}

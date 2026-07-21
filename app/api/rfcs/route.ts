@@ -29,6 +29,16 @@ export async function GET() {
       ) c ON c.rfc = e.rfc
     `;
 
+    // Nombre del cliente desde tb_clientes (catalogo maestro), usado como
+    // fallback del alias de EFIELES para mostrar en el selector.
+    const CLIENTE_NAME_JOIN = `
+      OUTER APPLY (
+        SELECT TOP 1 tc.name
+        FROM tb_clientes tc WITH (NOLOCK)
+        WHERE tc.rfc = e.rfc
+      ) cli
+    `;
+
     // Miembros solo ven los RFCs que el owner les asignó explícitamente en member_rfcs
     if (session.role === "member") {
       const result = await db
@@ -43,18 +53,21 @@ export async function GET() {
           created_at: string;
           last_update: string;
           cfdis_5a: number;
+          cliente_nombre: string | null;
         }>(
           `SELECT e.id, e.rfc, e.alias, e.fiel, e.downloads_enabled, e.created_at, e.last_update,
-                  ISNULL(c.cfdis_5a, 0) AS cfdis_5a
+                  ISNULL(c.cfdis_5a, 0) AS cfdis_5a,
+                  cli.name AS cliente_nombre
            FROM EFIELES e
            INNER JOIN member_rfcs mr ON mr.efiel_id = e.id AND mr.member_id = @memberId
            ${CFDIS_5A_JOIN}
+           ${CLIENTE_NAME_JOIN}
            ORDER BY e.created_at DESC`
         );
       return NextResponse.json({
-        rfcs: result.recordset.map(r => ({
+        rfcs: result.recordset.map(({ cliente_nombre, ...r }) => ({
           ...r,
-          alias: rfcAlias(r.rfc) ?? r.alias,
+          alias: rfcAlias(r.rfc) ?? r.alias ?? cliente_nombre,
         })),
       });
     }
@@ -71,18 +84,21 @@ export async function GET() {
         created_at: string;
         last_update: string;
         cfdis_5a: number;
+        cliente_nombre: string | null;
       }>(
         `SELECT e.id, e.rfc, e.alias, e.fiel, e.downloads_enabled, e.created_at, e.last_update,
-                ISNULL(c.cfdis_5a, 0) AS cfdis_5a
+                ISNULL(c.cfdis_5a, 0) AS cfdis_5a,
+                cli.name AS cliente_nombre
          FROM EFIELES e
          ${CFDIS_5A_JOIN}
+         ${CLIENTE_NAME_JOIN}
          WHERE e.user_id = @user_id
          ORDER BY e.created_at DESC`
       );
     return NextResponse.json({
-      rfcs: result.recordset.map(r => ({
+      rfcs: result.recordset.map(({ cliente_nombre, ...r }) => ({
         ...r,
-        alias: rfcAlias(r.rfc) ?? r.alias,
+        alias: rfcAlias(r.rfc) ?? r.alias ?? cliente_nombre,
       })),
     });
   } catch (err) {

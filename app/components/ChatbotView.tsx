@@ -339,11 +339,11 @@ export default function ChatbotView({ session, accountType }: Props) {
                 <select
                   value={selectedRfc}
                   onChange={e => { setSelectedRfc(e.target.value); setMessages([]) }}
-                  className="rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8]"
+                  className="w-auto [field-sizing:content] rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8]"
                 >
-                  {rfcs.map(r => (
+                  {[...rfcs].sort((a, b) => (a.alias ?? a.rfc).localeCompare(b.alias ?? b.rfc, 'es', { sensitivity: 'base', numeric: true })).map(r => (
                     <option key={r.rfc} value={r.rfc}>
-                      {r.alias ?? r.rfc}
+                      {r.rfc === selectedRfc ? r.rfc : (r.alias ? `${r.alias} — ${r.rfc}` : r.rfc)}
                     </option>
                   ))}
                 </select>
