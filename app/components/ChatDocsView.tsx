@@ -15,6 +15,7 @@ import {
   isChatGenerating,
 } from '@/lib/chat-persistence'
 import { pushLocalNotification } from '@/lib/local-notifications'
+import RfcSearchSelect from './RfcSearchSelect'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -306,33 +307,18 @@ export default function ChatDocsView({ session, accountType }: Props) {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2">
-                <label htmlFor="chat-docs-rfc" className="text-xs font-semibold text-slate-600 dark:text-zinc-400 uppercase tracking-wide">
+                <span className="text-xs font-semibold text-slate-600 dark:text-zinc-400 uppercase tracking-wide">
                   RFC
-                </label>
-                <select
-                  id="chat-docs-rfc"
+                </span>
+                <RfcSearchSelect
+                  rfcs={rfcs.map(r => ({ rfc: r.rfc.toUpperCase(), alias: r.alias }))}
                   value={activeRfc}
-                  onChange={(e) => handleRfcChange(e.target.value)}
+                  onChange={(rfc) => handleRfcChange(rfc)}
+                  focusRingClass="focus:ring-emerald-500"
+                  placeholder={rfcsLoading ? 'Cargando...' : rfcs.length === 0 ? 'Sin RFCs' : 'Sin contexto'}
                   disabled={rfcsLoading || rfcs.length === 0}
-                  title={
-                    rfcsLoading
-                      ? 'Cargando tus RFCs...'
-                      : rfcs.length === 0
-                        ? 'No tienes RFCs registrados en tu cuenta'
-                        : 'Al elegir un RFC, el asistente tomará su cédula como contexto'
-                  }
-                  className="rounded-lg border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <option value="">
-                    {rfcsLoading ? 'Cargando...' : rfcs.length === 0 ? 'Sin RFCs' : 'Sin contexto'}
-                  </option>
-                  {[...rfcs].sort((a, b) => a.rfc.localeCompare(b.rfc, 'es', { sensitivity: 'base', numeric: true })).map((r) => (
-                    <option key={r.id} value={r.rfc.toUpperCase()}>
-                      {r.rfc.toUpperCase()}
-                      {r.alias ? ` — ${r.alias}` : ''}
-                    </option>
-                  ))}
-                </select>
+                  clearOption={{ label: 'Sin contexto' }}
+                />
               </div>
               <button
                 type="button"

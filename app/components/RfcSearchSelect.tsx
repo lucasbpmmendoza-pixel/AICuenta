@@ -13,6 +13,11 @@ interface Props {
   value: string
   onChange: (rfc: string) => void
   focusRingClass?: string
+  // Texto del boton cuando no hay valor seleccionado.
+  placeholder?: string
+  disabled?: boolean
+  // Opcion al inicio para limpiar la seleccion (llama a onChange('')).
+  clearOption?: { label: string }
   // Opcion extra que aparece al final del listado (p. ej. "Sube tus XMLs" en Facturas).
   extraOption?: { label: string; onSelect: () => void }
 }
@@ -30,6 +35,9 @@ export default function RfcSearchSelect({
   value,
   onChange,
   focusRingClass = 'focus:ring-blue-500',
+  placeholder,
+  disabled = false,
+  clearOption,
   extraOption,
 }: Props) {
   const [open, setOpen] = useState(false)
@@ -113,6 +121,20 @@ export default function RfcSearchSelect({
               />
             </div>
             <div className="max-h-72 overflow-y-auto py-1">
+              {clearOption && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange('')
+                    setOpen(false)
+                  }}
+                  className={`block w-full px-3 py-2 text-left text-sm italic text-slate-500 dark:text-zinc-400 hover:bg-slate-100 dark:hover:bg-zinc-800 ${
+                    value === '' ? 'bg-slate-50 dark:bg-zinc-800/60 font-semibold' : ''
+                  }`}
+                >
+                  {clearOption.label}
+                </button>
+              )}
               {filtered.length === 0 ? (
                 <div className="px-3 py-2 text-xs text-slate-500 dark:text-zinc-500">Sin resultados</div>
               ) : (
@@ -165,10 +187,11 @@ export default function RfcSearchSelect({
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen(v => !v)}
-        className={`inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 ${focusRingClass}`}
+        onClick={() => !disabled && setOpen(v => !v)}
+        disabled={disabled}
+        className={`inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed ${focusRingClass}`}
       >
-        <span>{value}</span>
+        <span className={value ? '' : 'italic text-slate-400 dark:text-zinc-500'}>{value || placeholder || ''}</span>
         <svg
           className={`h-4 w-4 opacity-60 transition-transform ${open ? 'rotate-180' : ''}`}
           viewBox="0 0 24 24"
