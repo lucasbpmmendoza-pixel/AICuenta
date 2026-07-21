@@ -12,6 +12,7 @@ import { logAction } from '@/lib/logs'
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
 import { readSelectedRfc, saveSelectedRfc } from '@/lib/rfc-selection'
+import RfcSearchSelect from './RfcSearchSelect'
 
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
@@ -53,9 +54,6 @@ interface Props {
   session: JWTPayload
   accountType: 'single' | 'multi'
 }
-
-// Valor centinela del selector de empresa: manda a la herramienta de subir XMLs.
-const UPLOAD_XML_OPTION = '__upload_xml__'
 
 export default function FacturasView({ session, accountType }: Props) {
   const { user } = useAuth()
@@ -400,21 +398,16 @@ export default function FacturasView({ session, accountType }: Props) {
             <div className="flex items-center gap-3 flex-wrap">
               {/* RFC selector — incluye una opción para ir a subir XMLs (todos los usuarios) */}
               {selectedRfc ? (
-                <select
+                <RfcSearchSelect
+                  rfcs={rfcs}
                   value={selectedRfc}
-                  onChange={e => {
-                    const v = e.target.value
-                    if (v === UPLOAD_XML_OPTION) {
-                      router.push('/dashboard/facturas/xml')
-                      return
-                    }
-                    setSelectedRfc(v)
+                  onChange={setSelectedRfc}
+                  focusRingClass="focus:ring-blue-500"
+                  extraOption={{
+                    label: 'Sube tus XMLs para la descarga',
+                    onSelect: () => router.push('/dashboard/facturas/xml'),
                   }}
-                  className="w-auto [field-sizing:content] rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {[...rfcs].sort((a, b) => (a.alias ?? a.rfc).localeCompare(b.alias ?? b.rfc, 'es', { sensitivity: 'base', numeric: true })).map(r => <option key={r.rfc} value={r.rfc}>{r.rfc === selectedRfc ? r.rfc : (r.alias ? `${r.alias} — ${r.rfc}` : r.rfc)}</option>)}
-                  <option value={UPLOAD_XML_OPTION}>Sube tus XMLs para la descarga</option>
-                </select>
+                />
               ) : null}
 
               {/* Period type selector — oculto en freemium (forzado a "month") */}

@@ -16,6 +16,7 @@ import {
   isChatGenerating,
 } from '@/lib/chat-persistence'
 import { pushLocalNotification } from '@/lib/local-notifications'
+import RfcSearchSelect from './RfcSearchSelect'
 
 interface RfcOption { id: string; rfc: string; alias: string | null }
 
@@ -336,17 +337,12 @@ export default function ChatbotView({ session, accountType }: Props) {
 
               {/* RFC selector */}
               {rfcs.length > 1 ? (
-                <select
+                <RfcSearchSelect
+                  rfcs={rfcs}
                   value={selectedRfc}
-                  onChange={e => { setSelectedRfc(e.target.value); setMessages([]) }}
-                  className="w-auto [field-sizing:content] rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-[#7b6fe8]"
-                >
-                  {[...rfcs].sort((a, b) => (a.alias ?? a.rfc).localeCompare(b.alias ?? b.rfc, 'es', { sensitivity: 'base', numeric: true })).map(r => (
-                    <option key={r.rfc} value={r.rfc}>
-                      {r.rfc === selectedRfc ? r.rfc : (r.alias ? `${r.alias} — ${r.rfc}` : r.rfc)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={rfc => { setSelectedRfc(rfc); setMessages([]) }}
+                  focusRingClass="focus:ring-[#7b6fe8]"
+                />
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-3 py-1 text-xs font-bold text-blue-700 dark:text-blue-300 tracking-wide">
                   {rfcDisplay}

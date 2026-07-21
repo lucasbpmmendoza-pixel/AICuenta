@@ -7,6 +7,7 @@ import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import DashboardFooter from "./DashboardFooter";
 import DashboardCharts, { type DashboardData } from "./DashboardCharts";
+import RfcSearchSelect from "./RfcSearchSelect";
 import FiscalHealthScore from "./FiscalHealthScore";
 import { useAuth } from './AuthProvider'
 import FreemiumHistoryBanner from './FreemiumHistoryBanner'
@@ -183,13 +184,12 @@ export default function DashboardView({ session, accountType, xmlMode = false }:
             <div className="flex items-center gap-3 flex-wrap">
               {/* RFC selector */}
               {rfcs.length > 1 ? (
-                <select
+                <RfcSearchSelect
+                  rfcs={rfcs}
                   value={selectedRfc}
-                  onChange={e => setSelectedRfc(e.target.value)}
-                  className="w-auto [field-sizing:content] rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm font-semibold text-slate-700 dark:text-zinc-300 focus:outline-none focus:ring-2 focus:ring-deep-light-500"
-                >
-                  {[...rfcs].sort((a, b) => (a.alias ?? a.rfc).localeCompare(b.alias ?? b.rfc, 'es', { sensitivity: 'base', numeric: true })).map(r => <option key={r.rfc} value={r.rfc}>{r.rfc === selectedRfc ? r.rfc : (r.alias ? `${r.alias} — ${r.rfc}` : r.rfc)}</option>)}
-                </select>
+                  onChange={setSelectedRfc}
+                  focusRingClass="focus:ring-deep-light-500"
+                />
               ) : selectedRfc ? (
                 <span className="inline-flex items-center rounded-full bg-deep-light-50 dark:bg-deep-light-light-900/30 px-3 py-1 text-xs font-bold text-deep-light-700 dark:text-deep-light-300 tracking-wide">
                   {selectedRfc}
