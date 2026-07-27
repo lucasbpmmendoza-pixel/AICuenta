@@ -6,9 +6,18 @@ import { isDemoEmail } from "@/lib/demo-mode";
 import FacturasView from "@/app/components/FacturasView";
 import DemoCuadrosView from "@/app/components/DemoCuadrosView";
 
-export default async function FacturasPage() {
+export default async function FacturasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   const session = await getSession();
   if (!session) redirect("/login");
+
+  // En modo demo, "?view=facturas" fuerza la vista con facturas precargadas
+  // (a donde manda el boton "Volver a Facturas" desde la herramienta de XMLs).
+  const params = await searchParams;
+  const forceFacturas = params?.view === "facturas";
 
   // Cuenta demo dedicada (p. ej. marketing): ve las facturas demo ya cargadas,
   // con sus cuadros descargables — NO la herramienta de subir XMLs.
@@ -16,9 +25,13 @@ export default async function FacturasPage() {
     return <FacturasView session={session} accountType="multi" />;
   }
 
-  // En modo demo, Facturas se convierte en la herramienta "Crea tus cuadros gratis":
-  // el visitante sube sus propios XMLs y se procesan localmente (sin tocar la BD).
+  // En modo demo, Facturas por defecto es la herramienta "Crea tus cuadros gratis"
+  // (el hook para visitantes). Con ?view=facturas se muestra la vista con las
+  // facturas demo — el mismo FacturasView que ve la cuenta demo dedicada.
   if (session.isDemo) {
+    if (forceFacturas) {
+      return <FacturasView session={session} accountType="multi" />;
+    }
     return <DemoCuadrosView session={session} accountType="multi" />;
   }
 

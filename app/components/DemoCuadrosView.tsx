@@ -375,9 +375,11 @@ export default function DemoCuadrosView({ session, accountType }: Props) {
               </p>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Volver a Facturas / demos — simétrico a la opción "Sube tus XMLs" del selector de Facturas. */}
+              {/* Volver a Facturas / demos — simétrico a la opción "Sube tus XMLs" del selector de Facturas.
+                  En demo, /dashboard/facturas muestra esta misma vista (el hook), así que
+                  forzamos ?view=facturas para llegar al FacturasView con datos demo. */}
               <button
-                onClick={() => router.push('/dashboard/facturas')}
+                onClick={() => router.push(session.isDemo ? '/dashboard/facturas?view=facturas' : '/dashboard/facturas')}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-zinc-700 px-4 py-2 text-sm font-semibold text-slate-600 dark:text-zinc-300 hover:bg-slate-100 dark:hover:bg-zinc-800 transition"
               >
                 ← Volver a Facturas
