@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 
-// Fondo de marca: gradiente purpura -> lima. Fallback CSS por si la imagen no carga.
+const CARGOS = [
+  "Dueño(a)",
+  "Director(a)",
+  "Administrador(a)",
+  "Contador(a)",
+  "Auxiliar contable",
+  "Otro",
+] as const;
+
 const BG_STYLE: React.CSSProperties = {
   backgroundImage:
     "url('/promos-bg.jpg'), linear-gradient(135deg, #7B6FE8 0%, #A5C4C8 50%, #91EB78 100%)",
@@ -11,19 +19,40 @@ const BG_STYLE: React.CSSProperties = {
   backgroundRepeat: "no-repeat",
 };
 
+const inputCls =
+  "mt-2 block h-14 w-full rounded-2xl border border-white/60 bg-white/80 px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#7B6FE8] focus:bg-white focus:ring-4 focus:ring-[#7B6FE8]/25 disabled:opacity-60 dark:border-white/10 dark:bg-slate-900/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-[#91EB78] dark:focus:bg-slate-900 dark:focus:ring-[#91EB78]/25";
+
+const labelCls =
+  "block text-sm font-semibold text-slate-800 dark:text-slate-200";
+
 export default function PromosView() {
-  const [nombre, setNombre]   = useState("");
-  const [celular, setCelular] = useState("");
-  const [correo, setCorreo]   = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
-  const [sent, setSent]       = useState(false);
+  const [nombre, setNombre]         = useState("");
+  const [empresa, setEmpresa]       = useState("");
+  const [cargoOpcion, setCargoOpcion] = useState<string>("");
+  const [cargoOtro, setCargoOtro]   = useState("");
+  const [celular, setCelular]       = useState("");
+  const [correo, setCorreo]         = useState("");
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState("");
+  const [sent, setSent]             = useState(false);
+
+  const esOtro = cargoOpcion === "Otro";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    setLoading(true);
 
+    if (!cargoOpcion) {
+      setError("Selecciona un cargo.");
+      return;
+    }
+    const cargoFinal = esOtro ? cargoOtro.trim() : cargoOpcion;
+    if (!cargoFinal) {
+      setError("Escribe tu cargo.");
+      return;
+    }
+
+    setLoading(true);
     try {
       const params = new URLSearchParams(window.location.search);
       const origen = params.get("utm_source") || params.get("utm_campaign") || "directo";
@@ -33,6 +62,8 @@ export default function PromosView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre:  nombre.trim(),
+          empresa: empresa.trim(),
+          cargo:   cargoFinal,
           celular: celular.trim(),
           correo:  correo.trim(),
           origen:  origen.slice(0, 60),
@@ -70,7 +101,7 @@ export default function PromosView() {
             Quedaste registrado
           </h1>
           <p className="mt-3 text-base leading-6 text-slate-700 dark:text-slate-300">
-            Pronto vas a recibir las promociones exclusivas de AICuenta en tu correo y celular.
+            Pronto vas a recibir las promociones exclusivas de AICuenta en tu correo y numero.
           </p>
         </div>
       </div>
@@ -97,56 +128,69 @@ export default function PromosView() {
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-1 flex-col space-y-4">
             <div>
-              <label htmlFor="nombre" className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Nombre
-              </label>
+              <label htmlFor="nombre" className={labelCls}>Nombre</label>
               <input
-                id="nombre"
-                type="text"
-                required
-                maxLength={120}
-                autoComplete="name"
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                disabled={loading}
-                className="mt-2 block h-14 w-full rounded-2xl border border-white/60 bg-white/80 px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#7B6FE8] focus:bg-white focus:ring-4 focus:ring-[#7B6FE8]/25 disabled:opacity-60 dark:border-white/10 dark:bg-slate-900/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-[#91EB78] dark:focus:bg-slate-900 dark:focus:ring-[#91EB78]/25"
+                id="nombre" type="text" required maxLength={120} autoComplete="name"
+                value={nombre} onChange={(e) => setNombre(e.target.value)}
+                disabled={loading} className={inputCls}
               />
             </div>
 
             <div>
-              <label htmlFor="celular" className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Celular
-              </label>
+              <label htmlFor="empresa" className={labelCls}>Empresa o negocio</label>
               <input
-                id="celular"
-                type="tel"
-                required
-                maxLength={20}
-                inputMode="tel"
-                pattern="[0-9+()\-\s]{7,20}"
-                autoComplete="tel"
+                id="empresa" type="text" required maxLength={160} autoComplete="organization"
+                value={empresa} onChange={(e) => setEmpresa(e.target.value)}
+                disabled={loading} className={inputCls}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="cargo" className={labelCls}>Cargo</label>
+              <select
+                id="cargo" required
+                value={cargoOpcion} onChange={(e) => setCargoOpcion(e.target.value)}
+                disabled={loading}
+                className={inputCls + " appearance-none bg-[right_1rem_center] bg-no-repeat pr-10"}
+                style={{
+                  backgroundImage:
+                    "url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='2'><path d='M6 8l4 4 4-4'/></svg>\")",
+                }}
+              >
+                <option value="" disabled>Selecciona tu cargo</option>
+                {CARGOS.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+
+              {esOtro && (
+                <input
+                  type="text" required maxLength={60} autoFocus
+                  placeholder="Escribe tu cargo"
+                  value={cargoOtro} onChange={(e) => setCargoOtro(e.target.value)}
+                  disabled={loading}
+                  className={inputCls + " mt-3"}
+                />
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="correo" className={labelCls}>Correo</label>
+              <input
+                id="correo" type="email" required maxLength={160} autoComplete="email"
+                value={correo} onChange={(e) => setCorreo(e.target.value)}
+                disabled={loading} className={inputCls}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="celular" className={labelCls}>Numero</label>
+              <input
+                id="celular" type="tel" required maxLength={20} inputMode="tel"
+                pattern="[0-9+()\-\s]{7,20}" autoComplete="tel"
                 placeholder="10 digitos"
-                value={celular}
-                onChange={(e) => setCelular(e.target.value)}
-                disabled={loading}
-                className="mt-2 block h-14 w-full rounded-2xl border border-white/60 bg-white/80 px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#7B6FE8] focus:bg-white focus:ring-4 focus:ring-[#7B6FE8]/25 disabled:opacity-60 dark:border-white/10 dark:bg-slate-900/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-[#91EB78] dark:focus:bg-slate-900 dark:focus:ring-[#91EB78]/25"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="correo" className="block text-sm font-semibold text-slate-800 dark:text-slate-200">
-                Correo
-              </label>
-              <input
-                id="correo"
-                type="email"
-                required
-                maxLength={160}
-                autoComplete="email"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                disabled={loading}
-                className="mt-2 block h-14 w-full rounded-2xl border border-white/60 bg-white/80 px-4 text-base text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-[#7B6FE8] focus:bg-white focus:ring-4 focus:ring-[#7B6FE8]/25 disabled:opacity-60 dark:border-white/10 dark:bg-slate-900/70 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-[#91EB78] dark:focus:bg-slate-900 dark:focus:ring-[#91EB78]/25"
+                value={celular} onChange={(e) => setCelular(e.target.value)}
+                disabled={loading} className={inputCls}
               />
             </div>
 
