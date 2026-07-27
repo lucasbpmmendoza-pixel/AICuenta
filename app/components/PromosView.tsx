@@ -73,13 +73,13 @@ export default function PromosView() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || !data.ok) {
-        setError(data.error ?? "No pudimos registrarte. Intenta mas tarde.");
+        setError(data.error ?? "No pudimos registrarte. Intenta más tarde.");
         return;
       }
 
       setSent(true);
     } catch {
-      setError("Error de red. Verifica tu conexion e intenta de nuevo.");
+      setError("Error de red. Verifica tu conexión e intenta de nuevo.");
     } finally {
       setLoading(false);
     }
@@ -101,7 +101,7 @@ export default function PromosView() {
             Quedaste registrado
           </h1>
           <p className="mt-3 text-base leading-6 text-slate-700 dark:text-slate-300">
-            Pronto vas a recibir las promociones exclusivas de AICuenta en tu correo y numero.
+            Pronto vas a recibir las promociones exclusivas de AICuenta en tu correo y número.
           </p>
         </div>
       </div>
@@ -122,7 +122,7 @@ export default function PromosView() {
               Promociones <span className="text-[#7B6FE8] dark:text-[#91EB78]">AICuenta</span>
             </h1>
             <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-              Registrate y recibi las promociones exclusivas de AICuenta.
+              Regístrate y recibe las promociones exclusivas de AICuenta.
             </p>
           </header>
 
@@ -184,11 +184,11 @@ export default function PromosView() {
             </div>
 
             <div>
-              <label htmlFor="celular" className={labelCls}>Numero</label>
+              <label htmlFor="celular" className={labelCls}>Número</label>
               <input
                 id="celular" type="tel" required maxLength={20} inputMode="tel"
                 pattern="[0-9+()\-\s]{7,20}" autoComplete="tel"
-                placeholder="10 digitos"
+                placeholder="10 dígitos"
                 value={celular} onChange={(e) => setCelular(e.target.value)}
                 disabled={loading} className={inputCls}
               />
