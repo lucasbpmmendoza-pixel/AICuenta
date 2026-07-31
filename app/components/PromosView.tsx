@@ -101,7 +101,7 @@ export default function PromosView() {
             Quedaste registrado
           </h1>
           <p className="mt-3 text-base leading-6 text-slate-700 dark:text-slate-300">
-            Pronto vas a recibir las promociones exclusivas de AICuenta en tu correo y número.
+            Te vamos a enviar los datos del webinar a tu correo y número.
           </p>
         </div>
       </div>
@@ -119,10 +119,10 @@ export default function PromosView() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo6-negro.png"  alt="AIcuenta" className="mx-auto mb-3 hidden h-16 w-auto dark:block" />
             <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">
-              Únete a <span className="text-[#7B6FE8] dark:text-[#91EB78]">AICuenta</span>
+              Regístrate al <span className="text-[#7B6FE8] dark:text-[#91EB78]">webinar</span>
             </h1>
             <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-              Automatiza tu contabilidad desde tus propios datos.
+              Descubre la clave para mejorar tus finanzas. Asegura tu lugar.
             </p>
           </header>
 

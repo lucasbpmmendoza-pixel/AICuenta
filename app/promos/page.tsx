@@ -1,8 +1,8 @@
 import PromosView from "../components/PromosView";
 
 export const metadata = {
-  title: "Únete a AICuenta",
-  description: "Automatiza tu contabilidad desde tus propios datos.",
+  title: "Regístrate al webinar",
+  description: "Descubre la clave para mejorar tus finanzas. Asegura tu lugar.",
 };
 
 export default function PromosPage() {
