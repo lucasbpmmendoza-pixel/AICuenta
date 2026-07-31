@@ -119,10 +119,10 @@ export default function PromosView() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo6-negro.png"  alt="AIcuenta" className="mx-auto mb-3 hidden h-16 w-auto dark:block" />
             <h1 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">
-              Promociones <span className="text-[#7B6FE8] dark:text-[#91EB78]">AICuenta</span>
+              Únete a <span className="text-[#7B6FE8] dark:text-[#91EB78]">AICuenta</span>
             </h1>
             <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
-              Regístrate y recibe las promociones exclusivas de AICuenta.
+              Automatiza tu contabilidad desde tus propios datos.
             </p>
           </header>
 
