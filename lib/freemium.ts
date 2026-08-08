@@ -2,6 +2,7 @@ import type sql from "mssql";
 import type { JWTPayload } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
+import { isUnlimitedEmail } from "@/lib/plan-overrides";
 
 /**
  * Tier freemium de AICuenta.
@@ -51,9 +52,10 @@ export async function loadAccountAccess(
     const result = await db
       .request()
       .input("id", ownerId)
-      .query<{ account_type: string | null; has_active: number | null }>(`
+      .query<{ account_type: string | null; email: string | null; has_active: number | null }>(`
         SELECT
           u.account_type,
+          u.email,
           (
             SELECT TOP 1 1
             FROM membresias m WITH (NOLOCK)
@@ -67,7 +69,8 @@ export async function loadAccountAccess(
     const row = result.recordset[0];
     return {
       accountType: row?.account_type ?? null,
-      isFreemium: !row?.has_active, // sin membresia activa => freemium
+      // Override hardcodeado: correos internos nunca son freemium.
+      isFreemium: isUnlimitedEmail(row?.email) ? false : !row?.has_active,
     };
   } catch (err) {
     // Respaldo: si `membresias` no existe en este entorno, al menos lee

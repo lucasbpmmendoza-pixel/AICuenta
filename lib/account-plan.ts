@@ -1,4 +1,5 @@
 import type sql from "mssql";
+import { isUnlimitedEmail, UNLIMITED_LIMIT } from "@/lib/plan-overrides";
 
 export type AccountType = "single" | "multi";
 export type PlanType = "basic" | "business_pro" | "business_scale";
@@ -6,6 +7,7 @@ export type PlanType = "basic" | "business_pro" | "business_scale";
 type UserPlanRow = {
   account_type: string | null;
   plan_type?: string | null;
+  email?: string | null;
 };
 
 export type PlanLimits = {
@@ -71,15 +73,22 @@ export async function loadOwnerPlanLimits(db: sql.ConnectionPool, ownerId: strin
     const result = await db
       .request()
       .input("id", ownerId)
-      .query<UserPlanRow>("SELECT account_type, plan_type FROM users WHERE id = @id");
+      .query<UserPlanRow>("SELECT account_type, plan_type, email FROM users WHERE id = @id");
     row = result.recordset[0];
   } catch {
     const result = await db
       .request()
       .input("id", ownerId)
-      .query<UserPlanRow>("SELECT account_type FROM users WHERE id = @id");
+      .query<UserPlanRow>("SELECT account_type, email FROM users WHERE id = @id");
     row = result.recordset[0];
   }
 
-  return resolvePlanLimits(row?.account_type ?? null, row?.plan_type ?? null);
+  const limits = resolvePlanLimits(row?.account_type ?? null, row?.plan_type ?? null);
+
+  // Override hardcodeado: correos internos con RFC (y miembros) ilimitados.
+  if (isUnlimitedEmail(row?.email)) {
+    return { ...limits, maxRfcs: UNLIMITED_LIMIT, maxMembers: UNLIMITED_LIMIT };
+  }
+
+  return limits;
 }
