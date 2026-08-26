@@ -176,7 +176,12 @@ export async function fetchFacturasData(
           ISNULL(LugarExpedicion,'') AS LugarExpedicion,
           ISNULL(Movimiento,'') AS Movimiento
         FROM facturalo_cfdis WITH (NOLOCK)
-        WHERE RFC_Emisor=@rfc AND TipoComprobante='I'
+        -- Se filtra por rfc_cliente (la "propiedad" de la fila), NO por RFC_Emisor.
+        -- El mismo CFDI se guarda una vez por cada cliente involucrado (una fila para
+        -- el emisor y otra para el receptor); Movimiento es relativo a rfc_cliente.
+        -- Filtrar por RFC_Emisor traía además las copias de OTROS clientes receptores,
+        -- por eso la factura salía duplicada / de más.
+        WHERE rfc_cliente=@rfc AND TipoComprobante='I' AND Movimiento='Ingreso'
           AND Fecha>=@dateFrom AND Fecha<@dateTo
         ORDER BY Fecha DESC
       `),
@@ -199,7 +204,9 @@ export async function fetchFacturasData(
           ISNULL(SUM(ISNULL(TotalRetenidoIVA,0)     * ${TC}),0) AS IVA_Retenido_MXN,
           ISNULL(SUM(ISNULL(TotalTrasladadoIEPS,0)  * ${TC}),0) AS IEPS_MXN
         FROM facturalo_cfdis WITH (NOLOCK)
-        WHERE RFC_Receptor=@rfc AND TipoComprobante='I'
+        -- Igual que Ingresos: se filtra por rfc_cliente + Movimiento='Egreso'
+        -- (los gastos propios de este cliente), no por RFC_Receptor.
+        WHERE rfc_cliente=@rfc AND TipoComprobante='I' AND Movimiento='Egreso'
           AND Fecha>=@dateFrom AND Fecha<@dateTo
         GROUP BY RFC_Emisor, RazonSocialEmisor
         ORDER BY Total_MXN DESC
@@ -229,7 +236,7 @@ export async function fetchFacturasData(
             ISNULL(LugarExpedicion,'') AS LugarExpedicion,
             'Nómina Egreso' AS TipoNomina
           FROM facturalo_cfdis WITH (NOLOCK)
-          WHERE RFC_Emisor=@rfc AND TipoComprobante='N'
+          WHERE rfc_cliente=@rfc AND TipoComprobante='N' AND Movimiento='Egreso'
             AND Fecha>=@dateFrom AND Fecha<@dateTo
           UNION ALL
           SELECT
@@ -249,7 +256,7 @@ export async function fetchFacturasData(
             ISNULL(LugarExpedicion,'') AS LugarExpedicion,
             'Nómina Ingreso' AS TipoNomina
           FROM facturalo_cfdis WITH (NOLOCK)
-          WHERE RFC_Receptor=@rfc AND TipoComprobante='N'
+          WHERE rfc_cliente=@rfc AND TipoComprobante='N' AND Movimiento='Ingreso'
             AND Fecha>=@dateFrom AND Fecha<@dateTo
         ) n
         ORDER BY Fecha DESC
@@ -281,7 +288,7 @@ export async function fetchFacturasData(
             ISNULL(TotalRetenidoIVA,0)  * ${TC} AS IVA_Ret_MXN,
             'Emitida' AS Direccion
           FROM facturalo_cfdis WITH (NOLOCK)
-          WHERE RFC_Emisor=@rfc
+          WHERE rfc_cliente=@rfc AND Movimiento='Ingreso'
             AND (TotalRetenidoISR>0 OR TotalRetenidoIVA>0 OR TotalRetenidoIEPS>0)
             AND Fecha>=@dateFrom AND Fecha<@dateTo
           UNION ALL
@@ -304,7 +311,7 @@ export async function fetchFacturasData(
             ISNULL(TotalRetenidoIVA,0)  * ${TC} AS IVA_Ret_MXN,
             'Recibida' AS Direccion
           FROM facturalo_cfdis WITH (NOLOCK)
-          WHERE RFC_Receptor=@rfc
+          WHERE rfc_cliente=@rfc AND Movimiento='Egreso'
             AND (TotalRetenidoISR>0 OR TotalRetenidoIVA>0 OR TotalRetenidoIEPS>0)
             AND Fecha>=@dateFrom AND Fecha<@dateTo
         ) r
