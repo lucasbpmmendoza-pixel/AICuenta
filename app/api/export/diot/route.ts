@@ -5,6 +5,13 @@ import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
+import {
+  type DiotCuadroRow,
+  buildDiotTxt,
+  generaLinea,
+  n,
+  toDiotLineInput,
+} from "@/lib/diot-format";
 
 type DiotRow = {
   rfcEmisor: string;
@@ -15,42 +22,6 @@ type DiotRow = {
   baseIva0: number;
   baseIvaExento: number;
 };
-
-type DiotLineInput = {
-  rfc: string;
-  tipoTercero: string;
-  base8: number;
-  iva8: number;
-  base16: number;
-  iva16: number;
-  base0: number;
-  baseExento: number;
-};
-
-function n(v: unknown): number {
-  const x = Number(v);
-  return Number.isFinite(x) ? x : 0;
-}
-
-function toSatInt(v: number): number {
-  return Math.max(0, Math.round(n(v)));
-}
-
-function tipoTerceroByRfc(rfc: string): string {
-  if (rfc === "XEXX010101000") return "05";
-  if (rfc === "XAXX010101000") return "15";
-  return "04";
-}
-
-function clampIva(base: number, iva: number, tasa: number): number {
-  const maxCalc = Math.round(base * tasa);
-  if (maxCalc < iva) return Math.max(0, iva - 1);
-  return iva;
-}
-
-function buildDiotLine(line: DiotLineInput): string {
-  return `${line.tipoTercero}|85|${line.rfc}|||||${line.base8 > 0 ? line.base8 : ""}||||${line.base16 > 0 ? line.base16 : ""}||||||${line.iva8 > 0 ? line.iva8 : ""}||||${line.iva16 > 0 ? line.iva16 : ""}||||||||||||||||||||||||||||${line.baseExento > 0 ? line.baseExento : ""}|${line.base0 > 0 ? line.base0 : ""}|||01`;
-}
 
 async function validateRfc(userId: string, rfc: string): Promise<boolean> {
   const db = await getDb();
@@ -207,50 +178,28 @@ export async function GET(req: NextRequest) {
         ]
       : await fetchDiotRows(rfc, period.dateFrom, period.dateTo);
 
-    const lines: string[] = [];
-    const details = rows.map((row) => {
-      const base8 = toSatInt(row.baseIva8);
-      const base16 = toSatInt(row.baseIva16);
-      const base0 = toSatInt(row.baseIva0);
-      const baseExento = toSatInt(row.baseIvaExento);
-      const iva8 = clampIva(base8, toSatInt(row.iva8), 0.08);
-      const iva16 = clampIva(base16, toSatInt(row.iva16), 0.16);
+    // El cuadro conserva los decimales (es lo que ve el contador en el Excel);
+    // el redondeo a entero solo ocurre al armar el TXT.
+    const cuadro: DiotCuadroRow[] = rows.map((row) => ({
+      rfc: (row.rfcEmisor ?? "").trim().toUpperCase(),
+      base8: n(row.baseIva8),
+      iva8: n(row.iva8),
+      base16: n(row.baseIva16),
+      iva16: n(row.iva16),
+      base0: n(row.baseIva0),
+      baseExento: n(row.baseIvaExento),
+    }));
 
-      const output: DiotLineInput = {
-        rfc: (row.rfcEmisor ?? "").trim().toUpperCase(),
-        tipoTercero: tipoTerceroByRfc((row.rfcEmisor ?? "").trim().toUpperCase()),
-        base8,
-        iva8,
-        base16,
-        iva16,
-        base0,
-        baseExento,
-      };
-
-      if (
-        output.iva8 > 0 ||
-        output.iva16 > 0 ||
-        output.baseExento > 0 ||
-        output.base0 > 0 ||
-        output.base8 > 0 ||
-        output.base16 > 0
-      ) {
-        lines.push(buildDiotLine(output));
-      }
-
-      return output;
-    });
-
-    const txt = lines.join("\n") + (lines.length > 0 ? "\n" : "");
+    const txt = buildDiotTxt(cuadro);
 
     if (format === "json") {
       return Response.json(
         {
           rfc,
           period: period.label,
-          rows: details,
-          totalFilas: details.length,
-          totalLineasTxt: lines.length,
+          rows: cuadro,
+          totalFilas: cuadro.length,
+          totalLineasTxt: cuadro.map(toDiotLineInput).filter(generaLinea).length,
           previewTxt: txt.slice(0, 4000),
         },
         {
