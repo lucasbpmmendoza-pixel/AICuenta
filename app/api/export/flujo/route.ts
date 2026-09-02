@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
-import { getDb } from "@/lib/db";
+import { validateRfcAccess } from "@/lib/rfc-access";
 import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoFlujo, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
@@ -40,13 +40,6 @@ const COL_WIDTHS = [15, 38, 42, 13, 13, 17, 30, 17, 30, 13, 10, 12, 14, 14, 12, 
 const COL_COUNT  = EP_HEADERS.length;
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
-
-async function validateRfc(userId: string, rfc: string): Promise<boolean> {
-  const db = await getDb();
-  const r = await db.request().input("uid", userId).input("rfc", rfc)
-    .query<{ cnt: number }>("SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id=@uid AND rfc=@rfc");
-  return (r.recordset[0]?.cnt ?? 0) > 0;
-}
 
 // ─── GET ───────────────────────────────────────────────────────────────────────
 
@@ -96,8 +89,7 @@ export async function GET(req: NextRequest) {
     return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
   }
   if (!demoMode) {
-    const effectiveUserId = session.ownerId ?? session.sub;
-    if (!(await validateRfc(effectiveUserId, rfc))) {
+    if (!(await validateRfcAccess(session, rfc))) {
       return new Response("RFC no encontrado", { status: 403 });
     }
   }

@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { getSession } from "@/lib/session";
-import { getDb } from "@/lib/db";
+import { validateRfcAccess } from "@/lib/rfc-access";
 import { fetchRawCFDIForExport, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoRawCFDIForExport, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
@@ -10,13 +10,6 @@ import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-l
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
-
-async function validateRfc(userId: string, rfc: string): Promise<boolean> {
-  const db = await getDb();
-  const r = await db.request().input("uid", userId).input("rfc", rfc)
-    .query<{ cnt: number }>("SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id=@uid AND rfc=@rfc");
-  return (r.recordset[0]?.cnt ?? 0) > 0;
-}
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -232,17 +225,17 @@ function mesLabelLong(key: string): string {
 // Headers match writeTableHeaders() in variablesEspecificas.js
 const TABLE_HEADERS = [
   "Fecha", "Folio", "Emisor", "Régimen Emisor", "Receptor", "Régimen Receptor",
-  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion IMSS", "Retencion Secundaria", "Descuento", "Total",
+  "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Retencion ISR", "Retencion IVA", "Retencion Secundaria", "Descuento", "Total",
   "Moneda", "Clasificación", "Comprobante", "Forma pago", "Método Pago", "Uso CFDI",
 ];
 const COL_MAIN = TABLE_HEADERS.length;
 const COL_WIDTHS_MAIN = [13, 38, 18, 17, 16, 13, 13, 13, 13, 18, 13, 14, 14, 13, 13, 10, 13, 13, 22, 13, 10];
 
-const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret IMSS", "Ret Secundaria", "Total Retenciones", "Total"];
+const TOT_HEADERS = ["Mes", "Tipo", "Subtotal", "IVA 8", "IVA 16", "IVA Total", "Descuento", "Ret ISR", "Ret IVA", "Ret Secundaria", "Total Retenciones", "Total"];
 const COL_TOT = TOT_HEADERS.length;
 const COL_WIDTHS_TOT = [22, 22, 14, 13, 13, 13, 13, 13, 14, 14, 18, 14];
 
-const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret IMSS", "Ret Secundaria", "Ret Total", "Descuento", "Total", "Mes"];
+const RET_HEADERS = ["RFC Emisor", "Régimen Emisor", "RFC Receptor", "Régimen Receptor", "Clasificación", "Subtotal", "IVA 8%", "IVA 16%", "Total Trasladados", "Ret ISR", "Ret IVA", "Ret Secundaria", "Ret Total", "Descuento", "Total", "Mes"];
 const COL_RET = RET_HEADERS.length;
 const COL_WIDTHS_RET = [16, 20, 16, 20, 22, 14, 13, 13, 16, 13, 14, 14, 16, 13, 14, 16];
 
@@ -399,8 +392,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: FREEMIUM_FORBIDDEN_MESSAGE }, { status: 403 });
   }
   if (!demoMode) {
-    const effectiveUserId = session.ownerId ?? session.sub;
-    if (!(await validateRfc(effectiveUserId, rfc))) {
+    if (!(await validateRfcAccess(session, rfc))) {
       return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
     }
   }

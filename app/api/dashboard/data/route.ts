@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
+import { validateRfcAccess } from "@/lib/rfc-access";
 import { getDb } from "@/lib/db";
 import { getNominaDeduccionesColumn } from "@/lib/facturas-query";
 import { buildDemoDashboardData } from "@/lib/demo-data";
@@ -38,18 +39,6 @@ const ISR_REGIMENES: IsrRegimenOption[] = [
   { code: "625", name: "RESICO Personas Físicas", rateHint: "1% a 2.5%" },
   { code: "626", name: "RESICO Personas Morales", rateHint: "1%" },
  ];
-
-async function validateRfc(effectiveUserId: string, rfc: string): Promise<boolean> {
-  const db = await getDb();
-  const r = await db
-    .request()
-    .input("user_id", effectiveUserId)
-    .input("rfc", rfc)
-    .query<{ cnt: number }>(
-      "SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id = @user_id AND rfc = @rfc"
-    );
-  return (r.recordset[0]?.cnt ?? 0) > 0;
-}
 
 function n(v: unknown): number {
   const x = Number(v);
@@ -140,8 +129,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(buildDemoDashboardData(rfc, dateFrom, dateTo));
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  const owns = await validateRfc(effectiveUserId, rfc);
+  const owns = await validateRfcAccess(session, rfc);
   if (!owns) return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
 
   try {

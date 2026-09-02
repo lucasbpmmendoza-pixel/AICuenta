@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
+import { validateRfcAccess } from "@/lib/rfc-access";
 import { getDb, getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros } from "@/lib/facturas-query";
 import { isDemoSession } from "@/lib/demo-mode";
@@ -50,18 +51,6 @@ interface BenchmarkResponse {
 function safeJsonParse<T>(value: unknown, fallback: T): T {
   if (typeof value !== "string" || !value.trim()) return fallback;
   try { return JSON.parse(value) as T; } catch { return fallback; }
-}
-
-async function validateRfc(userId: string, rfc: string): Promise<boolean> {
-  const db = await getDb();
-  const r = await db
-    .request()
-    .input("uid", userId)
-    .input("rfc", rfc)
-    .query<{ cnt: number }>(
-      "SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id=@uid AND rfc=@rfc",
-    );
-  return (r.recordset[0]?.cnt ?? 0) > 0;
 }
 
 async function loadCedula(rfc: string): Promise<CedulaInfo | null> {
@@ -292,8 +281,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "year/month inválidos" }, { status: 400 });
   }
 
-  const effectiveUserId = session.ownerId ?? session.sub;
-  if (!(await validateRfc(effectiveUserId, rfc))) {
+  if (!(await validateRfcAccess(session, rfc))) {
     return NextResponse.json({ error: "RFC no encontrado" }, { status: 403 });
   }
 

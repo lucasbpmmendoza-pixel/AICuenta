@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
+import { validateRfcAccess } from "@/lib/rfc-access";
 import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
@@ -22,18 +23,6 @@ type DiotRow = {
   baseIva0: number;
   baseIvaExento: number;
 };
-
-async function validateRfc(userId: string, rfc: string): Promise<boolean> {
-  const db = await getDb();
-  const r = await db
-    .request()
-    .input("uid", userId)
-    .input("rfc", rfc)
-    .query<{ cnt: number }>(
-      "SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id=@uid AND rfc=@rfc"
-    );
-  return (r.recordset[0]?.cnt ?? 0) > 0;
-}
 
 function parsePeriod(req: NextRequest): { dateFrom: Date; dateTo: Date; label: string } {
   const { searchParams } = new URL(req.url);
@@ -146,8 +135,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!demoMode) {
-    const effectiveUserId = session.ownerId ?? session.sub;
-    if (!(await validateRfc(effectiveUserId, rfc))) {
+    if (!(await validateRfcAccess(session, rfc))) {
       return new Response("RFC no encontrado", { status: 403 });
     }
   }

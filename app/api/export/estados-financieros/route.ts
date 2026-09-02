@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import ExcelJS from "exceljs";
 import sql from "mssql";
 import { getSession } from "@/lib/session";
-import { getDb, getDbLong } from "@/lib/db";
+import { validateRfcAccess } from "@/lib/rfc-access";
+import { getDbLong } from "@/lib/db";
 import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoConceptos, getDemoNombreEmpresa, getDemoRfcs } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
@@ -54,13 +55,6 @@ interface AuditoriaConceptoRow {
 }
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
-
-async function validateRfc(userId: string, rfc: string): Promise<boolean> {
-  const db = await getDb();
-  const r = await db.request().input("uid", userId).input("rfc", rfc)
-    .query<{ cnt: number }>("SELECT COUNT(*) AS cnt FROM EFIELES WITH (NOLOCK) WHERE user_id=@uid AND rfc=@rfc");
-  return (r.recordset[0]?.cnt ?? 0) > 0;
-}
 
 // ─── Sheet builder helper ──────────────────────────────────────────────────────
 
@@ -219,8 +213,7 @@ export async function GET(req: NextRequest) {
       );
     }
   } else {
-    const effectiveUserId = session.ownerId ?? session.sub;
-    if (!(await validateRfc(effectiveUserId, rfc))) {
+    if (!(await validateRfcAccess(session, rfc))) {
       return new Response("RFC no encontrado", { status: 403 });
     }
   }
