@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sql from "mssql";
 import { getSession } from "@/lib/session";
 import { getDb } from "@/lib/db";
 import { deleteRfcFiles } from "@/lib/rfc-storage";
@@ -76,14 +77,26 @@ export async function DELETE(
 
   const rfc = row.recordset[0].rfc;
 
-  // Borrar registro de BD primero
+  // Borrar en BD dentro de una transacción:
+  //  1) desasignar el RFC de todos los miembros (member_rfcs),
+  //     necesario porque FK_member_rfcs_efiel es ON DELETE NO ACTION;
+  //  2) borrar el RFC de EFIELES (ya sin bloqueo de la FK).
+  const tx = new sql.Transaction(db);
   try {
-    await db
-      .request()
+    await tx.begin();
+
+    await new sql.Request(tx)
+      .input("efiel_id", id)
+      .query("DELETE FROM member_rfcs WHERE efiel_id = @efiel_id");
+
+    await new sql.Request(tx)
       .input("id",      id)
       .input("user_id", effectiveUserId)
       .query("DELETE FROM EFIELES WHERE id = @id AND user_id = @user_id");
+
+    await tx.commit();
   } catch (err) {
+    try { await tx.rollback(); } catch { /* la transacción pudo no haber iniciado */ }
     console.error("[rfcs DELETE] DB error:", (err as Error).message);
     return NextResponse.json({ error: "Error al eliminar el RFC" }, { status: 503 });
   }
