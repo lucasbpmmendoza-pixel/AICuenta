@@ -3,6 +3,7 @@ import ExcelJS from 'exceljs'
 import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from '@/lib/freemium'
+import { exportQuotaBlock } from '@/lib/cfdi-quota'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +19,7 @@ export async function GET(req: NextRequest) {
   const session = await getSession()
   if (!session) return new Response('Unauthorized', { status: 401 })
   if (await isFreemiumOwner(session)) return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 })
+  { const quotaBlock = await exportQuotaBlock(session); if (quotaBlock) return quotaBlock }
 
   const ownerId = session.ownerId ?? session.sub
 

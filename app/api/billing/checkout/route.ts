@@ -81,6 +81,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 2.5 Candado anti-doble-suscripcion: si el usuario ya tiene una membresia
+    // vigente, no crear otra Checkout Session (evita el cobro doble cuando el
+    // cliente vuelve a pagar por Link/Apple Pay con la tarjeta ya guardada).
+    // Se manda al portal para administrar la que ya tiene.
+    const yaActiva = await db.request().input("uid", session.sub).query(`
+      SELECT TOP 1 stripe_subscription_id
+      FROM membresias
+      WHERE user_id = @uid
+        AND estado NOT IN ('cancelada', 'expirada')
+        AND stripe_subscription_id IS NOT NULL
+    `);
+    if (yaActiva.recordset.length > 0) {
+      return NextResponse.json(
+        { error: "Ya tienes una suscripción activa", code: "already_subscribed" },
+        { status: 409 },
+      );
+    }
+
     const stripe = getStripe();
 
     // 3. Reutiliza el customer de Stripe o crea uno y lo guarda en users

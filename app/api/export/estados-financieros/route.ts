@@ -8,6 +8,7 @@ import { fetchEstadosFinancieros, fetchNombreEmpresa } from "@/lib/facturas-quer
 import { buildDemoConceptos, getDemoNombreEmpresa, getDemoRfcs } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
+import { exportQuotaBlock } from "@/lib/cfdi-quota";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay } from "@/lib/rfc-aliases";
 
@@ -200,6 +201,10 @@ export async function GET(req: NextRequest) {
   const demoMode = isDemoSession(session);
   if (!demoMode && (await isFreemiumOwner(session))) {
     return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
+  }
+  if (!demoMode) {
+    const quotaBlock = await exportQuotaBlock(session);
+    if (quotaBlock) return quotaBlock;
   }
   if (demoMode) {
     // En demo solo se permiten los RFCs de ejemplo. El RFC "detectado" que un

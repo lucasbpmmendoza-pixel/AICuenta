@@ -6,6 +6,7 @@ import { fetchflujo, fetchNombreEmpresa } from "@/lib/facturas-query";
 import { buildDemoFlujo, getDemoNombreEmpresa } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
+import { exportQuotaBlock } from "@/lib/cfdi-quota";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import { rfcDisplay, rfcAlias } from "@/lib/rfc-aliases";
 
@@ -87,6 +88,10 @@ export async function GET(req: NextRequest) {
   const demoMode = isDemoSession(session);
   if (!demoMode && (await isFreemiumOwner(session))) {
     return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
+  }
+  if (!demoMode) {
+    const quotaBlock = await exportQuotaBlock(session);
+    if (quotaBlock) return quotaBlock;
   }
   if (!demoMode) {
     if (!(await validateRfcAccess(session, rfc))) {

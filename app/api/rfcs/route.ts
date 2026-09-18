@@ -4,19 +4,24 @@ import { getDb } from "@/lib/db";
 import { rfcAlias } from "@/lib/rfc-aliases";
 import { getDemoRfcs } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
+import { loadOwnerCfdiQuota } from "@/lib/cfdi-quota";
 
 export async function GET() {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
   if (isDemoSession(session)) {
-    return NextResponse.json({ rfcs: getDemoRfcs() });
+    return NextResponse.json({ rfcs: getDemoRfcs(), quota: null });
   }
 
   const effectiveUserId = session.ownerId ?? session.sub;
 
   try {
     const db = await getDb();
+
+    // Cuota de CFDIs del dueno (tope del plan vs total usado). La UI la usa para
+    // avisar "excediste tu plan, elimina un RFC" cuando overQuota === true.
+    const quota = await loadOwnerCfdiQuota(db, effectiveUserId);
 
     // Subquery reutilizable: suma de CFDIs (recibidos+emitidos) de los ultimos 5 anios por RFC.
     // Se apoya en dbo.conteo_cfdi, poblada mes a mes por el job contarSAT_bd.php.
@@ -69,6 +74,7 @@ export async function GET() {
           ...r,
           alias: rfcAlias(r.rfc) ?? r.alias ?? cliente_nombre,
         })),
+        quota,
       });
     }
 
@@ -100,6 +106,7 @@ export async function GET() {
         ...r,
         alias: rfcAlias(r.rfc) ?? r.alias ?? cliente_nombre,
       })),
+      quota,
     });
   } catch (err) {
     console.error("[rfcs GET] DB error:", (err as Error).message);

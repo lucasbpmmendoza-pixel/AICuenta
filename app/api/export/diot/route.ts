@@ -5,6 +5,7 @@ import { validateRfcAccess } from "@/lib/rfc-access";
 import { getDb } from "@/lib/db";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from "@/lib/freemium";
+import { exportQuotaBlock } from "@/lib/cfdi-quota";
 import { consumeDemoDownloadSlot, formatRetryAfter } from "@/lib/demo-download-limit";
 import {
   type DiotCuadroRow,
@@ -119,6 +120,10 @@ export async function GET(req: NextRequest) {
   const demoMode = isDemoSession(session);
   if (!demoMode && (await isFreemiumOwner(session))) {
     return new Response(FREEMIUM_FORBIDDEN_MESSAGE, { status: 403 });
+  }
+  if (!demoMode) {
+    const quotaBlock = await exportQuotaBlock(session);
+    if (quotaBlock) return quotaBlock;
   }
 
   const { searchParams } = new URL(req.url);

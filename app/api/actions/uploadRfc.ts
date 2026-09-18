@@ -3,8 +3,8 @@
 import path from 'path'
 import { getSession } from '@/lib/session'
 import { getDb } from '@/lib/db'
-import { loadOwnerPlanLimits } from '@/lib/account-plan'
 import { uploadRfcFiles } from '@/lib/rfc-storage'
+import { extractRfcFromCer } from '@/lib/cer-rfc'
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from '@/lib/freemium'
 
 const RFC_SAFE = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i
@@ -34,10 +34,30 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
   if (cerExt !== '.cer') return { success: false, message: 'El archivo CER debe tener extensión .cer' }
   if (keyExt !== '.key') return { success: false, message: 'El archivo KEY debe tener extensión .key' }
 
-  // Validar limites por plan antes de subir archivos
+  // El RFC vive dentro del certificado .cer (fuente de verdad). Si se puede
+  // leer y no coincide con el capturado, rechazamos para evitar pares mal
+  // asignados (subir el RFC A con el .cer de B).
+  try {
+    const cerRfc = extractRfcFromCer(Buffer.from(await cerFile.arrayBuffer()))
+    if (cerRfc && cerRfc !== rfc) {
+      return {
+        success: false,
+        message: `El RFC capturado (${rfc}) no coincide con el del certificado .cer (${cerRfc}).`,
+      }
+    }
+  } catch {
+    // Si el .cer no se puede parsear, seguimos con el RFC capturado.
+  }
+
+  // Validar limites antes de subir archivos.
+  //
+  // Ya NO hay tope por numero de RFCs: un suscriptor puede registrar los que
+  // quiera. El limite real es el TOTAL de CFDIs de su plan y se valida al
+  // descargar/exportar (lib/cfdi-quota.ts), no aqui, porque un RFC recien dado
+  // de alta aun no tiene CFDIs contados en dbo.conteo_cfdi. Aqui solo queda el
+  // candado freemium: sin plan de pago, un unico RFC (onboarding).
   try {
     const db = await getDb()
-    const limits = await loadOwnerPlanLimits(db, effectiveUserId)
 
     const countResult = await db
       .request()
@@ -58,13 +78,6 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
     // no agregar/modificar mas alla de eso.
     if ((existsRfc || total >= 1) && (await isFreemiumOwner(session))) {
       return { success: false, message: FREEMIUM_FORBIDDEN_MESSAGE }
-    }
-
-    if (!existsRfc && total >= limits.maxRfcs) {
-      return {
-        success: false,
-        message: `Tu plan ${limits.planType} permite hasta ${limits.maxRfcs} RFC(s). Actualiza tu plan para registrar mas RFCs.`,
-      }
     }
   } catch (err) {
     console.error('[uploadRfc] limit check error:', (err as Error).message)

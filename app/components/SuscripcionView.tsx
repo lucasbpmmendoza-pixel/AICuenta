@@ -72,7 +72,22 @@ export default function SuscripcionView() {
   const [usingFallback, setUsingFallback] = useState(false)
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
   const [subscribingPlanId, setSubscribingPlanId] = useState<number | null>(null)
+  const [changingPlanId, setChangingPlanId] = useState<number | null>(null)
   const [openingPortal, setOpeningPortal] = useState(false)
+  // Suscripcion vigente del usuario (null = aun cargando / sin plan)
+  const [membership, setMembership] = useState<{ active: boolean; planId: number | null } | null>(null)
+
+  async function loadMembership() {
+    try {
+      const res = await fetch('/api/billing/membership', { credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      setMembership({ active: Boolean(data?.active), planId: data?.planId ?? null })
+    } catch {
+      setMembership({ active: false, planId: null })
+    }
+  }
+
+  useEffect(() => { loadMembership() }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -142,6 +157,18 @@ export default function SuscripcionView() {
       })
 
       const data = await res.json().catch(() => ({}))
+
+      // Ya tiene una suscripcion vigente: no crear otra, mandarlo al portal
+      // para administrarla (evita el cobro doble por reintento).
+      if (res.status === 409 && data?.code === 'already_subscribed') {
+        setMessage({
+          ok: true,
+          text: 'Ya tienes una suscripción activa. Te llevamos a tu portal para administrarla.',
+        })
+        await handleOpenPortal()
+        return
+      }
+
       if (!res.ok || !data?.url) {
         throw new Error(data?.error ?? 'No se pudo iniciar checkout')
       }
@@ -154,6 +181,40 @@ export default function SuscripcionView() {
       })
     } finally {
       setSubscribingPlanId(null)
+    }
+  }
+
+  // Mejora/cambia el plan de una suscripcion YA activa (sin crear otra).
+  async function handleChangePlan(planId: number) {
+    setMessage(null)
+    setChangingPlanId(planId)
+
+    try {
+      const res = await fetch('/api/billing/change-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId }),
+      })
+      const data = await res.json().catch(() => ({}))
+
+      // Sin suscripcion activa: caer al flujo de compra normal.
+      if (res.status === 409 && data?.code === 'no_subscription') {
+        await handleSubscribe(planId)
+        return
+      }
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error ?? 'No se pudo cambiar de plan')
+      }
+
+      setMessage({ ok: true, text: 'Tu plan se actualizó correctamente.' })
+      await loadMembership()
+    } catch (err) {
+      setMessage({
+        ok: false,
+        text: (err as Error).message || 'No se pudo cambiar de plan.',
+      })
+    } finally {
+      setChangingPlanId(null)
     }
   }
 
@@ -244,8 +305,13 @@ export default function SuscripcionView() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
                 {planesNormales.map((plan) => {
                   const isFeatured = featuredPlanId === plan.id
-                  const isFree = plan.costo === 0
                   const isSubscribing = subscribingPlanId === plan.id
+                  const isChanging = changingPlanId === plan.id
+                  const membershipLoading = membership === null
+                  const hasActive = Boolean(membership?.active)
+                  const isCurrent = hasActive && membership?.planId === plan.id
+                  const currentCosto = plans.find((p) => p.id === membership?.planId)?.costo ?? null
+                  const isUpgrade = hasActive && currentCosto != null && plan.costo > currentCosto
 
                   return (
                     <article
@@ -305,8 +371,8 @@ export default function SuscripcionView() {
                       </ul>
 
                       <button
-                        onClick={() => handleSubscribe(plan.id)}
-                        disabled={isSubscribing || usingFallback || isFree}
+                        onClick={() => (hasActive ? handleChangePlan(plan.id) : handleSubscribe(plan.id))}
+                        disabled={usingFallback || membershipLoading || isCurrent || isSubscribing || isChanging}
                         className={[
                           'mt-6 w-full rounded-xl py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60',
                           isFeatured
@@ -314,11 +380,17 @@ export default function SuscripcionView() {
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:text-zinc-100',
                         ].join(' ')}
                       >
-                        {isFree
-                          ? 'Plan actual'
-                          : isSubscribing
-                            ? 'Redirigiendo...'
-                            : 'Suscribirme'}
+                        {membershipLoading
+                          ? 'Cargando...'
+                          : isCurrent
+                            ? 'Plan actual'
+                            : isChanging
+                              ? 'Actualizando...'
+                              : isSubscribing
+                                ? 'Redirigiendo...'
+                                : hasActive
+                                  ? (isUpgrade ? 'Mejorar a este plan' : 'Cambiar a este plan')
+                                  : 'Suscribirme'}
                       </button>
                     </article>
                   )

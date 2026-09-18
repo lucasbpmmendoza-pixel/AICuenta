@@ -227,20 +227,37 @@ export async function POST(req: NextRequest) {
 
       case "customer.subscription.updated": {
         const sub = event.data.object as Stripe.Subscription;
-        await db
+
+        // Si cambio de plan (upgrade/downgrade via /change-plan o el portal de
+        // Stripe), el precio del item cambia: resolvemos el plan_id nuevo para
+        // mantener la fila sincronizada.
+        const priceId = sub.items.data[0]?.price?.id ?? null;
+        let planId: number | null = null;
+        if (priceId) {
+          const p = await db
+            .request()
+            .input("price", priceId)
+            .query<{ id: number }>(`SELECT id FROM plans WHERE stripe_price_id = @price`);
+          planId = p.recordset[0]?.id ?? null;
+        }
+
+        const upd = db
           .request()
           .input("sub", sub.id)
           .input("estado", mapEstado(sub.status))
           .input("expira", periodEnd(sub))
-          .input("renov", sub.cancel_at_period_end ? 0 : 1)
-          .query(`
-            UPDATE membresias
-            SET estado = @estado,
-                fecha_expiracion = @expira,
-                renovacion_automatica = @renov,
-                fecha_actualizacion = GETDATE()
-            WHERE stripe_subscription_id = @sub
-          `);
+          .input("renov", sub.cancel_at_period_end ? 0 : 1);
+        if (planId != null) upd.input("plan", planId);
+
+        await upd.query(`
+          UPDATE membresias
+          SET estado = @estado,
+              fecha_expiracion = @expira,
+              renovacion_automatica = @renov,
+              ${planId != null ? "plan_id = @plan," : ""}
+              fecha_actualizacion = GETDATE()
+          WHERE stripe_subscription_id = @sub
+        `);
         break;
       }
 

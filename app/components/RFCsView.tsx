@@ -19,6 +19,14 @@ interface Rfc {
   cfdis_5a: number
 }
 
+// Cuota de CFDIs del plan (viene de /api/rfcs). Ver lib/cfdi-quota.ts.
+interface Quota {
+  cap: number | null
+  used: number
+  overQuota: boolean
+  hasPlan: boolean
+}
+
 function formatCfdis(n: number) {
   return new Intl.NumberFormat('es-MX').format(n)
 }
@@ -70,6 +78,26 @@ function RfcForm({
   const [showEfiel, setShowEfiel] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error,   setError]     = useState<string | null>(null)
+  const [detectingRfc, setDetectingRfc] = useState(false)
+
+  // Al elegir el .cer, lee el RFC del certificado y autocompleta el campo.
+  // En edicion (initial) el RFC no cambia, asi que no autocompletamos.
+  async function handleCerSelected(f: File | null) {
+    setCerFile(f)
+    if (!f || initial) return
+    setDetectingRfc(true)
+    try {
+      const fd = new FormData()
+      fd.append('cer', f)
+      const res = await fetch('/api/rfcs/extract-rfc', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (data?.rfc) setRfc(String(data.rfc).toUpperCase())
+    } catch {
+      // Silencioso: si no se detecta, el usuario captura el RFC a mano.
+    } finally {
+      setDetectingRfc(false)
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -103,6 +131,11 @@ function RfcForm({
           disabled={!!initial} required maxLength={13} placeholder="Ej. XAXX010101000"
           className="rounded-lg border border-slate-300 dark:border-zinc-700 bg-slate-50 dark:bg-zinc-800 px-4 py-2.5 text-sm text-slate-900 dark:text-zinc-50 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition disabled:opacity-60"
         />
+        {detectingRfc ? (
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">Detectando RFC del certificado…</p>
+        ) : !initial ? (
+          <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">Se autocompleta al subir tu archivo .cer.</p>
+        ) : null}
       </div>
 
       {/* EFIEL password */}
@@ -150,7 +183,7 @@ function RfcForm({
 
       {/* File uploads */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <DropZone label="Archivo .CER" accept=".cer" extension="cer" file={cerFile} onFile={setCerFile} />
+        <DropZone label="Archivo .CER" accept=".cer" extension="cer" file={cerFile} onFile={handleCerSelected} />
         <DropZone label="Archivo .KEY" accept=".key" extension="key" file={keyFile} onFile={setKeyFile} />
       </div>
 
@@ -180,6 +213,7 @@ export default function RFCsView({ readOnly = false }: Props) {
   const isFreemium = Boolean(user?.isFreemium)
   const [showUpsell, setShowUpsell] = useState(false)
   const [rfcs,    setRfcs]    = useState<Rfc[]>([])
+  const [quota,   setQuota]   = useState<Quota | null>(null)
   const [loading, setLoading] = useState(true)
   const [banner,  setBanner]  = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -199,7 +233,8 @@ export default function RFCsView({ readOnly = false }: Props) {
       const res = await fetch('/api/rfcs')
       const data = await res.json()
       setRfcs(data.rfcs ?? [])
-    } catch { setRfcs([]) }
+      setQuota(data.quota ?? null)
+    } catch { setRfcs([]); setQuota(null) }
     finally { setLoading(false) }
   }
 
@@ -288,6 +323,28 @@ export default function RFCsView({ readOnly = false }: Props) {
                 : 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
             ].join(' ')}>
               {banner.text}
+            </div>
+          )}
+
+          {/* Cuota de CFDIs excedida: hay que borrar RFCs para reactivar descargas/exportes */}
+          {quota?.overQuota && quota.cap != null && (
+            <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+              <p className="font-semibold">Excediste el total de CFDIs de tu plan.</p>
+              <p className="mt-0.5">
+                Llevas <span className="font-semibold">{formatCfdis(quota.used)}</span> de{' '}
+                <span className="font-semibold">{formatCfdis(quota.cap)}</span> CFDIs permitidos.
+                Las descargas y exportes quedan bloqueados hasta que elimines uno o más RFCs y
+                vuelvas a estar por debajo del límite.
+              </p>
+            </div>
+          )}
+
+          {/* Indicador de uso cuando aún está dentro del límite */}
+          {quota?.hasPlan && quota.cap != null && !quota.overQuota && (
+            <div className="rounded-xl border border-slate-200 dark:border-zinc-800 bg-slate-50 dark:bg-zinc-900/40 px-4 py-2.5 text-xs text-slate-500 dark:text-zinc-400">
+              CFDIs usados:{' '}
+              <span className="font-semibold text-slate-700 dark:text-zinc-200">{formatCfdis(quota.used)}</span>{' '}
+              de {formatCfdis(quota.cap)} de tu plan.
             </div>
           )}
 
