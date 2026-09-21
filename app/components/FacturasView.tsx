@@ -65,7 +65,7 @@ export default function FacturasView({ session, accountType }: Props) {
   const [selectedRfc, setSelectedRfc] = useState<string>('')
   const [year,  setYear]              = useState(now.getFullYear())
   const [month, setMonth]             = useState(now.getMonth() + 1)
-  const [periodType, setPeriodType]   = useState<PeriodType>('month')
+  const [periodType, setPeriodType]   = useState<PeriodType>(isFreemium ? 'month' : 'custom')
   const [quarter, setQuarter]         = useState<number>(Math.ceil((now.getMonth() + 1) / 3))
   const [customFrom, setCustomFrom]   = useState('')
   const [customTo,   setCustomTo]     = useState('')
@@ -141,6 +141,11 @@ export default function FacturasView({ session, accountType }: Props) {
     } catch {}
     finally { setLoading(false) }
   }, [])
+
+  // Freemium no tiene selector de periodo: forzar "month" si el flag llega tarde.
+  useEffect(() => {
+    if (isFreemium) setPeriodType('month')
+  }, [isFreemium])
 
   useEffect(() => {
     if (!selectedRfc) return
@@ -401,7 +406,7 @@ export default function FacturasView({ session, accountType }: Props) {
               {/* Period type selector — oculto en freemium (forzado a "month") */}
               {!isFreemium && (
                 <div className="flex rounded-xl border border-slate-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 overflow-hidden">
-                  {(['month', 'quarter', 'year', 'custom'] as PeriodType[]).map(pt => (
+                  {(['custom', 'month', 'quarter', 'year'] as PeriodType[]).map(pt => (
                     <button
                       key={pt}
                       onClick={() => setPeriodType(pt)}

@@ -20,6 +20,16 @@ function addBorder(cell: ExcelJS.Cell) {
   cell.border = { top: b, left: b, bottom: b, right: b };
 }
 
+// Separa el IVA trasladado en su columna (8% o 16%). Usa la tasa registrada
+// cuando existe (Complemento P) y, si no, la deriva del IVA sobre el subtotal
+// (Factura PUE); clasifica por cercanía a 8% u 16%.
+function splitIva(rate: number, subtotal: number, iva: number): { iva8: number; iva16: number } {
+  if (!iva) return { iva8: 0, iva16: 0 };
+  const r = rate > 0 ? rate : (subtotal > 0 ? iva / subtotal : 0);
+  if (Math.abs(r - 0.08) <= Math.abs(r - 0.16)) return { iva8: iva, iva16: 0 };
+  return { iva8: 0, iva16: iva };
+}
+
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const HEADER_BG = "595959";
@@ -34,10 +44,10 @@ const EP_HEADERS = [
   "RFC Emisor", "Razón Social Emisor",
   "RFC Receptor", "Razón Social Receptor",
   "Forma Pago", "Moneda", "Tipo Cambio",
-  "Subtotal", "Importe Pagado", "Tasa o Cuota", "Importe Impuesto", "Ret. ISR", "Ret. IVA", "Total",
+  "Subtotal", "IVA 8%", "IVA 16%", "Importe Pagado", "Tasa o Cuota", "Importe Impuesto", "Ret. ISR", "Ret. IVA", "Total",
 ];
 
-const COL_WIDTHS = [15, 38, 42, 13, 13, 17, 30, 17, 30, 13, 10, 12, 14, 14, 12, 14, 13, 13, 14];
+const COL_WIDTHS = [15, 38, 42, 13, 13, 17, 30, 17, 30, 13, 10, 12, 14, 13, 13, 14, 12, 14, 13, 13, 14];
 const COL_COUNT  = EP_HEADERS.length;
 
 // ─── Auth helper ───────────────────────────────────────────────────────────────
@@ -132,11 +142,14 @@ export async function GET(req: NextRequest) {
       const importePagadoMx = Number(row.importe_pagado) * tc;
       const tasaOCuota = Number(row.tasa_o_cuota) || 0;
       const importeImpuestoMx = Number(row.importe_impuesto) * tc;
+      const { iva8, iva16 } = splitIva(tasaOCuota, subtotalMx, importeImpuestoMx);
 
       return {
         ...row,
         tc,
         subtotalMx,
+        iva8Mx: iva8,
+        iva16Mx: iva16,
         importePagadoMx,
         tasaOCuota,
         importeImpuestoMx,
@@ -207,6 +220,8 @@ export async function GET(req: NextRequest) {
           row.moneda,
           row.tc,
           row.subtotalMx,
+          row.iva8Mx,
+          row.iva16Mx,
           importePagado,
           tasaOCuota,
           importeImpuesto,
@@ -221,11 +236,13 @@ export async function GET(req: NextRequest) {
 
         dr.eachCell({ includeEmpty: true }, (cell, ci) => {
           addBorder(cell);
-          if ([13, 14, 16, 17, 18].includes(ci)) cell.numFmt = MXN_FMT;
+          if ([13, 14, 15, 16, 18, 19, 20].includes(ci)) cell.numFmt = MXN_FMT;
         });
       }
 
       const totSubtotal = sectionRows.reduce((s, r) => s + r.subtotalMx, 0);
+      const totIva8 = sectionRows.reduce((s, r) => s + r.iva8Mx, 0);
+      const totIva16 = sectionRows.reduce((s, r) => s + r.iva16Mx, 0);
       const totImportePagado = sectionRows.reduce((s, r) => s + r.importePagadoMx, 0);
       const totTasaOCuota = sectionRows.reduce((s, r) => s + r.tasaOCuota, 0);
       const totImporteImpuesto = sectionRows.reduce((s, r) => s + r.importeImpuestoMx, 0);
@@ -235,14 +252,14 @@ export async function GET(req: NextRequest) {
 
       const totRow = ws.addRow([
         `TOTAL ${title}`, null, null, null, null, null, null, null, null, null, null, null,
-        totSubtotal, totImportePagado, totTasaOCuota, totImporteImpuesto, totRetISR, totRetIVA, totTotal,
+        totSubtotal, totIva8, totIva16, totImportePagado, totTasaOCuota, totImporteImpuesto, totRetISR, totRetIVA, totTotal,
       ]);
       totRow.font = { bold: true };
       totRow.eachCell({ includeEmpty: true }, (cell, ci) => {
         addBorder(cell);
         setFill(cell, HEADER_BG);
         cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-        if ([13, 14, 16, 17, 18].includes(ci)) cell.numFmt = MXN_FMT;
+        if ([13, 14, 15, 16, 18, 19, 20].includes(ci)) cell.numFmt = MXN_FMT;
       });
 
       ws.addRow([]);
@@ -253,6 +270,8 @@ export async function GET(req: NextRequest) {
 
     const sumSection = (rowsToSum: typeof normalizedRows) => ({
       subtotal: rowsToSum.reduce((s, r) => s + r.subtotalMx, 0),
+      iva8: rowsToSum.reduce((s, r) => s + r.iva8Mx, 0),
+      iva16: rowsToSum.reduce((s, r) => s + r.iva16Mx, 0),
       importePagado: rowsToSum.reduce((s, r) => s + r.importePagadoMx, 0),
       tasaOCuota: rowsToSum.reduce((s, r) => s + r.tasaOCuota, 0),
       importeImpuesto: rowsToSum.reduce((s, r) => s + r.importeImpuestoMx, 0),
@@ -265,6 +284,8 @@ export async function GET(req: NextRequest) {
     const sumEgresos = sumSection(egresos);
 
     const grandSubtotal = sumIngresos.subtotal - sumEgresos.subtotal;
+    const grandIva8 = sumIngresos.iva8 - sumEgresos.iva8;
+    const grandIva16 = sumIngresos.iva16 - sumEgresos.iva16;
     const grandImportePagado = sumIngresos.importePagado - sumEgresos.importePagado;
     const grandTasaOCuota = sumIngresos.tasaOCuota - sumEgresos.tasaOCuota;
     const grandImporteImpuesto = sumIngresos.importeImpuesto - sumEgresos.importeImpuesto;
@@ -274,14 +295,14 @@ export async function GET(req: NextRequest) {
 
     const grandRow = ws.addRow([
       "TOTAL GENERAL", null, null, null, null, null, null, null, null, null, null, null,
-      grandSubtotal, grandImportePagado, grandTasaOCuota, grandImporteImpuesto, grandRetISR, grandRetIVA, grandTotal,
+      grandSubtotal, grandIva8, grandIva16, grandImportePagado, grandTasaOCuota, grandImporteImpuesto, grandRetISR, grandRetIVA, grandTotal,
     ]);
     grandRow.font = { bold: true };
     grandRow.eachCell({ includeEmpty: true }, (cell, ci) => {
       addBorder(cell);
       setFill(cell, HEADER_BG);
       cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
-      if ([13, 14, 16, 17, 18].includes(ci)) cell.numFmt = MXN_FMT;
+      if ([13, 14, 15, 16, 18, 19, 20].includes(ci)) cell.numFmt = MXN_FMT;
     });
 
     const buf = await wb.xlsx.writeBuffer();
