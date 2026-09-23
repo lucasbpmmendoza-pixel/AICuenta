@@ -5,7 +5,6 @@ import { getAppBaseUrl, getStripe } from "@/lib/stripe";
 
 interface UserRow {
   stripe_customer_id: string | null;
-  trial_elegible: boolean;
 }
 
 interface PlanRow {
@@ -69,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     // 2. Usuario (de la sesion JWT obtenemos id/email/name)
     const userResult = await db.request().input("id", session.sub).query<UserRow>(`
-      SELECT stripe_customer_id, trial_elegible
+      SELECT stripe_customer_id
       FROM users
       WHERE id = @id
     `);
@@ -135,8 +134,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Clientes antiguos (trial_elegible) obtienen 30 dias de prueba
-    const trialDays = userRow.trial_elegible ? 30 : 0;
+    // 4. 30 dias de prueba en la PRIMERA suscripcion de cada cliente. Si ya
+    // tuvo una (aunque este cancelada) no se repite el trial. Los intentos
+    // cuyo primer pago nunca paso (incomplete*) no cuentan como suscripcion.
+    const yaTuvoSuscripcion = vivas.data.some(
+      (s) => s.status !== "incomplete" && s.status !== "incomplete_expired",
+    );
+    const trialDays = yaTuvoSuscripcion ? 0 : 30;
     const baseUrl = getAppBaseUrl();
 
     const checkoutSession = await stripe.checkout.sessions.create({
