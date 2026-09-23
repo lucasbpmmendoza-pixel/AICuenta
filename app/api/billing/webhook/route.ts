@@ -30,20 +30,20 @@ function toId(value: string | { id: string } | null | undefined): string | null 
   return typeof value === "string" ? value : value.id;
 }
 
-// Mapea el status de Stripe a tu columna estado varchar(20)
+// Mapea el status de Stripe a membresias.estado. CK_membresias_estado solo
+// acepta activa/expirada/cancelada/suspendida: cualquier otro valor revienta
+// el INSERT/UPDATE y el webhook queda en 500.
 function mapEstado(status: Stripe.Subscription.Status): string {
   switch (status) {
     case "trialing":
-      return "trial";
     case "active":
       return "activa";
-    case "past_due":
-    case "unpaid":
-      return "morosa";
     case "canceled":
       return "cancelada";
+    case "incomplete_expired":
+      return "expirada";
     default:
-      return status; // incomplete, paused, etc.
+      return "suspendida"; // past_due, unpaid, incomplete, paused
   }
 }
 
@@ -215,13 +215,9 @@ export async function POST(req: NextRequest) {
               WHERE stripe_subscription_id = @sub
             `);
         }
-
-        // Refleja el plan activo en el usuario
-        await db
-          .request()
-          .input("user_id", userId)
-          .input("plan", String(planId))
-          .query(`UPDATE users SET plan_type = @plan WHERE id = @user_id`);
+        // Nota: users.plan_type es el tier legado de limites de RFC
+        // (basic/business_pro/business_scale, con CHECK); el plan de Stripe
+        // vive en membresias.plan_id. No escribir el id numerico ahi.
         break;
       }
 
@@ -311,7 +307,7 @@ export async function POST(req: NextRequest) {
           .input("sub", subscriptionId)
           .query(`
             UPDATE membresias
-            SET estado = 'morosa', fecha_actualizacion = GETDATE()
+            SET estado = 'suspendida', fecha_actualizacion = GETDATE()
             WHERE stripe_subscription_id = @sub
           `);
         // TODO: avisar al usuario por correo (Resend ya esta en el proyecto)

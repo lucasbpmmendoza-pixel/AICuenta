@@ -15,12 +15,15 @@ export async function POST() {
 
   try {
     const db = await getDb();
+    // users.stripe_customer_id lo fija el checkout antes de cobrar; membresias
+    // depende del webhook, asi que solo sirve de respaldo.
     const membershipResult = await db.request().input("user_id", session.sub).query<MembershipRow>(`
-      SELECT TOP 1 stripe_customer_id
-      FROM membresias
-      WHERE user_id = @user_id
-        AND stripe_customer_id IS NOT NULL
-      ORDER BY fecha_creacion DESC
+      SELECT COALESCE(
+        (SELECT stripe_customer_id FROM users WHERE id = @user_id),
+        (SELECT TOP 1 stripe_customer_id FROM membresias
+         WHERE user_id = @user_id AND stripe_customer_id IS NOT NULL
+         ORDER BY fecha_creacion DESC)
+      ) AS stripe_customer_id
     `);
 
     const membership = membershipResult.recordset[0];
