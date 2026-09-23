@@ -115,11 +115,6 @@ export async function POST(req: NextRequest) {
       .input("mid", memb.id)
       .input("plan", plan.id)
       .query(`UPDATE membresias SET plan_id = @plan, fecha_actualizacion = GETDATE() WHERE id = @mid`);
-    await db
-      .request()
-      .input("uid", session.sub)
-      .input("plan", String(plan.id))
-      .query(`UPDATE users SET plan_type = @plan WHERE id = @uid`);
 
     return NextResponse.json({ ok: true, planId: plan.id });
   } catch (err) {

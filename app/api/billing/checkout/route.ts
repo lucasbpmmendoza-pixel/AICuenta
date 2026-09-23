@@ -117,6 +117,24 @@ export async function POST(req: NextRequest) {
         .query(`UPDATE users SET stripe_customer_id = @cust WHERE id = @id`);
     }
 
+    // 3.5 Segundo candado, contra Stripe directo: si el webhook se retraso o
+    // fallo, membresias puede no reflejar una suscripcion que ya se cobro.
+    const vivas = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+    if (
+      vivas.data.some((s) =>
+        ["active", "trialing", "past_due", "unpaid"].includes(s.status),
+      )
+    ) {
+      return NextResponse.json(
+        { error: "Ya tienes una suscripción activa", code: "already_subscribed" },
+        { status: 409 },
+      );
+    }
+
     // 4. Clientes antiguos (trial_elegible) obtienen 30 dias de prueba
     const trialDays = userRow.trial_elegible ? 30 : 0;
     const baseUrl = getAppBaseUrl();
@@ -125,8 +143,12 @@ export async function POST(req: NextRequest) {
       mode: "subscription",
       customer: customerId,
       line_items: [{ price: plan.stripe_price_id, quantity: 1 }],
-      subscription_data:
-        trialDays > 0 ? { trial_period_days: trialDays } : undefined,
+      // La metadata tambien va en la suscripcion para poder reconciliarla
+      // (y que eventos customer.subscription.* sepan a que usuario/plan van).
+      subscription_data: {
+        metadata: { userId: session.sub, planId: String(plan.id) },
+        ...(trialDays > 0 ? { trial_period_days: trialDays } : {}),
+      },
       success_url: `${baseUrl}/dashboard?checkout=success`,
       cancel_url: `${baseUrl}/dashboard?checkout=cancel`,
       metadata: {
