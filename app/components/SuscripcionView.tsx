@@ -221,7 +221,7 @@ export default function SuscripcionView() {
   function handleContactSales() {
     setMessage({
       ok: true,
-      text: 'Para el plan Corporativo un asesor te contactara. Escribenos a ventas@aicuenta.com con tu volumen de facturas por mes.',
+      text: 'Para el plan Corporativo un asesor te contactara. Escribenos a lucasbp.mmendoza@gmail.com o llamanos / mandanos WhatsApp al +52 1 656 313 8465 con tu volumen de facturas por mes.',
     })
   }
 
