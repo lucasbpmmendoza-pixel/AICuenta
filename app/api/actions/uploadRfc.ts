@@ -6,6 +6,7 @@ import { getDb } from '@/lib/db'
 import { uploadRfcFiles } from '@/lib/rfc-storage'
 import { extractRfcFromCer } from '@/lib/cer-rfc'
 import { isFreemiumOwner, FREEMIUM_FORBIDDEN_MESSAGE } from '@/lib/freemium'
+import { shareRfcWithTeam } from '@/lib/team-share'
 
 const RFC_SAFE = /^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i
 
@@ -23,6 +24,7 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
   const efiel  = (formData.get('efiel') as string | null)?.trim() ?? ''
   const cerFile = formData.get('cer')  as File | null
   const keyFile = formData.get('key')  as File | null
+  const shareTeam = formData.get('shareTeam') === '1'
 
   if (!rfc || !efiel) return { success: false, message: 'RFC y contraseña EFIEL son obligatorios.' }
   if (!RFC_SAFE.test(rfc)) return { success: false, message: 'RFC con formato inválido.' }
@@ -110,6 +112,17 @@ export async function uploadRfc(formData: FormData): Promise<{ success: boolean;
           INSERT (user_id, rfc, fiel, last_update)
           VALUES (@user_id, @rfc, @fiel, DATEFROMPARTS(YEAR(SYSUTCDATETIME()), 1, 1));
       `)
+
+    // "Dar acceso a todo mi equipo": asignar el RFC a todos los miembros actuales
+    if (shareTeam) {
+      const row = await db
+        .request()
+        .input('user_id', effectiveUserId)
+        .input('rfc',     rfc)
+        .query<{ id: string }>('SELECT id FROM EFIELES WHERE user_id = @user_id AND rfc = @rfc')
+      const efielId = row.recordset[0]?.id
+      if (efielId) await shareRfcWithTeam(db, effectiveUserId, efielId)
+    }
   } catch (err) {
     console.error('[uploadRfc] DB error:', (err as Error).message)
     // Archivos subidos correctamente; no bloqueamos al usuario

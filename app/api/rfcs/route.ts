@@ -44,6 +44,18 @@ export async function GET() {
       ) cli
     `;
 
+    // Cuantos miembros del equipo hay y cuantos tienen acceso a cada RFC, para
+    // el boton "Compartir con equipo" de la vista de RFCs (solo owner).
+    const TEAM_SHARE_APPLY = `
+      OUTER APPLY (
+        SELECT COUNT(*) AS team_total,
+               SUM(CASE WHEN mr.efiel_id IS NOT NULL THEN 1 ELSE 0 END) AS team_shared
+        FROM users u WITH (NOLOCK)
+        LEFT JOIN member_rfcs mr WITH (NOLOCK) ON mr.member_id = u.id AND mr.efiel_id = e.id
+        WHERE u.owner_id = e.user_id AND u.role = 'member'
+      ) team
+    `;
+
     // Miembros solo ven los RFCs que el owner les asignó explícitamente en member_rfcs
     if (session.role === "member") {
       const result = await db
@@ -91,13 +103,17 @@ export async function GET() {
         last_update: string;
         cfdis_5a: number;
         cliente_nombre: string | null;
+        team_total: number;
+        team_shared: number;
       }>(
         `SELECT e.id, e.rfc, e.alias, e.fiel, e.downloads_enabled, e.created_at, e.last_update,
                 ISNULL(c.cfdis_5a, 0) AS cfdis_5a,
-                cli.name AS cliente_nombre
+                cli.name AS cliente_nombre,
+                team.team_total, ISNULL(team.team_shared, 0) AS team_shared
          FROM EFIELES e
          ${CFDIS_5A_JOIN}
          ${CLIENTE_NAME_JOIN}
+         ${TEAM_SHARE_APPLY}
          WHERE e.user_id = @user_id
          ORDER BY e.created_at DESC`
       );
