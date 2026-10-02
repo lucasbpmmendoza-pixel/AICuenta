@@ -17,6 +17,9 @@ interface Rfc {
   created_at: string
   last_update: string
   cfdis_5a: number
+  // Solo vienen para el owner (ver /api/rfcs)
+  team_total?: number
+  team_shared?: number
 }
 
 // Cuota de CFDIs del plan (viene de /api/rfcs). Ver lib/cfdi-quota.ts.
@@ -63,10 +66,12 @@ function formatDate(iso: string) {
 // ── Inline RFC form ────────────────────────────────────────────
 function RfcForm({
   initial,
+  hasTeam,
   onSuccess,
   onCancel,
 }: {
   initial?: Rfc
+  hasTeam: boolean
   onSuccess: (msg: string) => void
   onCancel: () => void
 }) {
@@ -79,6 +84,7 @@ function RfcForm({
   const [loading, setLoading]   = useState(false)
   const [error,   setError]     = useState<string | null>(null)
   const [detectingRfc, setDetectingRfc] = useState(false)
+  const [shareTeam, setShareTeam] = useState(false)
 
   // Al elegir el .cer, lee el RFC del certificado y autocompleta el campo.
   // En edicion (initial) el RFC no cambia, asi que no autocompletamos.
@@ -109,6 +115,7 @@ function RfcForm({
     fd.append('efiel', efiel)
     if (cerFile) fd.append('cer', cerFile)
     if (keyFile) fd.append('key', keyFile)
+    if (shareTeam) fd.append('shareTeam', '1')
 
     const result = await uploadRfc(fd)
     setLoading(false)
@@ -187,6 +194,22 @@ function RfcForm({
         <DropZone label="Archivo .KEY" accept=".key" extension="key" file={keyFile} onFile={setKeyFile} />
       </div>
 
+      {/* Acceso del equipo (solo al registrar; en edicion se usa el boton de la lista) */}
+      {hasTeam && !initial && (
+        <label className="flex items-start gap-2.5 cursor-pointer select-none">
+          <input
+            type="checkbox" checked={shareTeam} onChange={(e) => setShareTeam(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-300 dark:border-zinc-600 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm text-slate-700 dark:text-zinc-300">
+            Dar acceso a todo mi equipo
+            <span className="block text-xs text-slate-400 dark:text-zinc-500">
+              Todos los miembros de tu cuenta podrán ver y trabajar este RFC.
+            </span>
+          </span>
+        </label>
+      )}
+
       {error && (
         <div className="rounded-lg bg-red-50 dark:bg-red-900/30 px-4 py-3 text-sm font-medium text-red-700 dark:text-red-300">
           {error}
@@ -225,6 +248,7 @@ export default function RFCsView({ readOnly = false }: Props) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [deletingId,      setDeletingId]      = useState<string | null>(null)
   const [togglingId,      setTogglingId]      = useState<string | null>(null)
+  const [sharingId,       setSharingId]       = useState<string | null>(null)
   const [search,          setSearch]          = useState('')
 
   async function load() {
@@ -259,6 +283,23 @@ export default function RFCsView({ readOnly = false }: Props) {
     finally { setTogglingId(null) }
   }
 
+  // Comparte el RFC con todos los miembros, o lo quita si ya lo tienen todos
+  async function handleShareTeam(rfc: Rfc) {
+    const allShared = (rfc.team_total ?? 0) > 0 && rfc.team_shared === rfc.team_total
+    setSharingId(rfc.id)
+    try {
+      const res = await fetch(`/api/rfcs/${rfc.id}/team`, { method: allShared ? 'DELETE' : 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setRfcs((prev) => prev.map((r) => r.id === rfc.id ? { ...r, team_total: data.team_total, team_shared: data.team_shared } : r))
+        flash(true, allShared ? `Tu equipo ya no tiene acceso a ${rfc.rfc}.` : `Todo tu equipo tiene acceso a ${rfc.rfc}.`)
+      } else {
+        flash(false, data.error ?? 'Error al actualizar')
+      }
+    } catch { flash(false, 'Error de red.') }
+    finally { setSharingId(null) }
+  }
+
   async function handleDelete(id: string) {
     if (confirmDeleteId !== id) { setConfirmDeleteId(id); return }
     setDeletingId(id)
@@ -274,6 +315,9 @@ export default function RFCsView({ readOnly = false }: Props) {
     } catch { flash(false, 'Error de red.') }
     finally { setDeletingId(null); setConfirmDeleteId(null) }
   }
+
+  // Cuantos miembros tiene el equipo (igual en todas las filas)
+  const teamTotal = rfcs[0]?.team_total ?? 0
 
   return (
     <div className="flex-1 flex flex-col">
@@ -358,6 +402,7 @@ export default function RFCsView({ readOnly = false }: Props) {
                 </p>
               </div>
               <RfcForm
+                hasTeam={teamTotal > 0}
                 onSuccess={(msg) => { flash(true, msg); setShowAdd(false); load() }}
                 onCancel={() => setShowAdd(false)}
               />
@@ -375,6 +420,7 @@ export default function RFCsView({ readOnly = false }: Props) {
               </div>
               <RfcForm
                 initial={editingRfc}
+                hasTeam={teamTotal > 0}
                 onSuccess={(msg) => { flash(true, msg); setEditingRfc(null); load() }}
                 onCancel={() => setEditingRfc(null)}
               />
@@ -453,6 +499,12 @@ export default function RFCsView({ readOnly = false }: Props) {
                           ].join(' ')}>
                             {r.downloads_enabled ? 'Descargas activas' : 'Descargas pausadas'}
                           </span>
+                          {/* Team access badge */}
+                          {!readOnly && teamTotal > 0 && (r.team_shared ?? 0) > 0 && (
+                            <span className="inline-flex items-center rounded-full bg-blue-50 dark:bg-blue-900/30 px-2 py-0.5 text-xs font-semibold text-blue-600 dark:text-blue-300">
+                              {r.team_shared === r.team_total ? 'Todo el equipo' : `Equipo ${r.team_shared}/${r.team_total}`}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-400 dark:text-zinc-500 mt-0.5">
                           Actualizado: {formatDate(r.last_update)} · Registrado: {formatDate(r.created_at)}
@@ -478,6 +530,26 @@ export default function RFCsView({ readOnly = false }: Props) {
                           >
                             {editingRfc?.id === r.id ? 'Cancelar edición' : 'Editar'}
                           </button>
+
+                          {/* Team access */}
+                          {teamTotal > 0 && (() => {
+                            const allShared = r.team_shared === r.team_total
+                            return (
+                              <button
+                                onClick={() => handleShareTeam(r)}
+                                disabled={sharingId === r.id}
+                                title={allShared ? 'Quitar el acceso a todos los miembros' : 'Dar acceso a todos los miembros de tu equipo'}
+                                className={[
+                                  'rounded-lg px-3 py-1.5 text-xs font-semibold border transition-colors disabled:opacity-50',
+                                  allShared
+                                    ? 'border-slate-200 dark:border-zinc-700 text-slate-500 dark:text-zinc-400 hover:bg-slate-50 dark:hover:bg-zinc-800'
+                                    : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20',
+                                ].join(' ')}
+                              >
+                                {sharingId === r.id ? '...' : allShared ? 'Quitar al equipo' : 'Compartir con equipo'}
+                              </button>
+                            )
+                          })()}
 
                           {/* Toggle downloads */}
                           <button
