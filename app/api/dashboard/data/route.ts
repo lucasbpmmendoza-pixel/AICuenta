@@ -7,6 +7,7 @@ import { getNominaDeduccionesColumn } from "@/lib/facturas-query";
 import { buildDemoDashboardData } from "@/lib/demo-data";
 import { isDemoSession } from "@/lib/demo-mode";
 import { isFreemiumOwner, currentMonthPeriod } from "@/lib/freemium";
+import { REGIMENES_SAT } from "@/lib/regimenes-sat";
 
 type IsrRegimenOption = {
   code: string;
@@ -19,26 +20,7 @@ type NominaDeduccionesParsed = {
   imss: number;
 };
 
-const ISR_REGIMENES: IsrRegimenOption[] = [
-  { code: "601", name: "General de Ley Personas Morales", rateHint: "30%" },
-  { code: "603", name: "Personas Morales con Fines no Lucrativos", rateHint: "0%" },
-  { code: "605", name: "Sueldos y Salarios e Ingresos Asimilados", rateHint: "0%" },
-  { code: "606", name: "Arrendamiento", rateHint: "20%" },
-  { code: "608", name: "Demás ingresos", rateHint: "30%" },
-  { code: "610", name: "Residentes en el Extranjero", rateHint: "30%" },
-  { code: "611", name: "Ingresos por Dividendos", rateHint: "10%" },
-  { code: "612", name: "Personas Físicas con Actividades Empresariales y Profesionales", rateHint: "30%" },
-  { code: "614", name: "Ingresos por intereses", rateHint: "10%" },
-  { code: "615", name: "Régimen de los ingresos por obtención de premios", rateHint: "10%" },
-  { code: "616", name: "Sin obligaciones fiscales", rateHint: "0%" },
-  { code: "620", name: "Sociedades Cooperativas de Produccion", rateHint: "30%" },
-  { code: "621", name: "Incorporacion Fiscal", rateHint: "10%" },
-  { code: "622", name: "Actividades Agricolas, Ganaderas, Silvicolas y Pesqueras", rateHint: "21%" },
-  { code: "623", name: "Opcional para Grupos de Sociedades", rateHint: "30%" },
-  { code: "624", name: "Coordinados", rateHint: "30%" },
-  { code: "625", name: "RESICO Personas Físicas", rateHint: "1% a 2.5%" },
-  { code: "626", name: "RESICO Personas Morales", rateHint: "1%" },
- ];
+const ISR_REGIMENES: IsrRegimenOption[] = REGIMENES_SAT;
 
 function n(v: unknown): number {
   const x = Number(v);
@@ -350,16 +332,16 @@ export async function GET(req: NextRequest) {
     // Estima ISR provisional mensual según régimen fiscal
     function estimarISR(reg: string, ing: number, util: number, retenido: number): number {
       switch (reg) {
-        // RESICO Personas Físicas — tasa progresiva sobre ingresos
+        // Plataformas Tecnológicas — la plataforma retiene el ISR
         case '625':
+          return retenido;
+        // Régimen Simplificado de Confianza (RESICO) — tasa progresiva sobre ingresos
+        case '626':
           if (ing <= 25_000)  return ing * 0.0100;
           if (ing <= 50_000)  return ing * 0.0110;
           if (ing <= 83_333)  return ing * 0.0150;
           if (ing <= 208_333) return ing * 0.0200;
           return ing * 0.0250;
-        // RESICO Personas Morales — 1 % sobre ingresos
-        case '626':
-          return ing * 0.01;
         // General Personas Morales — pago provisional ~30 % sobre ingresos
         // (Art. 14 LISR: ingresos acumulados × coeficiente utilidad × 30%;
         //  se usa 30% directo sobre ingresos como estimado conservador)

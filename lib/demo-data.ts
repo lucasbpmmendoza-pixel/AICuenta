@@ -225,9 +225,9 @@ export function buildDemoDashboardData(rfc: string, dateFrom: Date, dateTo: Date
       total: satEmitidos + satRecibidos,
     },
     isrRegimenes: [
-      { code: "601", name: "General de Ley Personas Morales", rateHint: "30%" },
-      { code: "612", name: "Personas Fisicas con Actividades Empresariales y Profesionales", rateHint: "30%" },
-      { code: "625", name: "RESICO Personas Fisicas", rateHint: "1% a 2.5%" },
+      { code: "601", name: "Régimen General de Ley Personas Morales", rateHint: "30%" },
+      { code: "612", name: "Régimen de las Personas Físicas con Actividades Empresariales y Profesionales", rateHint: "30%" },
+      { code: "626", name: "Régimen Simplificado de Confianza", rateHint: "1% a 2.5%" },
     ],
   };
 }

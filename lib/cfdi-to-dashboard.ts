@@ -5,37 +5,10 @@
 import type { CfdiRow } from './cfdi-xml'
 import type { DashboardData } from '@/app/components/DashboardCharts'
 
-// Etiquetas de régimen fiscal (SAT). Solo las más comunes; el resto cae a genérico.
-const REGIMEN_LABELS: Record<string, string> = {
-  '601': 'General de Ley Personas Morales',
-  '603': 'Personas Morales con Fines no Lucrativos',
-  '605': 'Sueldos y Salarios e Ingresos Asimilados a Salarios',
-  '606': 'Arrendamiento',
-  '607': 'Enajenación o Adquisición de Bienes',
-  '608': 'Demás ingresos',
-  '610': 'Residentes en el Extranjero sin Establecimiento Permanente',
-  '611': 'Ingresos por Dividendos (socios y accionistas)',
-  '612': 'Personas Físicas con Actividades Empresariales y Profesionales',
-  '614': 'Ingresos por intereses',
-  '615': 'Régimen de los ingresos por obtención de premios',
-  '616': 'Sin obligaciones fiscales',
-  '620': 'Sociedades Cooperativas de Producción',
-  '621': 'Incorporación Fiscal',
-  '622': 'Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras',
-  '623': 'Opcional para Grupos de Sociedades',
-  '624': 'Coordinados',
-  '625': 'RESICO Personas Físicas',
-  '626': 'Régimen Simplificado de Confianza',
-}
-
-// Tarifa de referencia por régimen (para el selector de ISR del dashboard).
-const REGIMEN_RATE_HINT: Record<string, string> = {
-  '601': '30%', '612': '30%', '606': '10%', '621': '10%',
-  '625': '1% a 2.5%', '626': '1%', '622': '21%',
-}
+import { findRegimenSat } from './regimenes-sat'
 
 function regimenLabel(code: string): string {
-  return REGIMEN_LABELS[code] ?? 'Provisional mensual'
+  return findRegimenSat(code)?.name ?? 'Provisional mensual'
 }
 
 function inPeriod(fecha: string, year: number, month: number): boolean {
@@ -122,12 +95,12 @@ export function buildDashboardFromCfdis(
   }
 
   // Lista de regímenes para el selector de ISR: el detectado primero + comunes.
-  const baseRegimenes = ['601', '612', '625']
+  const baseRegimenes = ['601', '612', '626']
   const codes = [regimenFiscal, ...baseRegimenes].filter((c, i, arr) => c && arr.indexOf(c) === i)
   const isrRegimenes = codes.map((code) => ({
     code,
     name: regimenLabel(code),
-    rateHint: REGIMEN_RATE_HINT[code] ?? '30%',
+    rateHint: findRegimenSat(code)?.rateHint ?? '30%',
   }))
 
   const round = (n: number) => Number(n.toFixed(2))
