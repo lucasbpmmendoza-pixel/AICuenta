@@ -15,7 +15,7 @@ import { rfcDisplay } from "@/lib/rfc-aliases";
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
 const MESES_ES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-const TIPOS = ["INGRESOS","GASTOS","GASTOS - NOMINA"] as const;
+const TIPOS = ["INGRESOS","GASTOS","GASTOS - NOMINA","NOMINA - INGRESO"] as const;
 type Tipo = typeof TIPOS[number];
 
 // Colors match sacarColor() in variablesEstaticas.js (pass 6-char hex; setFill prepends FF)
@@ -277,7 +277,7 @@ function plainHeaderRow(ws: ExcelJS.Worksheet, headers: string[]) {
 
 function sectionTitle(ws: ExcelJS.Worksheet, tipo: Tipo) {
   const bg = tipo === "INGRESOS" ? C.AZUL : tipo === "GASTOS" ? C.GRIS : C.VERDE;
-  const row = ws.addRow([tipo]);
+  const row = ws.addRow([tipo === "GASTOS - NOMINA" ? "NOMINA - GASTO" : tipo]);
   row.height = 20;
   const cell = row.getCell(1);
   cell.font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
@@ -449,7 +449,7 @@ export async function buildFacturasExport(
       let tipo: Tipo;
       if (row.TipoComprobante === "N") {
         // Nomina: emisor => egreso, receptor => ingreso.
-        tipo = mov === "INGRESO" ? "INGRESOS" : "GASTOS - NOMINA";
+        tipo = mov === "INGRESO" ? "NOMINA - INGRESO" : "GASTOS - NOMINA";
       }
       else if (mov === "INGRESO")        tipo = "INGRESOS";
       else if (mov === "EGRESO")         tipo = "GASTOS";
@@ -459,8 +459,8 @@ export async function buildFacturasExport(
       const mes   = mesKey(fecha);
 
       if (!buffers[mes]) {
-        totales[mes] = { INGRESOS: resetTotales(), GASTOS: resetTotales(), "GASTOS - NOMINA": resetTotales() };
-        buffers[mes] = { INGRESOS: [], GASTOS: [], "GASTOS - NOMINA": [] };
+        totales[mes] = { INGRESOS: resetTotales(), GASTOS: resetTotales(), "GASTOS - NOMINA": resetTotales(), "NOMINA - INGRESO": resetTotales() };
+        buffers[mes] = { INGRESOS: [], GASTOS: [], "GASTOS - NOMINA": [], "NOMINA - INGRESO": [] };
       }
 
       const dd   = String(fecha.getUTCDate()).padStart(2, "0");
