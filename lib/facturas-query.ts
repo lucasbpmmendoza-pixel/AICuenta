@@ -639,10 +639,22 @@ export async function fetchNombreEmpresa(rfc: string): Promise<string> {
     .request()
     .input("rfc", sql.NVarChar, rfc)
     .query<{ nombre: string }>(`
-      SELECT TOP 1 ISNULL(NULLIF(RazonSocialEmisor,''), @rfc) AS nombre
-      FROM facturalo_cfdis WITH (NOLOCK)
-      WHERE RFC_Emisor=@rfc
-      ORDER BY Fecha DESC
+      SELECT TOP 1 nombre FROM (
+        SELECT * FROM (
+          SELECT TOP 1 RazonSocialEmisor AS nombre, 1 AS prio
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Emisor=@rfc AND ISNULL(RazonSocialEmisor,'')<>''
+          ORDER BY Fecha DESC
+        ) e
+        UNION ALL
+        SELECT * FROM (
+          SELECT TOP 1 RazonSocialReceptor AS nombre, 2 AS prio
+          FROM facturalo_cfdis WITH (NOLOCK)
+          WHERE RFC_Receptor=@rfc AND ISNULL(RazonSocialReceptor,'')<>''
+          ORDER BY Fecha DESC
+        ) r
+      ) x
+      ORDER BY prio
     `);
   return r.recordset[0]?.nombre ?? rfc;
 }

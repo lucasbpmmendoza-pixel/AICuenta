@@ -24,7 +24,8 @@ const C = {
   AZUL:      "1F4E79",  // AZUL  — INGRESOS section title/totals, grand TOTAL INGRESOS
   GRIS:      "595959",  // GRIS  — GASTOS section title/totals, TOTAL GENERAL MES, grand TOTAL GASTOS
   VERDE:     "2E7D32",  // VERDE — NOMINA section title/totals
-  GRISCLARO: "E8E8E8",  // GRISCLARO — RFC group subtotals
+  GRISCLARO: "E8E8E8",  // GRISCLARO — RFC group subtotals, GASTOS rows in TOTALES sheet
+  AZULCLARO: "ADD8E6",  // AZULCLARO — INGRESOS rows in TOTALES sheet (como pato)
   AMARILLO:  "FFFF00",  // AMARILLO — Efectivo rows (FF+FFFF00 = FFFFFF00)
 };
 
@@ -334,6 +335,7 @@ function totalesMesRow(wsTot: ExcelJS.Worksheet, label: string, tipo: Tipo, t: T
   ]);
   row.eachCell({ includeEmpty: true }, (cell, ci) => {
     addBorder(cell);
+    setFill(cell, tipo === "INGRESOS" ? C.AZULCLARO : C.GRISCLARO);
     cell.alignment = { vertical: "middle", horizontal: ci <= 2 ? "left" : "right" };
     if (ci >= 3) cell.numFmt = MXN;
   });
