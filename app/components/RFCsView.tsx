@@ -5,6 +5,7 @@ import DropZone from './DropZone'
 import { uploadRfc } from '@/app/api/actions/uploadRfc'
 import { rfcAlias } from '@/lib/rfc-aliases'
 import { saveRegimenForRfc } from '@/lib/rfc-regimen-preference'
+import { REGIMENES_SAT } from '@/lib/regimenes-sat'
 import { useAuth } from './AuthProvider'
 import FreemiumUpsellModal from './FreemiumUpsellModal'
 
@@ -38,26 +39,7 @@ interface Props {
   readOnly?: boolean
 }
 
-const ISR_REGIMENES = [
-  { code: '601', name: 'General de Ley Personas Morales', rateHint: '30%' },
-  { code: '603', name: 'Personas Morales con Fines no Lucrativos', rateHint: '0%' },
-  { code: '605', name: 'Sueldos y Salarios e Ingresos Asimilados', rateHint: '0%' },
-  { code: '606', name: 'Arrendamiento', rateHint: '20%' },
-  { code: '608', name: 'Demás ingresos', rateHint: '30%' },
-  { code: '610', name: 'Residentes en el Extranjero', rateHint: '30%' },
-  { code: '611', name: 'Ingresos por Dividendos', rateHint: '10%' },
-  { code: '612', name: 'Personas Físicas con Actividades Empresariales y Profesionales', rateHint: '30%' },
-  { code: '614', name: 'Ingresos por intereses', rateHint: '10%' },
-  { code: '615', name: 'Régimen de los ingresos por obtención de premios', rateHint: '10%' },
-  { code: '616', name: 'Sin obligaciones fiscales', rateHint: '0%' },
-  { code: '620', name: 'Sociedades Cooperativas de Producción', rateHint: '30%' },
-  { code: '621', name: 'Incorporación Fiscal', rateHint: '10%' },
-  { code: '622', name: 'Actividades Agricolas, Ganaderas, Silvicolas y Pesqueras', rateHint: '21%' },
-  { code: '623', name: 'Opcional para Grupos de Sociedades', rateHint: '30%' },
-  { code: '624', name: 'Coordinados', rateHint: '30%' },
-  { code: '625', name: 'RESICO Personas Físicas', rateHint: '1% a 2.5%' },
-  { code: '626', name: 'RESICO Personas Morales', rateHint: '1%' },
-] as const
+const ISR_REGIMENES = REGIMENES_SAT
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })

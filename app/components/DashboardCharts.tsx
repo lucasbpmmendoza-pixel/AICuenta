@@ -67,13 +67,13 @@ function calcularIsrPorRegimen(regimen: string, ingresos: number, egresos: numbe
   const utilidad = Math.max(ingresos - egresos, 0)
   switch (regimen) {
     case '625':
+      return isrRetenido
+    case '626':
       if (ingresos <= 25000) return ingresos * 0.01
       if (ingresos <= 50000) return ingresos * 0.011
       if (ingresos <= 83333) return ingresos * 0.015
       if (ingresos <= 208333) return ingresos * 0.02
       return ingresos * 0.025
-    case '626':
-      return ingresos * 0.01
     case '601':
       return ingresos * 0.30
     case '612':
@@ -85,6 +85,7 @@ function calcularIsrPorRegimen(regimen: string, ingresos: number, egresos: numbe
     case '603':
     case '605':
     case '616':
+    case '619':
       return 0
     case '611':
     case '614':
@@ -97,6 +98,13 @@ function calcularIsrPorRegimen(regimen: string, ingresos: number, egresos: numbe
     case '608':
     case '610':
     case '620':
+    case '602':
+    case '604':
+    case '607':
+    case '609':
+    case '613':
+    case '617':
+    case '618':
       return ingresos * 0.30
     default:
       return (isrRetenido > 0 ? Math.max(ingresos * 0.10, isrRetenido) : utilidad * 0.30) || 0
